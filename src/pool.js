@@ -54,7 +54,28 @@ export class PoolGame{
  canAim(){return this.canControl()&&!this.ballInHand}
  takeShot(){if(!this.canAim()||!this.aiming)return;if(this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
  startShot(){this.placed=false;this.potted=[];this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
- receive(m){if(m.t==='table'&&!this.host){this.onTable?.(m);return}if(m.t==='next-rack'&&this.host){this.newRack();return}if(m.t==='state'&&!this.host){const freshRound=m.round>this.round;this.balls=m.b.map(x=>({x:x[0],y:x[1],on:x[2],k:x[3],n:x[4],vx:0,vy:0,wx:0,wy:0,wz:0}));this.turn=m.turn;this.phase=m.phase;this.over=m.over;this.round=m.round;if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}this.groups=m.groups||this.groups;this.breakShot=!!m.breakShot;this.ballInHand=!!m.ballInHand;if(this.ballInHand)this.placed=false;this.calledPocket=m.calledPocket;if(!this.canCallEight())this.calledPocket=null;if(m.result&&!this.finished){this.finished=true;this.onFinish({winner:m.result,round:m.round})}}else if(m.t==='shot'&&this.host&&this.turn==='b'&&this.phase==='aim'){if(m.place&&this.validCueSpot({x:m.place[0],y:m.place[1]})){this.balls[0].x=m.place[0];this.balls[0].y=m.place[1];this.ballInHand=false}this.calledPocket=this.canCallEight()?(m.called??null):null;this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)}}
+ receive(m){
+  if(m.t==='table'&&!this.host)return this.onTable?.(m)
+  if(m.t==='next-rack'&&this.host)return this.newRack()
+  if(m.t==='state'&&!this.host)return this.receiveState(m)
+  if(m.t==='shot'&&this.host&&this.turn==='b'&&this.phase==='aim')this.receiveShot(m)
+ }
+ receiveState(m){
+  const freshRound=m.round>this.round
+  this.balls=m.b.map(x=>({x:x[0],y:x[1],on:x[2],k:x[3],n:x[4],vx:0,vy:0,wx:0,wy:0,wz:0}))
+  this.turn=m.turn;this.phase=m.phase;this.over=m.over;this.round=m.round
+  if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}
+  this.groups=m.groups||this.groups;this.breakShot=!!m.breakShot;this.ballInHand=!!m.ballInHand
+  if(this.ballInHand)this.placed=false
+  this.calledPocket=m.calledPocket
+  if(!this.canCallEight())this.calledPocket=null
+  if(m.result&&!this.finished){this.finished=true;this.onFinish({winner:m.result,round:m.round})}
+ }
+ receiveShot(m){
+  if(m.place&&this.validCueSpot({x:m.place[0],y:m.place[1]})){this.balls[0].x=m.place[0];this.balls[0].y=m.place[1];this.ballInHand=false}
+  this.calledPocket=this.canCallEight()?(m.called??null):null
+  this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
+ }
  sync(){if(this.host)this.send({t:'state',b:this.balls.map(b=>[Math.round(b.x),Math.round(b.y),b.on,b.k,b.n]),turn:this.turn,phase:this.phase,over:this.over,result:this.result||'',round:this.round,groups:this.groups,breakShot:this.breakShot,ballInHand:this.ballInHand,calledPocket:this.calledPocket})}
  sub(dt){
   for(const b of this.balls){
