@@ -39,7 +39,8 @@ export function detectEvents(prev,balls){
 export const snapshot=balls=>balls.map(b=>({x:b.x,y:b.y,on:b.on}))
 
 export function createSfx(){
- let ctx=null,master=null,noise=null,enabled=true
+ let ctx=null,master=null,noise=null,enabled=true,haptics=true,lastBuzz=0
+ const buzz=(ms,level=1)=>{if(!haptics||typeof navigator==='undefined'||!navigator.vibrate)return;const now=performance.now();if(now-lastBuzz<55)return;lastBuzz=now;try{navigator.vibrate(Math.round(ms*level))}catch{}}
  // The context can only start from a user gesture, so it is built on demand.
  function audio(){
   if(ctx)return ctx
@@ -90,15 +91,19 @@ export function createSfx(){
  }
  let prev=null
  return {
-  get enabled(){return enabled},
+  get enabled(){return enabled},get haptics(){return haptics},
   setEnabled(v){enabled=v;if(!v&&ctx)master.gain.value=0;else if(ctx)master.gain.value=.5},
+  setHaptics(v){haptics=!!v},
   // Called from a user gesture so the context is allowed to start.
   resume(){try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
-  cue(v){if(!enabled||!audio()||ctx.state!=='running')return;try{play.cue(v)}catch{}},
+  cue(v){buzz(7,.7+v*.45);if(!enabled||!audio()||ctx.state!=='running')return;try{play.cue(v)}catch{}},
   update(balls){
-   const events=enabled?detectEvents(prev,balls):[]
+   const events=(enabled||haptics)?detectEvents(prev,balls):[]
    prev=snapshot(balls)
-   if(!events.length||!enabled||!audio()||ctx.state!=='running')return
+   if(!events.length)return
+   const strongest=events.reduce((a,e)=>e.t==='pocket'?e:(a?.t==='pocket'?a:(!a||e.v>a.v?e:a)),null)
+   if(strongest)buzz(strongest.t==='pocket'?15:strongest.t==='rail'?6:4,strongest.t==='pocket'?1:.7)
+   if(!enabled||!audio()||ctx.state!=='running')return
    // a break fires dozens at once; play the loudest few so it stays a crack
    // rather than a wall of noise
    events.sort((a,b)=>b.v-a.v)

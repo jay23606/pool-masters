@@ -5,6 +5,8 @@ import {rayToRail} from './pool.js'
 // same {x,y,vx,vy,on,k,n} balls the 2D renderer does and never writes to them,
 // so physics and the network protocol are untouched.
 const CLOTH='#15794a',CUSHION='#0f6038',WOOD='#472616',WOOD_DARK='#2c180e'
+const MOODS={hall:{bg:'#07110d',key:'#fff3dc',rim:'#9fd8ff'},warm:{bg:'#1a100c',key:'#ffe0a8',rim:'#d99b62'},cool:{bg:'#07131d',key:'#d9ebff',rim:'#70b9ff'}}
+const CUES={classic:{shaft:'#e6d6ab',butt:'#4a2a18',tip:'#4e8fa6'},ebony:{shaft:'#d8c49e',butt:'#171414',tip:'#d9b35d'},midnight:{shaft:'#c7d0d7',butt:'#102b52',tip:'#71c4e9'}}
 const tx=x=>x-W/2, tz=y=>y-H/2   // table coords -> world (y is up)
 
 // Bake a pool-ball skin into a sphere-UV texture, once per ball.
@@ -52,8 +54,8 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  renderer.toneMapping=THREE.ACESFilmicToneMapping
  renderer.toneMappingExposure=.92
 
- const scene=new THREE.Scene()
- scene.background=new THREE.Color('#07110d')
+ const scene=new THREE.Scene(),mood=MOODS[options.lighting]||MOODS.hall,cueStyle=CUES[options.cue]||CUES.classic
+ scene.background=new THREE.Color(mood.bg)
  const pmrem=new THREE.PMREMGenerator(renderer)
  scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture
  scene.environmentIntensity=.22
@@ -75,7 +77,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  // a pool-hall pendant: one shadow-casting spot straight over the table
  // inverse-square falloff so the cloth is brightest at centre and rolls off
  // toward the cushions, the way a low pendant over a table actually reads
- const key=new THREE.SpotLight('#fff3dc',1.9e6,1600,.8,.55,2)
+ const key=new THREE.SpotLight(mood.key,1.9e6,1600,.8,.55,2)
  // deliberately off-axis: a light straight overhead hides every ball's shadow
  // underneath it, which reads as flat from this camera
  key.position.set(-300,430,-150);key.target.position.set(20,0,40);key.castShadow=true
@@ -83,7 +85,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  key.shadow.camera.near=120;key.shadow.camera.far=900
  key.shadow.bias=-.0009;key.shadow.normalBias=.9;key.shadow.focus=1
  scene.add(key,key.target)
- const rim=new THREE.DirectionalLight('#9fd8ff',.28);rim.position.set(360,260,-300);scene.add(rim)
+ const rim=new THREE.DirectionalLight(mood.rim,.28);rim.position.set(360,260,-300);scene.add(rim)
  const front=new THREE.DirectionalLight('#ffe9c4',.18);front.position.set(-220,380,420);scene.add(front)
 
  const std=(color,roughness,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness})
@@ -134,9 +136,9 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  ghost.renderOrder=4;ghost.visible=false;scene.add(ghost)
 
  const cue=new THREE.Group()
- {const shaft=new THREE.Mesh(new THREE.CylinderGeometry(2.6,4.4,200,18),std('#e6d6ab',.5))
-  const butt=new THREE.Mesh(new THREE.CylinderGeometry(4.4,5.6,140,18),std('#4a2a18',.35))
-  const tip=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.6,5,16),std('#4e8fa6',.7))
+ {const shaft=new THREE.Mesh(new THREE.CylinderGeometry(2.6,4.4,200,18),std(cueStyle.shaft,.5))
+  const butt=new THREE.Mesh(new THREE.CylinderGeometry(4.4,5.6,140,18),std(cueStyle.butt,.35))
+  const tip=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.6,5,16),std(cueStyle.tip,.7))
   shaft.rotation.z=butt.rotation.z=tip.rotation.z=Math.PI/2
   tip.position.x=2.5;shaft.position.x=-100;butt.position.x=-270
   ;[shaft,butt,tip].forEach(m=>{m.castShadow=true;cue.add(m)})

@@ -20,11 +20,12 @@ const VIEWS=['top','3d','2d'],VIEW_LABEL={top:'TOP','3d':'3D','2d':'2D'}
 const stored=localStorage.getItem('pool-masters:table-view')
 const sfx=createSfx()
 sfx.setEnabled(localStorage.getItem('pool-masters:muted')!=='1')
+sfx.setHaptics(localStorage.getItem('pool-masters:haptics')!=='0')
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>sfx.resume(),{once:true})
 const view={mode:VIEWS.includes(stored)?stored:'top',renderer:null,switching:false}
 const FELTS={green:'#17794b',blue:'#176c88',burgundy:'#712e3c',charcoal:'#34443d'}
-const tablePrefs={size:Number(localStorage.getItem('pool-masters:table-size'))||7,felt:localStorage.getItem('pool-masters:felt')||FELTS.green}
+const tablePrefs={size:Number(localStorage.getItem('pool-masters:table-size'))||7,felt:localStorage.getItem('pool-masters:felt')||FELTS.green,cue:localStorage.getItem('pool-masters:cue')||'classic',lighting:localStorage.getItem('pool-masters:lighting')||'hall'}
 if(!TABLE_SIZES[tablePrefs.size])tablePrefs.size=7
 setTableSize(tablePrefs.size)
 
@@ -36,6 +37,7 @@ document.querySelector('#app').innerHTML=`
 </main><dialog id="name-dialog"><form method="dialog"><h2>Choose your name</h2><p>This device remembers you. You can change it anytime.</p><input id="name" maxlength="24" placeholder="Pool player" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-name" value="default" class="primary">Continue</button></div></form></dialog><dialog id="room-dialog"><form method="dialog"><h2>Name this table</h2><p>Players will see this name in the open-table list.</p><input id="room-name" maxlength="48" placeholder="Friday night pool" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-room-name" value="default" class="primary">Save</button></div></form></dialog><div id="toast"></div>`
 $('.view-buttons').insertAdjacentHTML('afterbegin','<button id="table-settings" class="view-toggle" title="Table size and felt">TABLE</button>')
 document.body.insertAdjacentHTML('beforeend','<dialog id="table-dialog"><form method="dialog"><h2>Set up the table</h2><p>Table size changes the ball-to-table proportion. Changing it starts a fresh rack.</p><label>Table size <select id="table-size"><option value="7">7 ft · bar</option><option value="8">8 ft · home</option><option value="9">9 ft · league</option></select></label><label>Felt <select id="felt"><option value="green">Classic green</option><option value="blue">Tournament blue</option><option value="burgundy">Burgundy</option><option value="charcoal">Charcoal</option></select></label><div><button value="cancel" class="ghost">Cancel</button><button id="save-table" value="default" class="primary">Apply</button></div></form></dialog>')
+$('#table-dialog form').insertAdjacentHTML('beforeend','<label>Cue finish <select id="cue-finish"><option value="classic">Classic maple</option><option value="ebony">Ebony</option><option value="midnight">Midnight blue</option></select></label><label>Room lighting <select id="lighting"><option value="hall">Pool hall</option><option value="warm">Warm lounge</option><option value="cool">Cool arena</option></select></label><label><input id="haptics" type="checkbox"> Haptic feedback</label>')
 
 // The renderer is swappable at any time: the game owns the simulation, the
 // renderer only draws it and maps pointer events back to table coordinates.
@@ -104,8 +106,8 @@ function bind(){
  $('#save-room-name').onclick=async e=>{e.preventDefault();const name=$('#room-name').value.trim().slice(0,48);if(!name||!state.room?.isHost)return;try{await state.room.update({name});$('#room-label').textContent=name;$('#room-dialog').close();toast('Table name saved')}catch(err){toast(err.message||'Could not rename table')}}
  $('#next-rack').onclick=()=>{if(state.mode==='practice'){state.game?.newRack();$('#next-rack').hidden=true}}
  $('#focus-table').onclick=()=>{const focused=$('#game').classList.toggle('focus');$('#focus-table').textContent=focused?'Show chat':'Focus table';view.renderer?.resize()}
- $('#table-settings').onclick=()=>{$('#table-size').value=tablePrefs.size;$('#felt').value=Object.entries(FELTS).find(([,v])=>v===tablePrefs.felt)?.[0]||'green';$('#table-dialog').showModal()}
- $('#save-table').onclick=async e=>{e.preventDefault();await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value]);$('#table-dialog').close()}
+ $('#table-settings').onclick=()=>{$('#table-size').value=tablePrefs.size;$('#felt').value=Object.entries(FELTS).find(([,v])=>v===tablePrefs.felt)?.[0]||'green';$('#cue-finish').value=tablePrefs.cue;$('#lighting').value=tablePrefs.lighting;$('#haptics').checked=sfx.haptics;$('#table-dialog').showModal()}
+ $('#save-table').onclick=async e=>{e.preventDefault();tablePrefs.cue=$('#cue-finish').value;tablePrefs.lighting=$('#lighting').value;localStorage.setItem('pool-masters:cue',tablePrefs.cue);localStorage.setItem('pool-masters:lighting',tablePrefs.lighting);sfx.setHaptics($('#haptics').checked);localStorage.setItem('pool-masters:haptics',sfx.haptics?'1':'0');await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value]);$('#table-dialog').close()}
  const paintSfx=()=>{$('#mute-sfx').textContent=sfx.enabled?'♪':'✕';$('#mute-sfx').classList.toggle('on',sfx.enabled)}
  $('#mute-sfx').onclick=()=>{sfx.setEnabled(!sfx.enabled);localStorage.setItem('pool-masters:muted',sfx.enabled?'0':'1');paintSfx()}
  paintSfx()
