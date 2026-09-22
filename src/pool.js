@@ -7,10 +7,12 @@ export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<boun
 // Measured from the collision model: throw rises with the cut angle and then
 // saturates once ball-on-ball friction is fully mobilised, at about 3.4 degrees.
 const THROW_MAX=.06,THROW_K=.155
+const STEP=1/120       // fixed simulation step, so frame pacing cannot change a shot
+const CATCHUP=3        // never make up more than this much time in one go
 const kind=n=>n===8?'eight':n<8?'solid':'stripe',other=t=>t==='a'?'b':'a',shuffle=a=>a.sort(()=>Math.random()-.5)
 function rack(){const nums=shuffle([...Array(7)].map((_,i)=>i+1).concat([...Array(7)].map((_,i)=>i+9))),a=[{x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}];nums.splice(4,0,8);let q=0;for(let row=0;row<5;row++)for(let i=0;i<=row;i++){const n=nums[q++];a.push({x:420+row*15.66,y:190+(i-row/2)*18,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})}return a}
 export class PoolGame{
- constructor(o){Object.assign(this,o);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.last=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.practice)this.sync()}
+ constructor(o){Object.assign(this,o);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
  resetRack(){this.balls=rack();this.turn='a';this.phase='aim';this.over=false;this.result='';this.finished=false;this.aiming=false;this.groups={a:null,b:null};this.breakShot=true;this.calledPocket=null;this.ballInHand=false;this.placed=false;this.setSpin(0,0)}
  bind(){this.handlers={power:()=>this.powerOut.textContent=this.power.value+'%',down:e=>{if(!this.canControl())return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(this.ballInHand){if(!this.validCueSpot(p))return;cue.x=p.x;cue.y=p.y;this.ballInHand=false;this.placed=true;this.pendingPlace=[p.x,p.y];this.flash('Ball in hand placed · tap again to aim');return}if(this.canCallEight()&&this.calledPocket==null){this.calledPocket=this.nearestPocket(p);this.flash('8-ball pocket marked · tap again to aim');return}const pa=Math.atan2(p.y-cue.y,p.x-cue.x);if(!this.aiming)this.angle=pa;this.aiming=true;this.drag=true;this.pointerAngle=pa;this.surface.setPointerCapture?.(e.pointerId)},move:e=>{if(!this.drag)return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(Math.hypot(p.x-cue.x,p.y-cue.y)<5)return;const a=Math.atan2(p.y-cue.y,p.x-cue.x);this.angle=aimStep(this.angle,this.pointerAngle,a);this.pointerAngle=a},up:e=>{this.handlers.move(e);this.drag=false;this.surface.releasePointerCapture?.(e.pointerId)},shoot:()=>this.takeShot(),
    // Both of these are one tap away from being set wrong by accident, so
@@ -219,17 +221,42 @@ export class PoolGame{
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
   if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`}
- loop(t){const dt=Math.min(.033,(t-this.last)/1000||0);this.last=t
-  if(this.host&&this.phase==='roll'){
-   const n=substeps(this.balls,dt)
-   for(let i=0;i<n;i++)this.sub(dt/n)
-   if(t-(this.sent||0)>40){this.sent=t;this.sync()}
-   if(this.balls.every(b=>!b.on||atRest(b)))this.resolve()
+ // The simulation is no longer paced by the animation frame. Browsers stop or
+ // heavily throttle requestAnimationFrame in a hidden tab, and since the host
+ // simulates for both players, a host who switched tabs froze the game for
+ // their opponent as well. The physics now advances in fixed steps against the
+ // wall clock, and a timer keeps it moving while hidden -- coarsely, because
+ // timers are throttled too, but moving. Fixed steps also mean a shot plays out
+ // identically however the frames happen to fall.
+ advance(now){
+  let dt=(now-(this.simAt??now))/1000
+  this.simAt=now
+  if(!(dt>0))return 0
+  dt=Math.min(dt,CATCHUP)
+  if(!(this.host&&this.phase==='roll')){this.acc=0;return 0}
+  this.acc=(this.acc||0)+dt
+  let stepped=0
+  while(this.acc>=STEP&&this.phase==='roll'){
+   const n=substeps(this.balls,STEP)
+   for(let i=0;i<n;i++)this.sub(STEP/n)
+   this.acc-=STEP;stepped+=STEP
+   if(this.balls.every(b=>!b.on||atRest(b))){this.resolve();break}
   }
-  this.sfx?.update(this.balls)
-  this.draw(dt);this.raf=requestAnimationFrame(x=>this.loop(x))}
+  if(stepped&&now-(this.sent||0)>40){this.sent=now;this.sync()}
+  return stepped
+ }
+ loop(t){
+  const now=performance.now()
+  const frameDt=Math.min(.05,(now-(this.drawnAt??now))/1000)
+  this.drawnAt=now
+  const stepped=this.advance(now)
+  // after a long catch-up the balls jump, and a jump reads as a collision
+  if(stepped<.1)this.sfx?.update(this.balls)
+  this.draw(frameDt)
+  this.raf=requestAnimationFrame(x=>this.loop(x))
+ }
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}
- destroy(){cancelAnimationFrame(this.raf);clearTimeout(this.ft);this.power.removeEventListener('input',this.handlers.power);this.surface.removeEventListener('pointerdown',this.handlers.down);this.surface.removeEventListener('pointermove',this.handlers.move);this.surface.removeEventListener('pointerup',this.handlers.up);this.shoot.removeEventListener('click',this.handlers.shoot)
+ destroy(){cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.power.removeEventListener('input',this.handlers.power);this.surface.removeEventListener('pointerdown',this.handlers.down);this.surface.removeEventListener('pointermove',this.handlers.move);this.surface.removeEventListener('pointerup',this.handlers.up);this.shoot.removeEventListener('click',this.handlers.shoot)
   this.moveCue?.removeEventListener('click',this.handlers.moveCue)
   this.changePocket?.removeEventListener('click',this.handlers.changePocket)
   if(this.spinPad){this.spinPad.removeEventListener('pointerdown',this.handlers.spinDown);this.spinPad.removeEventListener('pointermove',this.handlers.spinMove);this.spinPad.removeEventListener('pointerup',this.handlers.spinUp);this.spinPad.removeEventListener('dblclick',this.handlers.spinReset)}}
