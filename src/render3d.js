@@ -11,7 +11,7 @@ const tx=x=>x-W/2, tz=y=>y-H/2   // table coords -> world (y is up)
 // The two number discs sit on the UV poles, so the digits are pre-warped into
 // polar coordinates to come out round and upright on the sphere.
 function ballTexture(THREE,kind,n){
- const TW=512,TH=256,cap=.12,c=document.createElement('canvas');c.width=TW;c.height=TH
+ const TW=512,TH=256,cap=.085,c=document.createElement('canvas');c.width=TW;c.height=TH
  const g=c.getContext('2d'),white='#f7f4e9',col=COLORS[n]
  if(kind==='cue'){g.fillStyle='#f2efe4';g.fillRect(0,0,TW,TH);g.fillStyle='#b83232';for(const[u,v]of[[.25,.5],[.75,.5],[.5,.28],[.0,.72]]){g.beginPath();g.arc(u*TW,v*TH,9,0,7);g.fill()}}
  else{

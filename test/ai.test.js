@@ -147,3 +147,24 @@ test('when snookered the AI finds an angle that legally makes contact',()=>{
  assert.ok(hit,'the escape should make contact')
  assert.equal(hit.k,'stripe','and it should be a legal ball')
 })
+
+test('the eight is refused while you still have balls, and the game says why',()=>{
+ const balls=[ball(120,190,'cue',0),ball(400,60,'stripe',9),ball(430,330,'stripe',10),
+              ball(500,260,'eight',8)]
+ const g=table(balls,'stripe')
+ Object.assign(g,{turn:'a',me:'a',ready:true,groups:{a:'stripe',b:'solid'}})
+ assert.equal(g.canCallEight(),false,'two stripes are still up')
+ assert.equal(g.eightBlocked(),2,'and the game should know it is two')
+ // line up on the eight anyway
+ g.aiming=true
+ g.angle=Math.atan2(260-190,500-120)
+ assert.equal(g.guide().hit.k,'eight','this aim really is at the eight')
+ assert.equal(g.aimingAtEight(),true,'which the HUD needs to notice')
+})
+
+test('once the group is cleared the eight is callable again',()=>{
+ const g=table([ball(120,190,'cue',0),ball(600,120,'solid',3),ball(500,260,'eight',8)],'stripe')
+ Object.assign(g,{turn:'a',me:'a',ready:true,groups:{a:'stripe',b:'solid'}})
+ assert.equal(g.eightBlocked(),0)
+ assert.equal(g.canCallEight(),true)
+})
