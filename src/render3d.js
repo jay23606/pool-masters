@@ -41,7 +41,7 @@ function ballTexture(THREE,kind,n){
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t
 }
 
-export async function createRenderer3D(canvas,camera3d='top'){
+export async function createRenderer3D(canvas,camera3d='top',options={}){
  const THREE=await import('three')
  const {RoomEnvironment}=await import('three/examples/jsm/environments/RoomEnvironment.js')
 
@@ -98,7 +98,7 @@ export async function createRenderer3D(canvas,camera3d='top'){
   ng.putImageData(img,0,0)}
  const clothBump=new THREE.CanvasTexture(noise)
  clothBump.wrapS=clothBump.wrapT=THREE.RepeatWrapping;clothBump.repeat.set(70,38)
- const clothMat=new THREE.MeshStandardMaterial({color:CLOTH,roughness:.99,bumpMap:clothBump,bumpScale:1.5})
+ const clothMat=new THREE.MeshStandardMaterial({color:options.felt||CLOTH,roughness:.99,bumpMap:clothBump,bumpScale:1.5})
  const cushionMat=std(CUSHION,.95),woodMat=std(WOOD,.45),apronMat=std(WOOD_DARK,.6)
  const cloth=box(W,6,H,clothMat,0,-3,0);cloth.receiveShadow=true
  box(768,36,448,apronMat,0,-24,0)
@@ -178,6 +178,7 @@ export async function createRenderer3D(canvas,camera3d='top'){
   // swapping between the two 3D cameras must not rebuild the scene: the ball
   // textures are baked once and are by far the most expensive thing here
   setCamera(m){cam=CAMS[m]||CAMS.top;frame()},
+  setFelt(color){clothMat.color.set(color)},
   point(e){
    const r=canvas.getBoundingClientRect()
    ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1))

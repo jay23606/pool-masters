@@ -4,6 +4,7 @@ import { createFoyer } from '@jay23606/foyer'
 import { PoolGame } from './pool.js'
 import { createRenderer2D } from './render2d.js'
 import { createSfx } from './sfx.js'
+import { TABLE_SIZES,setTableSize } from './table.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
@@ -22,6 +23,10 @@ sfx.setEnabled(localStorage.getItem('pool-masters:muted')!=='1')
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>sfx.resume(),{once:true})
 const view={mode:VIEWS.includes(stored)?stored:'top',renderer:null,switching:false}
+const FELTS={green:'#17794b',blue:'#176c88',burgundy:'#712e3c',charcoal:'#34443d'}
+const tablePrefs={size:Number(localStorage.getItem('pool-masters:table-size'))||7,felt:localStorage.getItem('pool-masters:felt')||FELTS.green}
+if(!TABLE_SIZES[tablePrefs.size])tablePrefs.size=7
+setTableSize(tablePrefs.size)
 
 document.querySelector('#app').innerHTML=`
 <header><button class="brand" id="home">● Pool Masters</button><div class="identity"><span id="mini-rating"></span><button id="edit-name" class="ghost"></button></div></header>
@@ -29,16 +34,26 @@ document.querySelector('#app').innerHTML=`
  <section id="lobby" class="screen active"><div class="hero"><p class="eyebrow">THE TABLE IS OPEN</p><h1>Rack up.<br><em>Play anyone.</em></h1><p>Instant rooms, live chat, and calls. No account required.</p><div class="actions"><button id="quick" class="primary">Find a game</button><button id="practice">Practice vs AI</button></div><div class="join"><input id="code" maxlength="5" placeholder="ROOM CODE"><button id="join">Join</button></div></div><div class="lobby-side"><div class="panel"><div class="panel-title"><h2>Open tables</h2><button id="refresh" class="icon">↻</button></div><div id="rooms" class="room-list"></div><button id="create" class="wide">+ Create a private table</button></div><div class="panel leaderboard"><h2>League leaders</h2><div id="leaders"></div></div></div></section>
  <section id="game" class="screen"><div class="game-top"><div><button id="leave" class="ghost">← Leave room</button><span id="room-label"></span><button id="rename-room" class="ghost" hidden>Rename</button></div><div class="call-actions"><button id="focus-table" class="ghost">Focus table</button><button id="copy" class="ghost">Copy invite</button><button id="call">Start call</button></div></div><div class="play-layout"><div class="table-card"><div id="versus"></div><div class="table-bar"><div id="groups"></div><div class="view-buttons"><button id="mute-sfx" class="view-toggle sfx-toggle" title="Table sound"></button><button id="view-3d" class="view-toggle" title="Switch table view: top-down 3D, angled 3D, flat 2D">TOP</button></div></div><div class="canvas-wrap"><canvas id="table" width="700" height="380"></canvas><canvas id="table3d" hidden></canvas><div id="callout"></div></div><div class="shot-controls"><div id="spin" class="spin" title="Cue tip contact point. Drag for draw, follow and English; double-click to centre."><i></i></div><label>Power <input id="power" type="range" min="1" max="100" value="45"><output>45%</output></label><button id="shoot" class="primary" disabled>Shoot</button><button id="next-rack" hidden>Next rack</button><button id="move-cue" class="redo" hidden>Move cue ball</button><button id="change-pocket" class="redo" hidden>Change 8-ball pocket</button></div><div id="game-status"></div><div id="practice-record" hidden></div></div><aside id="room-sidebar"><div id="video-panel"><video id="remote-video" autoplay playsinline></video><video id="local-video" autoplay playsinline muted></video><div class="media-controls"><button id="mute">Mic</button><button id="camera">Camera</button></div></div><div class="chat"><div id="messages"></div><form id="chat-form"><input id="message" maxlength="500" autocomplete="off" placeholder="Message the room"><button>Send</button></form></div></aside></div></section>
 </main><dialog id="name-dialog"><form method="dialog"><h2>Choose your name</h2><p>This device remembers you. You can change it anytime.</p><input id="name" maxlength="24" placeholder="Pool player" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-name" value="default" class="primary">Continue</button></div></form></dialog><dialog id="room-dialog"><form method="dialog"><h2>Name this table</h2><p>Players will see this name in the open-table list.</p><input id="room-name" maxlength="48" placeholder="Friday night pool" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-room-name" value="default" class="primary">Save</button></div></form></dialog><div id="toast"></div>`
+$('.view-buttons').insertAdjacentHTML('afterbegin','<button id="table-settings" class="view-toggle" title="Table size and felt">TABLE</button>')
+document.body.insertAdjacentHTML('beforeend','<dialog id="table-dialog"><form method="dialog"><h2>Set up the table</h2><p>Table size changes the ball-to-table proportion. Changing it starts a fresh rack.</p><label>Table size <select id="table-size"><option value="7">7 ft · bar</option><option value="8">8 ft · home</option><option value="9">9 ft · league</option></select></label><label>Felt <select id="felt"><option value="green">Classic green</option><option value="blue">Tournament blue</option><option value="burgundy">Burgundy</option><option value="charcoal">Charcoal</option></select></label><div><button value="cancel" class="ghost">Cancel</button><button id="save-table" value="default" class="primary">Apply</button></div></form></dialog>')
 
 // The renderer is swappable at any time: the game owns the simulation, the
 // renderer only draws it and maps pointer events back to table coordinates.
 const cameraFor=m=>m==='3d'?'angled':'top'
 async function buildRenderer(){
  if(view.mode!=='2d'){
-  try{const{createRenderer3D}=await import('./render3d.js');return await createRenderer3D($('#table3d'),cameraFor(view.mode))}
+  try{const{createRenderer3D}=await import('./render3d.js');return await createRenderer3D($('#table3d'),cameraFor(view.mode),tablePrefs)}
   catch(e){console.warn('3D renderer unavailable',e);view.mode='2d';toast('3D is unavailable on this device')}
  }
- return createRenderer2D($('#table'))
+ return createRenderer2D($('#table'),tablePrefs)
+}
+async function rebuildRenderer(){view.renderer?.destroy();view.renderer=null;await applyView(false)}
+async function applyTablePrefs(size=tablePrefs.size,felt=tablePrefs.felt,{fresh=true,remote=false}={}){
+ tablePrefs.size=setTableSize(size);tablePrefs.felt=felt
+ localStorage.setItem('pool-masters:table-size',tablePrefs.size);localStorage.setItem('pool-masters:felt',felt)
+ await rebuildRenderer()
+ if(fresh&&state.game){state.game.resetRack();state.game.sync()}
+ if(!remote)toast(`${TABLE_SIZES[tablePrefs.size].label} table ready`)
 }
 async function applyView(persist){
  if(view.switching)return
@@ -88,6 +103,8 @@ function bind(){
  $('#save-room-name').onclick=async e=>{e.preventDefault();const name=$('#room-name').value.trim().slice(0,48);if(!name||!state.room?.isHost)return;try{await state.room.update({name});$('#room-label').textContent=name;$('#room-dialog').close();toast('Table name saved')}catch(err){toast(err.message||'Could not rename table')}}
  $('#next-rack').onclick=()=>{if(state.mode==='practice'){state.game?.newRack();$('#next-rack').hidden=true}}
  $('#focus-table').onclick=()=>{const focused=$('#game').classList.toggle('focus');$('#focus-table').textContent=focused?'Show chat':'Focus table';view.renderer?.resize()}
+ $('#table-settings').onclick=()=>{$('#table-size').value=tablePrefs.size;$('#felt').value=Object.entries(FELTS).find(([,v])=>v===tablePrefs.felt)?.[0]||'green';$('#table-dialog').showModal()}
+ $('#save-table').onclick=async e=>{e.preventDefault();await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value]);$('#table-dialog').close()}
  const paintSfx=()=>{$('#mute-sfx').textContent=sfx.enabled?'♪':'✕';$('#mute-sfx').classList.toggle('on',sfx.enabled)}
  $('#mute-sfx').onclick=()=>{sfx.setEnabled(!sfx.enabled);localStorage.setItem('pool-masters:muted',sfx.enabled?'0':'1');paintSfx()}
  paintSfx()

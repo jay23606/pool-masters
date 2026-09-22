@@ -16,7 +16,7 @@ export function rack(){
  let q=0
  for(let row=0;row<5;row++)for(let i=0;i<=row;i++){
   const n=nums[q++]
-  a.push({x:420+row*15.66,y:190+(i-row/2)*18,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})
+  a.push({x:420+row*(R*Math.sqrt(3)),y:190+(i-row/2)*(2*R),vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})
  }
  return a
 }

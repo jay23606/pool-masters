@@ -3,8 +3,9 @@ import {rayToRail} from './pool.js'
 
 // The original top-down renderer. Kept as the default and as a fallback for
 // devices where WebGL is unavailable or too slow.
-export function createRenderer2D(canvas){
+export function createRenderer2D(canvas,options={}){
  const g=canvas.getContext('2d')
+ let felt=options.felt||'#17794b'
  function drawBall(b){
   g.save();g.beginPath();g.arc(b.x,b.y,R,0,7);g.clip()
   const surface=g.createRadialGradient(b.x-3.5,b.y-4,1,b.x+2,b.y+3,R*1.25)
@@ -24,7 +25,7 @@ export function createRenderer2D(canvas){
   destroy(){},
   draw(game){
    g.clearRect(0,0,W,H);g.fillStyle='#5f351f';g.fillRect(0,0,W,H)
-   const grad=g.createRadialGradient(350,170,10,350,190,400);grad.addColorStop(0,'#17794b');grad.addColorStop(1,'#06452c');g.fillStyle=grad;g.fillRect(22,22,656,336)
+   const grad=g.createRadialGradient(350,170,10,350,190,400);grad.addColorStop(0,felt);grad.addColorStop(1,shade(felt,-.48));g.fillStyle=grad;g.fillRect(22,22,656,336)
    g.fillStyle='#07100c'
    POCKETS.forEach(([x,y],i)=>{g.beginPath();g.arc(x,y,PR-2,0,7);g.fill();if(game.calledPocket===i){g.strokeStyle='#ffd75d';g.lineWidth=3;g.beginPath();g.arc(x,y,PR+3,0,7);g.stroke()}})
    for(const b of game.balls)if(b.on)drawBall(b)
@@ -38,6 +39,12 @@ export function createRenderer2D(canvas){
    g.lineCap='round'
    for(const[a,b,w,c]of[[0,5,4,'#4e8fa6'],[5,52,7,'#ece0bb'],[52,160,9,'#a76f38'],[160,205,11,'#1d1915'],[205,242,14,'#714326']]){g.strokeStyle=c;g.lineWidth=w;g.beginPath();g.moveTo(...at(a));g.lineTo(...at(b));g.stroke()}
    g.lineCap='butt'
-  }
+  },
+  setFelt(color){felt=color}
  }
+}
+
+function shade(hex,amount){
+ const n=parseInt(hex.slice(1),16),f=v=>Math.max(0,Math.min(255,Math.round(v*(1+amount))))
+ return `#${[f(n>>16),f((n>>8)&255),f(n&255)].map(v=>v.toString(16).padStart(2,'0')).join('')}`
 }
