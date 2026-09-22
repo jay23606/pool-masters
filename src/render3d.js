@@ -1,0 +1,220 @@
+import {W,H,R,PR,POCKETS,COLORS} from './table.js'
+import {rayToRail} from './pool.js'
+
+// WebGL renderer. Purely a view over the existing 2D simulation: it reads the
+// same {x,y,vx,vy,on,k,n} balls the 2D renderer does and never writes to them,
+// so physics and the network protocol are untouched.
+const CLOTH='#15794a',CUSHION='#0f6038',WOOD='#472616',WOOD_DARK='#2c180e'
+const tx=x=>x-W/2, tz=y=>y-H/2   // table coords -> world (y is up)
+
+// Bake a pool-ball skin into a sphere-UV texture, once per ball.
+// The two number discs sit on the UV poles, so the digits are pre-warped into
+// polar coordinates to come out round and upright on the sphere.
+function ballTexture(THREE,kind,n){
+ const TW=512,TH=256,cap=.12,c=document.createElement('canvas');c.width=TW;c.height=TH
+ const g=c.getContext('2d'),white='#f7f4e9',col=COLORS[n]
+ if(kind==='cue'){g.fillStyle='#f2efe4';g.fillRect(0,0,TW,TH);g.fillStyle='#b83232';for(const[u,v]of[[.25,.5],[.75,.5],[.5,.28],[.0,.72]]){g.beginPath();g.arc(u*TW,v*TH,9,0,7);g.fill()}}
+ else{
+  g.fillStyle=white;g.fillRect(0,0,TW,TH)
+  // solids are colour everywhere but the poles; stripes keep a white band top and bottom
+  g.fillStyle=col
+  if(kind==='stripe')g.fillRect(0,TH*.27,TW,TH*.46)
+  else g.fillRect(0,TH*cap,TW,TH*(1-2*cap))
+  // number discs, pre-warped into the two polar caps
+  const nc=document.createElement('canvas');nc.width=nc.height=128
+  const ng=nc.getContext('2d')
+  ng.fillStyle=white;ng.beginPath();ng.arc(64,64,64,0,7);ng.fill()
+  ng.fillStyle='#14190f';ng.font='bold 66px Arial, sans-serif';ng.textAlign='center';ng.textBaseline='middle';ng.fillText(String(n),64,68)
+  const src=ng.getImageData(0,0,128,128).data,capRows=Math.round(TH*cap),img=g.getImageData(0,0,TW,TH),dst=img.data
+  for(let j=0;j<capRows;j++)for(const top of[true,false]){
+   const row=top?j:TH-1-j, r=(j+.5)/capRows
+   for(let i=0;i<TW;i++){
+    const a=(i/TW)*Math.PI*2*(top?1:-1),sx=Math.round(64+Math.cos(a)*r*63),sy=Math.round(64+Math.sin(a)*r*63)
+    if(sx<0||sy<0||sx>127||sy>127)continue
+    const s=(sy*128+sx)*4,d=(row*TW+i)*4
+    if(src[s+3]<8)continue
+    dst[d]=src[s];dst[d+1]=src[s+1];dst[d+2]=src[s+2];dst[d+3]=255
+   }
+  }
+  g.putImageData(img,0,0)
+ }
+ const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t
+}
+
+export async function createRenderer3D(canvas){
+ const THREE=await import('three')
+ const {RoomEnvironment}=await import('three/examples/jsm/environments/RoomEnvironment.js')
+
+ const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'})
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75))
+ renderer.shadowMap.enabled=true
+ renderer.shadowMap.type=THREE.PCFSoftShadowMap
+ renderer.toneMapping=THREE.ACESFilmicToneMapping
+ renderer.toneMappingExposure=.92
+
+ const scene=new THREE.Scene()
+ scene.background=new THREE.Color('#07110d')
+ const pmrem=new THREE.PMREMGenerator(renderer)
+ scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture
+ scene.environmentIntensity=.22
+
+ const camera=new THREE.PerspectiveCamera(40,W/H,10,4000)
+ const CAM_DIR=new THREE.Vector3(0,.9,.55).normalize(),TARGET=new THREE.Vector3(0,0,4)
+
+ scene.add(new THREE.HemisphereLight('#cfe9dc','#0e2218',.16))
+ // a pool-hall pendant: one shadow-casting spot straight over the table
+ // inverse-square falloff so the cloth is brightest at centre and rolls off
+ // toward the cushions, the way a low pendant over a table actually reads
+ const key=new THREE.SpotLight('#fff3dc',1.9e6,1600,.8,.55,2)
+ // deliberately off-axis: a light straight overhead hides every ball's shadow
+ // underneath it, which reads as flat from this camera
+ key.position.set(-300,430,-150);key.target.position.set(20,0,40);key.castShadow=true
+ key.shadow.mapSize.set(1024,1024)
+ key.shadow.camera.near=120;key.shadow.camera.far=900
+ key.shadow.bias=-.0009;key.shadow.normalBias=.9;key.shadow.focus=1
+ scene.add(key,key.target)
+ const rim=new THREE.DirectionalLight('#9fd8ff',.28);rim.position.set(360,260,-300);scene.add(rim)
+ const front=new THREE.DirectionalLight('#ffe9c4',.18);front.position.set(-220,380,420);scene.add(front)
+
+ const std=(color,roughness,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness})
+ const box=(w,h,d,mat,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);scene.add(m);return m}
+
+ // ---- table ----
+ // one small noise tile as a bump map: the cloth stops reading as flat vinyl
+ // for the cost of a 128px texture generated once
+ const noise=document.createElement('canvas');noise.width=noise.height=128
+ {const ng=noise.getContext('2d'),img=ng.createImageData(128,128)
+  for(let i=0;i<128*128;i++){const v=200+Math.random()*55;img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255}
+  ng.putImageData(img,0,0)}
+ const clothBump=new THREE.CanvasTexture(noise)
+ clothBump.wrapS=clothBump.wrapT=THREE.RepeatWrapping;clothBump.repeat.set(70,38)
+ const clothMat=new THREE.MeshStandardMaterial({color:CLOTH,roughness:.99,bumpMap:clothBump,bumpScale:1.5})
+ const cushionMat=std(CUSHION,.95),woodMat=std(WOOD,.45),apronMat=std(WOOD_DARK,.6)
+ const cloth=box(W,6,H,clothMat,0,-3,0);cloth.receiveShadow=true
+ box(768,36,448,apronMat,0,-24,0)
+ for(const[w,d,x,z]of[[768,34,0,-207],[768,34,0,207],[34,380,-367,0],[34,380,367,0]]){const m=box(w,18,d,woodMat,x,9,z);m.castShadow=true;m.receiveShadow=true}
+ // cushions, in table coords, with gaps left at the six pockets
+ for(const[x0,x1,y0,y1]of[[47,331,18,28],[369,653,18,28],[47,331,352,362],[369,653,352,362],[18,28,47,333],[672,682,47,333]]){
+  const m=box(x1-x0,13,y1-y0,cushionMat,tx((x0+x1)/2),6.5,tz((y0+y1)/2));m.castShadow=true;m.receiveShadow=true
+ }
+ const pocketMat=std('#05100b',.9)
+ const pocketGeo=new THREE.CylinderGeometry(PR-1.5,PR-3,7,28)
+ POCKETS.forEach(([x,y])=>{const m=new THREE.Mesh(pocketGeo,pocketMat);m.position.set(tx(x),-1,tz(y));scene.add(m)})
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(PR+3,1.7,8,36),new THREE.MeshBasicMaterial({color:'#ffd75d'}))
+ ring.rotation.x=-Math.PI/2;ring.position.y=1.6;ring.visible=false;scene.add(ring)
+
+ // ---- balls ----
+ const ballGeo=new THREE.SphereGeometry(R,40,28)
+ const balls=[]   // one entry per ball index, created lazily to match game.balls
+ function ballFor(i,b){
+  if(balls[i])return balls[i]
+  const mat=new THREE.MeshStandardMaterial({map:ballTexture(THREE,b.k,b.n),roughness:.13,metalness:0,envMapIntensity:1.4})
+  const mesh=new THREE.Mesh(ballGeo,mat);mesh.castShadow=true;mesh.position.set(tx(b.x),R,tz(b.y))
+  mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
+  scene.add(mesh)
+  return balls[i]={mesh,mat,shown:{x:b.x,y:b.y},sink:0}
+ }
+
+ // ---- aim overlays ----
+ const lineMat=(color,opacity)=>new THREE.LineBasicMaterial({color,transparent:true,opacity,depthTest:false})
+ const makeLine=(mat,pts)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts*3),3));const l=new THREE.Line(g,mat);l.frustumCulled=false;l.renderOrder=5;scene.add(l);return l}
+ const aimLine=makeLine(lineMat('#ffffff',.9),2),cutLine=makeLine(lineMat('#ffd96a',.9),2),bankLine=makeLine(lineMat('#ffffff',.4),3)
+ function setLine(line,pts){const a=line.geometry.attributes.position;pts.forEach((p,i)=>a.setXYZ(i,tx(p.x),1.4,tz(p.y)));a.needsUpdate=true;line.geometry.setDrawRange(0,pts.length);line.visible=pts.length>1}
+ const ghost=new THREE.Mesh(ballGeo,new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.22,depthWrite:false}))
+ ghost.renderOrder=4;ghost.visible=false;scene.add(ghost)
+
+ const cue=new THREE.Group()
+ {const shaft=new THREE.Mesh(new THREE.CylinderGeometry(2.6,4.4,200,18),std('#e6d6ab',.5))
+  const butt=new THREE.Mesh(new THREE.CylinderGeometry(4.4,5.6,140,18),std('#4a2a18',.35))
+  const tip=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.6,5,16),std('#4e8fa6',.7))
+  shaft.rotation.z=butt.rotation.z=tip.rotation.z=Math.PI/2
+  tip.position.x=2.5;shaft.position.x=-100;butt.position.x=-270
+  ;[shaft,butt,tip].forEach(m=>{m.castShadow=true;cue.add(m)})
+ }
+ cue.visible=false;scene.add(cue)
+
+ // ---- framing ----
+ const CORNERS=[]
+ for(const x of[-374,374])for(const z of[-213,213])for(const y of[0,18])CORNERS.push(new THREE.Vector3(x,y,z))
+ function frame(){
+  let dist=900
+  for(let pass=0;pass<6;pass++){
+   camera.position.copy(CAM_DIR).multiplyScalar(dist).add(TARGET)
+   camera.lookAt(TARGET);camera.updateMatrixWorld();camera.updateProjectionMatrix()
+   let worst=0
+   for(const c of CORNERS){const p=c.clone().project(camera);worst=Math.max(worst,Math.abs(p.x),Math.abs(p.y))}
+   if(Math.abs(worst-.985)<.01)break
+   dist*=worst/.985
+  }
+  key.target.updateMatrixWorld()
+ }
+
+ function resize(){
+  const wrap=canvas.parentElement,cw=Math.max(240,wrap?.clientWidth||W),ch=cw*H/W
+  renderer.setSize(cw,ch,false)
+  camera.aspect=cw/ch;frame()
+ }
+ const ro=new ResizeObserver(resize);if(canvas.parentElement)ro.observe(canvas.parentElement)
+ resize()
+
+ const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-R),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),hitPt=new THREE.Vector3()
+ const up=new THREE.Vector3(0,1,0),axis=new THREE.Vector3(),spin=new THREE.Quaternion()
+
+ return {
+  mode:'3d',
+  el:canvas,
+  resize,
+  point(e){
+   const r=canvas.getBoundingClientRect()
+   ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1))
+   ray.setFromCamera(ndc,camera)
+   if(!ray.ray.intersectPlane(plane,hitPt))return null
+   return{x:hitPt.x+W/2,y:hitPt.z+H/2}
+  },
+  draw(game,dt){
+   const k=1-Math.exp(-Math.min(dt,.05)*34)
+   game.balls.forEach((b,i)=>{
+    const e=ballFor(i,b),s=e.shown
+    // ease toward the simulated position: host state arrives rounded to whole
+    // units, which is invisible top-down but reads as jitter up close
+    const dx=b.x-s.x,dy=b.y-s.y
+    if(Math.hypot(dx,dy)>45){s.x=b.x;s.y=b.y}else{s.x+=dx*k;s.y+=dy*k}
+    const mx=tx(s.x),mz=tz(s.y),moved=Math.hypot(mx-e.mesh.position.x,mz-e.mesh.position.z)
+    if(moved>.0005&&e.sink===0){
+     axis.set(mz-e.mesh.position.z,0,-(mx-e.mesh.position.x)).normalize()
+     spin.setFromAxisAngle(axis,moved/R);e.mesh.quaternion.premultiply(spin)
+    }
+    e.mesh.position.x=mx;e.mesh.position.z=mz
+    if(b.on){e.sink=0;e.mesh.position.y=R;e.mesh.scale.setScalar(1);e.mesh.visible=true}
+    else{e.sink=Math.min(1,e.sink+dt*4);e.mesh.position.y=R-e.sink*34;e.mesh.scale.setScalar(1-e.sink*.35);e.mesh.visible=e.sink<1}
+   })
+   ring.visible=game.calledPocket!=null
+   if(ring.visible){const[px,py]=POCKETS[game.calledPocket];ring.position.x=tx(px);ring.position.z=tz(py)}
+
+   const aiming=game.aiming&&game.canAim()
+   cue.visible=ghost.visible=aiming
+   if(!aiming){aimLine.visible=cutLine.visible=bankLine.visible=false}
+   else{
+    const q=game.guide(),c=balls[0]?.shown||q.c
+    const end={x:c.x+q.dx*q.t,y:c.y+q.dy*q.t}
+    setLine(aimLine,[c,end])
+    if(q.hit){
+     const nx=(q.hit.x-end.x)/(2*R),ny=(q.hit.y-end.y)/(2*R),d=rayToRail(q.hit.x,q.hit.y,nx,ny)
+     setLine(cutLine,[q.hit,{x:q.hit.x+nx*d,y:q.hit.y+ny*d}])
+     ghost.position.set(tx(end.x),R,tz(end.y));ghost.visible=true
+    }else{cutLine.visible=false;ghost.visible=false}
+    setLine(bankLine,q.banks.length?[end,...q.banks]:[])
+    const pull=R+10+(+game.power.value/100)*46
+    cue.position.set(tx(c.x)-q.dx*pull,R+7,tz(c.y)-q.dy*pull)
+    cue.rotation.set(0,-Math.atan2(q.dy,q.dx),0)
+    cue.rotateZ(-.07)   // pivot about the tip so the butt lifts, not the tip
+   }
+   renderer.render(scene,camera)
+  },
+  destroy(){
+   ro.disconnect()
+   scene.traverse(o=>{o.geometry?.dispose?.();const m=o.material;if(m)(Array.isArray(m)?m:[m]).forEach(x=>{x.map?.dispose?.();x.dispose?.()})})
+   pmrem.dispose();renderer.dispose()
+  }
+ }
+}

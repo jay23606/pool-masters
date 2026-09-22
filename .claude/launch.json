@@ -1,0 +1,1 @@
+{"version":"0.0.1","configurations":[{"name":"pool-masters","runtimeExecutable":"npx","runtimeArgs":["vite","--port","5183","--strictPort"],"port":5183}]}
