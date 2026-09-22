@@ -48,7 +48,7 @@ export class PoolGame{
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  canControl(){return this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.calledPocket});this.pendingPlace=null}
+ takeShot(){if(!this.canAim()||!this.aiming)return;const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.calledPocket});this.pendingPlace=null}
  startShot(){this.placed=false;this.potted=[];this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
  receive(m){if(m.t==='state'&&!this.host){this.balls=m.b.map(x=>({x:x[0],y:x[1],on:x[2],k:x[3],n:x[4],vx:0,vy:0,wx:0,wy:0,wz:0}));this.turn=m.turn;this.phase=m.phase;this.over=m.over;this.round=m.round;this.groups=m.groups||this.groups;this.breakShot=!!m.breakShot;this.ballInHand=!!m.ballInHand;if(this.ballInHand)this.placed=false;this.calledPocket=m.calledPocket;if(m.result&&!this.finished){this.finished=true;this.onFinish({winner:m.result,round:m.round})}}else if(m.t==='shot'&&this.host&&this.turn==='b'&&this.phase==='aim'){if(m.place&&this.validCueSpot({x:m.place[0],y:m.place[1]})){this.balls[0].x=m.place[0];this.balls[0].y=m.place[1];this.ballInHand=false}this.calledPocket=m.called??null;this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)}}
  sync(){if(this.host)this.send({t:'state',b:this.balls.map(b=>[Math.round(b.x),Math.round(b.y),b.on,b.k,b.n]),turn:this.turn,phase:this.phase,over:this.over,result:this.result||'',round:this.round,groups:this.groups,breakShot:this.breakShot,ballInHand:this.ballInHand,calledPocket:this.calledPocket})}
@@ -226,6 +226,7 @@ export class PoolGame{
    if(t-(this.sent||0)>40){this.sent=t;this.sync()}
    if(this.balls.every(b=>!b.on||atRest(b)))this.resolve()
   }
+  this.sfx?.update(this.balls)
   this.draw(dt);this.raf=requestAnimationFrame(x=>this.loop(x))}
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}
  destroy(){cancelAnimationFrame(this.raf);clearTimeout(this.ft);this.power.removeEventListener('input',this.handlers.power);this.surface.removeEventListener('pointerdown',this.handlers.down);this.surface.removeEventListener('pointermove',this.handlers.move);this.surface.removeEventListener('pointerup',this.handlers.up);this.shoot.removeEventListener('click',this.handlers.shoot)
