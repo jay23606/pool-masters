@@ -10,6 +10,19 @@ of the same simulation, loaded on demand when you hit the 3D button on the table
 (and falling back to 2D if WebGL is unavailable). The simulation in `src/pool.js`
 and the peer-to-peer protocol are identical either way.
 
+## Physics
+
+`src/physics.js` models the balls properly rather than damping velocity each
+frame. Each ball carries angular velocity as well as linear, and a struck ball
+skids before it grips and rolls — which is where stun, draw and follow come
+from. Ball-on-ball contact has friction and restitution, so cuts throw the
+object ball a few degrees off the line of centres; cushions lose more of a hard
+impact than a soft one and react to sidespin. The tip contact point is set with
+the cue-ball control beside the power slider.
+
+The host is still authoritative: it runs the whole simulation and broadcasts
+positions. The only protocol change is that a shot now carries its tip offset.
+
 ## Development
 
 ```sh
