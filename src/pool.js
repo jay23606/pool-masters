@@ -123,8 +123,71 @@ export class PoolGame{
   }
   return best
  }
+ // Ball in hand was being ignored entirely: the AI shot from wherever the foul
+ // left the cue and never cleared the flag, so the human inherited a ball in
+ // hand they had not earned. Use it instead, on the spot that opens up the
+ // best shot.
+ placeCueBall(){
+  const cue=this.balls[0]
+  let best={score:-Infinity,x:cue.x,y:cue.y}
+  for(let i=1;i<8;i++)for(let j=1;j<5;j++){
+   const p={x:MINX+(MAXX-MINX)*i/8,y:MINY+(MAXY-MINY)*j/5}
+   if(!this.validCueSpot(p))continue
+   cue.x=p.x;cue.y=p.y
+   const plan=this.bestShot()
+   const score=plan?plan.score:-1
+   if(score>best.score)best={score,x:p.x,y:p.y}
+  }
+  cue.x=best.x;cue.y=best.y
+  this.ballInHand=false;this.placed=false
+ }
+ // When no pot is on, the old fallback shoved the cue at the nearest legal
+ // ball's centre with no regard for what was in the way -- which is how it
+ // ended up crashing into the eight. Prefer a ball it can actually reach.
+ // Snookered: no legal ball has a clear straight path. Rather than approximate
+ // a bank off the mirror line -- which this cushion model would not obey, since
+ // it sheds normal speed and keeps tangential -- roll the cue ball forward
+ // through the real physics and keep the first angle that makes a legal hit.
+ // Only the cue moves before first contact, so each trial is cheap.
+ simulateFirstHit(angle,power){
+  const cue={...this.balls[0]},others=this.balls.filter((b,i)=>i>0&&b.on)
+  strike(cue,Math.cos(angle)*shotSpeed(power),Math.sin(angle)*shotSpeed(power))
+  const dt=1/60
+  for(let t=0;t<3.5;t+=dt){
+   const n=substeps([cue],dt)
+   for(let k=0;k<n;k++){
+    integrate(cue,dt/n)
+    for(const q of POCKETS)if(Math.hypot(cue.x-q[0],cue.y-q[1])<PR)return null   // scratch
+    railBounce(cue)
+    for(const o of others)if(Math.hypot(o.x-cue.x,o.y-cue.y)<2*R)return o
+   }
+   if(atRest(cue))return null
+  }
+  return null
+ }
+ escapeShot(want){
+  const start=Math.random()*Math.PI*2
+  for(const power of [52,74]){
+   for(let i=0;i<40;i++){
+    const angle=start+i*Math.PI*2/40
+    const hit=this.simulateFirstHit(angle,power)
+    if(hit&&(want?hit.k===want:hit.k!=='eight'))return{angle,power}
+   }
+  }
+  return null
+ }
+ safetyTarget(){
+  const cue=this.balls[0],g=this.group('b')
+  const legal=this.balls.filter(b=>b.on&&b.k!=='cue'&&(g?b.k===(this.remaining(g)?g:'eight'):b.k!=='eight'))
+  return legal.map(t=>{
+   const d=Math.hypot(t.x-cue.x,t.y-cue.y)||1
+   const cx=t.x-(t.x-cue.x)/d*2*R,cy=t.y-(t.y-cue.y)/d*2*R
+   return{t,d,clear:this.pathClear(cue,cx,cy,[t])?1:0}
+  }).sort((a,b)=>b.clear-a.clear||a.d-b.d)[0]
+ }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
+  if(this.ballInHand)this.placeCueBall()
   const cue=this.balls[0],shot=this.bestShot()
   let angle,power
   if(shot){
@@ -132,14 +195,20 @@ export class PoolGame{
    power=shot.power
    if(shot.target.k==='eight')this.calledPocket=shot.pocket
   }else{
-   // nothing on: roll safe at the nearest legal ball so it is still a fair hit
-   const g=this.group('b')
-   const targets=this.balls.filter(b=>b.on&&b.k!=='cue'&&(g?b.k===(this.remaining(g)?g:'eight'):b.k!=='eight'))
-   const t=targets.sort((a,b)=>Math.hypot(a.x-cue.x,a.y-cue.y)-Math.hypot(b.x-cue.x,b.y-cue.y))[0]
-   if(!t)return
+   // nothing on: roll safe at a legal ball it has a clear path to
+   const pick=this.safetyTarget()
+   if(!pick)return
+   const t=pick.t
    if(t.k==='eight')this.calledPocket=this.nearestPocket(t)
-   angle=Math.atan2(t.y-cue.y,t.x-cue.x)+(Math.random()-.5)*.1
-   power=28+Math.random()*18
+   if(pick.clear){
+    angle=Math.atan2(t.y-cue.y,t.x-cue.x)+(Math.random()-.5)*.05
+    power=26+Math.random()*14
+   }else{
+    const g=this.group('b')
+    const esc=this.escapeShot(g?(this.remaining(g)?g:'eight'):null)
+    if(esc){angle=esc.angle;power=esc.power}
+    else{angle=Math.atan2(t.y-cue.y,t.x-cue.x);power=30}
+   }
   }
   this.startShot()
   strike(cue,Math.cos(angle)*shotSpeed(power),Math.sin(angle)*shotSpeed(power))
