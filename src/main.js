@@ -10,7 +10,9 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY)
 const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostMigration:false,peerGraceMs:5000})
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,rankings:[],profile:null}
-const view={mode:localStorage.getItem('pool-masters:view')==='3d'?'3d':'2d',renderer:null,switching:false}
+// 3D is the default. New key: the old one was written on every load, not just
+// on a deliberate switch, so a stored value under it says nothing about intent.
+const view={mode:localStorage.getItem('pool-masters:table-view')==='2d'?'2d':'3d',renderer:null,switching:false}
 
 document.querySelector('#app').innerHTML=`
 <header><button class="brand" id="home">● Pool Masters</button><div class="identity"><span id="mini-rating"></span><button id="edit-name" class="ghost"></button></div></header>
@@ -28,7 +30,7 @@ async function buildRenderer(){
  }
  return createRenderer2D($('#table'))
 }
-async function applyView(){
+async function applyView(persist){
  if(view.switching)return
  view.switching=true
  try{
@@ -37,7 +39,7 @@ async function applyView(){
   $('#table').hidden=next.mode!=='2d';$('#table3d').hidden=next.mode!=='3d'
   $('#view-3d').textContent=next.mode==='3d'?'2D':'3D'
   $('#view-3d').classList.toggle('on',next.mode==='3d')
-  localStorage.setItem('pool-masters:view',next.mode)
+  if(persist)localStorage.setItem('pool-masters:table-view',next.mode)
   state.game?.setRenderer(next);next.resize()
  }finally{view.switching=false}
 }
@@ -72,7 +74,7 @@ function bind(){
  $('#next-rack').onclick=()=>{if(state.mode==='practice'){state.game?.newRack();$('#next-rack').hidden=true}}
  $('#focus-table').onclick=()=>{const focused=$('#game').classList.toggle('focus');$('#focus-table').textContent=focused?'Show chat':'Focus table';view.renderer?.resize()}
  $('#view-3d').addEventListener('pointerdown',e=>e.stopPropagation())
- $('#view-3d').onclick=()=>{view.mode=view.mode==='3d'?'2d':'3d';applyView()}
+ $('#view-3d').onclick=()=>{view.mode=view.mode==='3d'?'2d':'3d';applyView(true)}
  $('#copy').onclick=async()=>{await navigator.clipboard.writeText(location.href);toast('Invite link copied')};$('#call').onclick=startCall;$('#mute').onclick=()=>{state.media?.toggleMuted();$('#mute').classList.toggle('on')};$('#camera').onclick=()=>{state.media?.toggleCamera();$('#camera').classList.toggle('on')}
  $('#chat-form').onsubmit=async e=>{e.preventDefault();const input=$('#message'),body=input.value.trim();if(!body||!state.room)return;input.value='';await state.room.say(body)}
  window.addEventListener('popstate',()=>{if(!new URLSearchParams(location.search).get('room'))leaveRoom(false)})
