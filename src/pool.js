@@ -47,6 +47,10 @@ export class PoolGame{
  newRack(){if(!this.over)return;this.round++;this.resetRack();this.sync()}
  group(player=this.turn){return this.groups[player]}
  remaining(group){return this.balls.filter(b=>b.on&&b.k===group).length}
+ // The eight is only legal once your own group is gone. Nothing used to say so:
+ // a tap meant to call a pocket was simply swallowed.
+ eightBlocked(){const g=this.group(this.me);return g?this.remaining(g):null}
+ aimingAtEight(){return this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  canControl(){return this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
@@ -217,10 +221,12 @@ export class PoolGame{
  }
  guide(){const c=this.balls[0],dx=Math.cos(this.angle),dy=Math.sin(this.angle),rail=rayToRail(c.x,c.y,dx,dy);let hit=null,t=rail;for(let i=1;i<this.balls.length;i++){const b=this.balls[i];if(!b.on)continue;const ox=b.x-c.x,oy=b.y-c.y,p=ox*dx+oy*dy,s=ox*ox+oy*oy-p*p;if(p>R&&s<=4*R*R){const z=p-Math.sqrt(4*R*R-s);if(z<t){t=z;hit=b}}}return{c,dx,dy,t,hit,banks:!hit?bankPath(c.x,c.y,dx,dy,2):[]}}
  draw(dt=.016){this.renderer.draw(this,dt);this.updateHud()}
- updateHud(){const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table';if(this.groupStatus){const text=`YOU: ${label(mine).toUpperCase()} · OPPONENT: ${label(their).toUpperCase()}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
+ updateHud(){const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table';const count=p=>{const g=this.group(p);return g?(this.remaining(g)||'ON THE 8'):''}
+  const tag=(x,p)=>{const c=count(p);return label(x).toUpperCase()+(c?` · ${c}`:'')}
+  if(this.groupStatus){const text=`YOU: ${tag(mine,this.me)} · OPPONENT: ${tag(their,other(this.me))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
-  if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`}
+  if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.aimingAtEight()&&this.eightBlocked()?`The 8 is not yours yet · ${this.eightBlocked()} ${label(mine).toLowerCase()} still to pot`:this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`}
  // The simulation is no longer paced by the animation frame. Browsers stop or
  // heavily throttle requestAnimationFrame in a hidden tab, and since the host
  // simulates for both players, a host who switched tabs froze the game for
