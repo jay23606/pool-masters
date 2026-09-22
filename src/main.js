@@ -5,6 +5,7 @@ import { PoolGame } from './pool.js'
 import { createRenderer2D } from './render2d.js'
 import { createSfx } from './sfx.js'
 import { TABLE_SIZES,setTableSize } from './table.js'
+import { FELTS,loadTablePrefs,saveTablePrefs } from './preferences.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
@@ -24,9 +25,7 @@ sfx.setHaptics(localStorage.getItem('pool-masters:haptics')!=='0')
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>sfx.resume(),{once:true})
 const view={mode:VIEWS.includes(stored)?stored:'top',renderer:null,switching:false}
-const FELTS={green:'#17794b',blue:'#176c88',burgundy:'#712e3c',charcoal:'#34443d'}
-const tablePrefs={size:Number(localStorage.getItem('pool-masters:table-size'))||7,felt:localStorage.getItem('pool-masters:felt')||FELTS.green,cue:localStorage.getItem('pool-masters:cue')||'classic',lighting:localStorage.getItem('pool-masters:lighting')||'hall'}
-if(!TABLE_SIZES[tablePrefs.size])tablePrefs.size=7
+const tablePrefs=loadTablePrefs()
 setTableSize(tablePrefs.size)
 
 document.querySelector('#app').innerHTML=`
@@ -52,7 +51,7 @@ async function buildRenderer(){
 async function rebuildRenderer(){view.renderer?.destroy();view.renderer=null;await applyView(false)}
 async function applyTablePrefs(size=tablePrefs.size,felt=tablePrefs.felt,{fresh=true,remote=false}={}){
  tablePrefs.size=setTableSize(size);tablePrefs.felt=felt
- localStorage.setItem('pool-masters:table-size',tablePrefs.size);localStorage.setItem('pool-masters:felt',felt)
+ Object.assign(tablePrefs,saveTablePrefs(tablePrefs))
  await rebuildRenderer()
  if(!remote&&state.mode==='online'&&state.room?.isHost)broadcastGame({t:'table',size:tablePrefs.size,felt:tablePrefs.felt})
  if(fresh&&state.game){state.game.resetRack();state.game.sync()}
@@ -107,7 +106,7 @@ function bind(){
  $('#next-rack').onclick=()=>{if(state.mode==='practice'){state.game?.newRack();$('#next-rack').hidden=true}}
  $('#focus-table').onclick=()=>{const focused=$('#game').classList.toggle('focus');$('#focus-table').textContent=focused?'Show chat':'Focus table';view.renderer?.resize()}
  $('#table-settings').onclick=()=>{$('#table-size').value=tablePrefs.size;$('#felt').value=Object.entries(FELTS).find(([,v])=>v===tablePrefs.felt)?.[0]||'green';$('#cue-finish').value=tablePrefs.cue;$('#lighting').value=tablePrefs.lighting;$('#haptics').checked=sfx.haptics;$('#table-dialog').showModal()}
- $('#save-table').onclick=async e=>{e.preventDefault();tablePrefs.cue=$('#cue-finish').value;tablePrefs.lighting=$('#lighting').value;localStorage.setItem('pool-masters:cue',tablePrefs.cue);localStorage.setItem('pool-masters:lighting',tablePrefs.lighting);sfx.setHaptics($('#haptics').checked);localStorage.setItem('pool-masters:haptics',sfx.haptics?'1':'0');await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value]);$('#table-dialog').close()}
+ $('#save-table').onclick=async e=>{e.preventDefault();tablePrefs.cue=$('#cue-finish').value;tablePrefs.lighting=$('#lighting').value;sfx.setHaptics($('#haptics').checked);localStorage.setItem('pool-masters:haptics',sfx.haptics?'1':'0');await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value]);$('#table-dialog').close()}
  const paintSfx=()=>{$('#mute-sfx').textContent=sfx.enabled?'♪':'✕';$('#mute-sfx').classList.toggle('on',sfx.enabled)}
  $('#mute-sfx').onclick=()=>{sfx.setEnabled(!sfx.enabled);localStorage.setItem('pool-masters:muted',sfx.enabled?'0':'1');paintSfx()}
  paintSfx()
