@@ -52,6 +52,7 @@ async function applyTablePrefs(size=tablePrefs.size,felt=tablePrefs.felt,{fresh=
  tablePrefs.size=setTableSize(size);tablePrefs.felt=felt
  localStorage.setItem('pool-masters:table-size',tablePrefs.size);localStorage.setItem('pool-masters:felt',felt)
  await rebuildRenderer()
+ if(!remote&&state.mode==='online'&&state.room?.isHost)broadcastGame({t:'table',size:tablePrefs.size,felt:tablePrefs.felt})
  if(fresh&&state.game){state.game.resetRack();state.game.sync()}
  if(!remote)toast(`${TABLE_SIZES[tablePrefs.size].label} table ready`)
 }
@@ -123,7 +124,7 @@ async function enterRoom(room){
  state.game?.destroy();state.game=null;state.room=room;state.mode='online';showGame();$('.call-actions').hidden=false;$('#rename-room').hidden=!room.isHost;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=room.name||`Room ${room.code}`
  state.unsubs.push(room.on('players',players=>onPlayers(players)),room.on('message',appendMessage),room.on('closed',()=>{toast('The table closed');leaveRoom()}))
  ;(await room.history(80)).forEach(appendMessage);state.net=await room.connect({topology:'star'});state.net.on('data',({data})=>{try{state.game?.receive(JSON.parse(data))}catch{}});state.net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});state.net.on('leave',id=>state.peers.delete(id))
- state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,practice:false,send:broadcastGame,onFinish:finishRanked})
+ state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,practice:false,send:broadcastGame,onTable:m=>applyTablePrefs(m.size,m.felt,{fresh:false,remote:true}),onFinish:finishRanked})
  onPlayers(room.players);await room.update?.({status:room.players.length>=2?'playing':'waiting'}).catch(()=>{})
 }
 function broadcastGame(data){state.peers.forEach(p=>p.send(JSON.stringify(data)))}
