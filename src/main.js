@@ -111,7 +111,7 @@ function bind(){
  $('#mute-sfx').onclick=()=>{sfx.setEnabled(!sfx.enabled);localStorage.setItem('pool-masters:muted',sfx.enabled?'0':'1');paintSfx()}
  paintSfx()
  $('#view-3d').onclick=()=>{view.mode=VIEWS[(VIEWS.indexOf(view.mode)+1)%VIEWS.length];applyView(true)}
- $('#copy').onclick=async()=>{await navigator.clipboard.writeText(location.href);toast('Invite link copied')};$('#call').onclick=startCall;$('#mute').onclick=()=>{state.media?.toggleMuted();$('#mute').classList.toggle('on')};$('#camera').onclick=()=>{state.media?.toggleCamera();$('#camera').classList.toggle('on')}
+ $('#copy').onclick=copyInvite;$('#call').onclick=startCall;$('#mute').onclick=()=>{state.media?.toggleMuted();$('#mute').classList.toggle('on')};$('#camera').onclick=()=>{state.media?.toggleCamera();$('#camera').classList.toggle('on')}
  $('#chat-form').onsubmit=async e=>{e.preventDefault();const input=$('#message'),body=input.value.trim();if(!body||!state.room)return;input.value='';await state.room.say(body)}
  window.addEventListener('popstate',()=>{if(!new URLSearchParams(location.search).get('room'))leaveRoom(false)})
 }
@@ -122,11 +122,24 @@ async function quickPlay(){
 }
 async function joinRoom(code){code=String(code||'').trim().toUpperCase();if(!code)return toast('Enter a room code');try{await enterRoom(await foyer.join(code))}catch(e){toast(e.message||'Could not join that room')}}
 async function enterRoom(room){
- state.game?.destroy();state.game=null;state.room=room;state.mode='online';showGame();$('.call-actions').hidden=false;$('#rename-room').hidden=!room.isHost;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=room.name||`Room ${room.code}`
+ // Do the fallible work first. A bad/expired invite must not tear down a game
+ // the player is already in.
+ let roomHistory,net
+ try{roomHistory=await room.history(80);net=await room.connect({topology:'star'})}
+ catch(error){net?.close?.();await room.leave?.().catch(()=>{});throw error}
+ const oldRoom=state.room
+ state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.())
+ state.room=room;state.net=net;state.mode='online';showGame();$('.call-actions').hidden=false;$('#rename-room').hidden=!room.isHost;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=room.name||`Room ${room.code}`
  state.unsubs.push(room.on('players',players=>onPlayers(players)),room.on('message',appendMessage),room.on('closed',()=>{toast('The table closed');leaveRoom()}))
- ;(await room.history(80)).forEach(appendMessage);state.net=await room.connect({topology:'star'});state.net.on('data',({data})=>{try{state.game?.receive(JSON.parse(data))}catch{}});state.net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});state.net.on('leave',id=>state.peers.delete(id))
+ roomHistory.forEach(appendMessage);net.on('data',({data})=>{try{state.game?.receive(JSON.parse(data))}catch{}});net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});net.on('leave',id=>state.peers.delete(id))
  state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,practice:false,send:broadcastGame,onTable:m=>applyTablePrefs(m.size,m.felt,{fresh:false,remote:true}),onFinish:finishRanked})
  onPlayers(room.players);await room.update?.({status:room.players.length>=2?'playing':'waiting'}).catch(()=>{})
+ if(oldRoom&&oldRoom.id!==room.id)await oldRoom.leave().catch(()=>{})
+}
+async function copyInvite(){
+ if(!state.room?.code)return toast('Create or join a room first')
+ const url=new URL(location.href);url.search='';url.searchParams.set('room',state.room.code)
+ try{await navigator.clipboard.writeText(url.href);toast(`Invite for ${state.room.code} copied`)}catch{toast('Could not copy the invite')}
 }
 function broadcastGame(data){state.peers.forEach(p=>p.send(JSON.stringify(data)))}
 function onPlayers(players){
