@@ -120,11 +120,19 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  const balls=[]   // one entry per ball index, created lazily to match game.balls
  function ballFor(i,b){
   if(balls[i])return balls[i]
-  const mat=new THREE.MeshStandardMaterial({map:ballTexture(THREE,b.k,b.n),roughness:.13,metalness:0,envMapIntensity:1.4})
-  const mesh=new THREE.Mesh(ballGeo,mat);mesh.castShadow=true;mesh.position.set(tx(b.x),R,tz(b.y))
+ const mat=new THREE.MeshStandardMaterial({map:ballTexture(THREE,b.k,b.n),roughness:.13,metalness:0,envMapIntensity:1.4})
+ const mesh=new THREE.Mesh(ballGeo,mat);mesh.castShadow=true;mesh.position.set(tx(b.x),R,tz(b.y))
+  // A spherical UV stripe mostly lives around the silhouette in a top-down
+  // camera, which made stripes look identical to solids. This small, fixed
+  // ivory inlay reads as the visible white band without rotating constantly.
+  let stripe=null
+  if(b.k==='stripe'){
+   stripe=new THREE.Mesh(new THREE.TorusGeometry(R*.58,R*.17,10,32),std('#f7f4e9',.32))
+   stripe.rotation.x=Math.PI/2;stripe.position.set(tx(b.x),R+.16,tz(b.y));stripe.castShadow=true;scene.add(stripe)
+  }
   mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
   scene.add(mesh)
-  return balls[i]={mesh,mat,shown:{x:b.x,y:b.y},sink:0}
+  return balls[i]={mesh,mat,stripe,shown:{x:b.x,y:b.y},sink:0}
  }
 
  // ---- aim overlays ----
@@ -202,8 +210,9 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
      spin.setFromAxisAngle(axis,moved/R);e.mesh.quaternion.premultiply(spin)
     }
     e.mesh.position.x=mx;e.mesh.position.z=mz
-    if(b.on){e.sink=0;e.mesh.position.y=R;e.mesh.scale.setScalar(1);e.mesh.visible=true}
-    else{e.sink=Math.min(1,e.sink+dt*4);e.mesh.position.y=R-e.sink*34;e.mesh.scale.setScalar(1-e.sink*.35);e.mesh.visible=e.sink<1}
+    if(e.stripe){e.stripe.position.x=mx;e.stripe.position.z=mz}
+    if(b.on){e.sink=0;e.mesh.position.y=R;e.mesh.scale.setScalar(1);e.mesh.visible=true;if(e.stripe){e.stripe.position.y=R+.16;e.stripe.scale.setScalar(1);e.stripe.visible=true}}
+    else{e.sink=Math.min(1,e.sink+dt*4);e.mesh.position.y=R-e.sink*34;e.mesh.scale.setScalar(1-e.sink*.35);e.mesh.visible=e.sink<1;if(e.stripe){e.stripe.position.y=R-e.sink*34+.16;e.stripe.scale.setScalar(1-e.sink*.35);e.stripe.visible=e.sink<1}}
    })
    ring.visible=game.calledPocket!=null
    if(ring.visible){const[px,py]=POCKETS[game.calledPocket];ring.position.x=tx(px);ring.position.z=tz(py)}
