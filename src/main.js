@@ -145,7 +145,9 @@ function broadcastGame(data){state.peers.forEach(p=>p.send(JSON.stringify(data))
 function onPlayers(players){
  const mine=players.find(p=>p.id===foyer.player.id),other=players.find(p=>p.id!==foyer.player.id);state.opponent=other||null
  $('#versus').innerHTML=`<span><b>${esc(mine?.name||foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>${esc(other?.name||'Waiting…')}</b><small>${other?'Opponent':'Share the code'}</small></span>`
- state.game?.setReady(Boolean(other));if(other&&state.room?.isHost)state.room.update({status:'playing',isOpen:false}).catch(()=>{})
+ // In Foyer, changing isOpen from true to false emits the terminal `closed`
+ // event. A full table is still a live room, so mark its phase only.
+ state.game?.setReady(Boolean(other));if(other&&state.room?.isHost)state.room.update({status:'playing'}).catch(()=>{})
 }
 function appendMessage(m){const log=$('#messages');if(document.getElementById(`msg-${m.id}`))return;const row=document.createElement('div');row.id=`msg-${m.id}`;row.className=m.system?'system':'message';row.innerHTML=m.system?esc(m.body):`<b>${esc(m.playerName)}</b><span>${esc(m.body)}</span>`;log.append(row);log.scrollTop=log.scrollHeight}
 async function finishRanked(result){
