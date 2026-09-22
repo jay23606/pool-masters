@@ -8,7 +8,7 @@ const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY)
 const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostMigration:false,peerGraceMs:5000})
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-const state={room:null,net:null,game:null,media:null,unsubs:[],mode:'lobby',opponent:null,rankings:[],profile:null}
+const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,rankings:[],profile:null}
 
 document.querySelector('#app').innerHTML=`
 <header><button class="brand" id="home">● Pool Masters</button><div class="identity"><span id="mini-rating"></span><button id="edit-name" class="ghost"></button></div></header>
@@ -54,11 +54,11 @@ async function joinRoom(code){code=String(code||'').trim().toUpperCase();if(!cod
 async function enterRoom(room){
  state.game?.destroy();state.game=null;state.room=room;state.mode='online';showGame();$('.call-actions').hidden=false;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=`Room ${room.code}`
  state.unsubs.push(room.on('players',players=>onPlayers(players)),room.on('message',appendMessage),room.on('closed',()=>{toast('The table closed');leaveRoom()}))
- ;(await room.history(80)).forEach(appendMessage);state.net=await room.connect({topology:'star'});state.net.on('data',({data})=>{try{state.game?.receive(JSON.parse(data))}catch{}});state.net.on('peer',()=>state.game?.sync())
+ ;(await room.history(80)).forEach(appendMessage);state.net=await room.connect({topology:'star'});state.net.on('data',({data})=>{try{state.game?.receive(JSON.parse(data))}catch{}});state.net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});state.net.on('leave',id=>state.peers.delete(id))
  state.game=new PoolGame({canvas:$('#table'),status:$('#game-status'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),host:room.isHost,practice:false,send:broadcastGame,onFinish:finishRanked})
  onPlayers(room.players);await room.update?.({status:room.players.length>=2?'playing':'waiting'}).catch(()=>{})
 }
-function broadcastGame(data){state.net?.peers?.forEach(p=>p.send(JSON.stringify(data)))}
+function broadcastGame(data){state.peers.forEach(p=>p.send(JSON.stringify(data)))}
 function onPlayers(players){
  const mine=players.find(p=>p.id===foyer.player.id),other=players.find(p=>p.id!==foyer.player.id);state.opponent=other||null
  $('#versus').innerHTML=`<span><b>${esc(mine?.name||foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>${esc(other?.name||'Waiting…')}</b><small>${other?'Opponent':'Share the code'}</small></span>`
@@ -74,5 +74,5 @@ async function finishRanked(result){
 function startPractice(){state.game?.destroy();state.mode='practice';state.room=null;state.opponent={name:'AI Coach'};showGame();history.replaceState({},'',location.pathname);$('#room-label').textContent='Unranked practice';$('#versus').innerHTML=`<span><b>${esc(foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>AI Coach</b><small>Practice</small></span>`;state.game=new PoolGame({canvas:$('#table'),status:$('#game-status'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),host:true,practice:true,send:()=>{},onFinish:()=>{}});$('.call-actions').hidden=true;$('#video-panel').hidden=true;$('.chat').hidden=true}
 function showGame(){$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#messages').innerHTML='';$('#video-panel').hidden=false;$('.chat').hidden=false}
 async function startCall(){if(!state.room)return;try{if(!state.media){state.media=state.room.media();state.media.onStream((_,s)=>{$('#remote-video').srcObject=s;$('#video-panel').classList.add('live')});state.media.onLeave(()=>{$('#remote-video').srcObject=null});const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#local-video').srcObject=stream;await state.media.start(stream);$('#call').textContent='End call';return}state.media.stop();state.media=null;$('#local-video').srcObject=null;$('#remote-video').srcObject=null;$('#call').textContent='Start call'}catch(e){toast('Camera or microphone unavailable')}}
-async function leaveRoom(push=true){state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
+async function leaveRoom(push=true){state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
 boot().catch(e=>{console.error(e);toast('Could not connect. Reload to try again.')})
