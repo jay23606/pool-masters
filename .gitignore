@@ -3,3 +3,7 @@ dist/
 .vite/
 .env*
 !.env.example
+
+# one-off patch scripts
+/*.mjs
+!tools/*.mjs
