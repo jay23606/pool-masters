@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict'
 import {PoolGame} from '../src/pool.js'
 import {integrate,ballCollide,railBounce,substeps,atRest,strike} from '../src/physics.js'
-import {R,PR,POCKETS} from '../src/table.js'
+import {R,PR,POCKETS,MINX,MAXX,MINY,MAXY} from '../src/table.js'
 const shotSpeed=v=>120+Math.pow(Math.max(1,Math.min(100,v))/100,1.45)*3080
 
 // The AI methods only touch ball state, so they can be exercised on a bare
@@ -109,4 +109,41 @@ test('the throw correction moves the aim off the naive ghost ball on a cut',()=>
  const straight=table([ball(350,300,'cue',0),ball(350,120,'solid',1)])
  const none=straight.aimFor(straight.balls[0],straight.balls[1],0,-1)
  assert.ok(Math.hypot(none.gx-naive.x,none.gy-naive.y)<.05,'a straight shot needs no correction')
+})
+
+test('the AI uses ball in hand instead of leaving it set for the next player',()=>{
+ const g=table([ball(154,190,'cue',0),ball(500,120,'solid',1),ball(300,300,'solid',2)])
+ g.ballInHand=true
+ g.aiShot()
+ assert.equal(g.ballInHand,false,'ball in hand must not leak to the opponent')
+ const cue=g.balls[0]
+ assert.ok(cue.x>=MINX&&cue.x<=MAXX&&cue.y>=MINY&&cue.y<=MAXY,'cue placed on the table')
+ assert.ok(!g.balls.slice(1).some(b=>b.on&&Math.hypot(b.x-cue.x,b.y-cue.y)<2*R),'cue not placed inside a ball')
+})
+
+test('a safety picks a ball it can actually reach, not just the nearest one',()=>{
+ // nearest legal ball is screened by the eight; a farther one is wide open
+ const g=table([
+  ball(350,300,'cue',0),
+  ball(350,150,'solid',1),          // nearest, but blocked
+  ball(350,225,'eight',8),          // the screen
+  ball(120,300,'solid',2)           // farther, clear
+ ])
+ const pick=g.safetyTarget()
+ assert.ok(pick,'expected a safety target')
+ assert.equal(pick.t.n,2,'should pass over the screened ball')
+ assert.equal(pick.clear,1)
+})
+
+test('when snookered the AI finds an angle that legally makes contact',()=>{
+ const balls=[ball(60,190,'cue',0)]
+ for(let i=0;i<5;i++)balls.push(ball(60+2*R+1,190-40+i*20,'solid',i+1))   // a wall of the other group
+ balls.push(ball(600,100,'stripe',9),ball(620,300,'stripe',10),ball(400,190,'eight',8))
+ const g=table(balls,'stripe')
+ assert.equal(g.safetyTarget().clear,0,'this position really is snookered')
+ const esc=g.escapeShot('stripe')
+ assert.ok(esc,'expected an escape to be found')
+ const hit=g.simulateFirstHit(esc.angle,esc.power)
+ assert.ok(hit,'the escape should make contact')
+ assert.equal(hit.k,'stripe','and it should be a legal ball')
 })
