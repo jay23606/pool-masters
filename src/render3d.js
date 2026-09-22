@@ -41,7 +41,7 @@ function ballTexture(THREE,kind,n){
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t
 }
 
-export async function createRenderer3D(canvas){
+export async function createRenderer3D(canvas,camera3d='top'){
  const THREE=await import('three')
  const {RoomEnvironment}=await import('three/examples/jsm/environments/RoomEnvironment.js')
 
@@ -59,7 +59,17 @@ export async function createRenderer3D(canvas){
  scene.environmentIntensity=.22
 
  const camera=new THREE.PerspectiveCamera(40,W/H,10,4000)
- const CAM_DIR=new THREE.Vector3(0,.9,.55).normalize(),TARGET=new THREE.Vector3(0,0,4)
+ const TARGET=new THREE.Vector3(0,0,4)
+ // Two camera placements over one scene. Top-down keeps the plan view the
+ // 2D renderer gives — same orientation, so aiming intuition carries over —
+ // while still being lit, shaded and rounded. Its up vector points along -z
+ // so table y runs down the screen exactly as it does in 2D, and it uses a
+ // narrower lens to keep the perspective from bowing the rails outward.
+ const CAMS={
+  top:{dir:new THREE.Vector3(0,1,0),up:new THREE.Vector3(0,0,-1),fov:26},
+  angled:{dir:new THREE.Vector3(0,.9,.55).normalize(),up:new THREE.Vector3(0,1,0),fov:40}
+ }
+ let cam=CAMS[camera3d]||CAMS.top
 
  scene.add(new THREE.HemisphereLight('#cfe9dc','#0e2218',.16))
  // a pool-hall pendant: one shadow-casting spot straight over the table
@@ -138,8 +148,9 @@ export async function createRenderer3D(canvas){
  for(const x of[-374,374])for(const z of[-213,213])for(const y of[0,18])CORNERS.push(new THREE.Vector3(x,y,z))
  function frame(){
   let dist=900
+  camera.up.copy(cam.up);camera.fov=cam.fov
   for(let pass=0;pass<6;pass++){
-   camera.position.copy(CAM_DIR).multiplyScalar(dist).add(TARGET)
+   camera.position.copy(cam.dir).multiplyScalar(dist).add(TARGET)
    camera.lookAt(TARGET);camera.updateMatrixWorld();camera.updateProjectionMatrix()
    let worst=0
    for(const c of CORNERS){const p=c.clone().project(camera);worst=Math.max(worst,Math.abs(p.x),Math.abs(p.y))}
@@ -164,6 +175,9 @@ export async function createRenderer3D(canvas){
   mode:'3d',
   el:canvas,
   resize,
+  // swapping between the two 3D cameras must not rebuild the scene: the ball
+  // textures are baked once and are by far the most expensive thing here
+  setCamera(m){cam=CAMS[m]||CAMS.top;frame()},
   point(e){
    const r=canvas.getBoundingClientRect()
    ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1))
