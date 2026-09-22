@@ -6,6 +6,9 @@ import {R,MINX,MAXX,MINY,MAXY} from './table.js'
 // coefficients here rather than invented ones.
 export const G=2414                 // gravity, units/s^2
 
+// power slider percentage -> launch speed
+export const shotSpeed=v=>120+Math.pow(Math.max(1,Math.min(100,v))/100,1.45)*3080
+
 export const MU_SLIDE=.22           // cloth friction while a ball is skidding
 export const MU_ROLL=.04          // rolling resistance once it grips
 export const SPIN_DECAY=12          // rad/s^2, decay of vertical-axis English

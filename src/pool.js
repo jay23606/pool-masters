@@ -1,16 +1,13 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
-import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike} from './physics.js'
-export const shotSpeed=v=>120+Math.pow(Math.max(1,Math.min(100,v))/100,1.45)*3080
+import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
+import {other,rack,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite} from './rules.js'
+import {chooseShot} from './ai.js'
+export {shotSpeed}
 export const aimStep=(aim,previous,current)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*.5
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
-// Measured from the collision model: throw rises with the cut angle and then
-// saturates once ball-on-ball friction is fully mobilised, at about 3.4 degrees.
-const THROW_MAX=.06,THROW_K=.155
 const STEP=1/120       // fixed simulation step, so frame pacing cannot change a shot
 const CATCHUP=3        // never make up more than this much time in one go
-const kind=n=>n===8?'eight':n<8?'solid':'stripe',other=t=>t==='a'?'b':'a',shuffle=a=>a.sort(()=>Math.random()-.5)
-function rack(){const nums=shuffle([...Array(7)].map((_,i)=>i+1).concat([...Array(7)].map((_,i)=>i+9))),a=[{x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}];nums.splice(4,0,8);let q=0;for(let row=0;row<5;row++)for(let i=0;i<=row;i++){const n=nums[q++];a.push({x:420+row*15.66,y:190+(i-row/2)*18,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})}return a}
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
  resetRack(){this.balls=rack();this.turn='a';this.phase='aim';this.over=false;this.result='';this.finished=false;this.aiming=false;this.groups={a:null,b:null};this.breakShot=true;this.calledPocket=null;this.ballInHand=false;this.placed=false;this.setSpin(0,0)}
@@ -41,12 +38,12 @@ export class PoolGame{
  // draw/follow; both are clamped inside the miscue limit by strike().
  setSpin(a,b){this.spin={a,b};if(this.spinDot)this.spinDot.style.transform=`translate(${a*32}px,${-b*32}px)`}
  spinFrom(e){const r=this.spinPad.getBoundingClientRect();let dx=(e.clientX-r.left)/r.width*2-1,dy=(e.clientY-r.top)/r.height*2-1;const m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m}this.setSpin(dx*.5,-dy*.5)}
- nearestPocket(p){return POCKETS.reduce((best,x,i)=>Math.hypot(p.x-x[0],p.y-x[1])<best.d?{i,d:Math.hypot(p.x-x[0],p.y-x[1])}:best,{i:0,d:Infinity}).i}
- validCueSpot(p){return p.x>=MINX&&p.x<=MAXX&&p.y>=MINY&&p.y<=MAXY&&!this.balls.some(b=>b.k!=='cue'&&b.on&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)}
+ nearestPocket(p){return nearestPocket(p)}
+ validCueSpot(p){return validCueSpot(this.balls,p)}
  setReady(v){this.ready=v;this.draw()}
  newRack(){if(!this.over)return;this.round++;this.resetRack();this.sync()}
  group(player=this.turn){return this.groups[player]}
- remaining(group){return this.balls.filter(b=>b.on&&b.k===group).length}
+ remaining(group){return countLeft(this.balls,group)}
  // The eight is only legal once your own group is gone. Nothing used to say so:
  // a tap meant to call a pocket was simply swallowed.
  eightBlocked(){const g=this.group(this.me);return g?this.remaining(g):null}
@@ -73,151 +70,28 @@ export class PoolGame{
   }}
  foul(){const cue=this.balls[0];cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash('Foul · ball in hand')}
  finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(winner===this.me?'You win!':'You lose')}
- resolve(){const shooter=this.turn,group=this.group(),black=this.potted.some(b=>b.k==='eight'),open=!group,wrongFirst=this.firstHit&&(open?this.firstHit.k==='eight':this.firstHit.k!==(this.before===0?'eight':group));if(black){const legal=this.breakShot?!this.scratch:group&&this.before===0&&!this.scratch&&this.calledPocket===this.eightPocket;this.finish(legal?shooter:other(shooter));this.phase='aim';this.sync();return}if(this.scratch||wrongFirst)this.foul();else{let assigned=false;if(open){const made=this.potted.filter(b=>b.k==='solid'||b.k==='stripe'),groups=[...new Set(made.map(b=>b.k))];if((!this.breakShot&&made[0])||(this.breakShot&&groups.length===1)){const g=this.breakShot?groups[0]:made[0].k;this.groups[shooter]=g;this.groups[other(shooter)]=g==='solid'?'stripe':'solid';assigned=true;this.flash(`${g==='solid'?'Solids':'Stripes'} are yours`)}}const madeOwn=group?this.potted.some(b=>b.k===group):assigned;if(!madeOwn){this.turn=other(shooter);this.calledPocket=null}}this.breakShot=false;this.balls.forEach(clearMotion);this.phase='aim';this.sync();if(this.practice&&!this.over&&this.turn==='b')setTimeout(()=>this.aiShot(),650)}
- // Is the straight line from `from` to (tx,ty) free of other balls?
- pathClear(from,tx,ty,skip){
-  const dx=tx-from.x,dy=ty-from.y,len=Math.hypot(dx,dy)
-  if(!len)return false
-  const ux=dx/len,uy=dy/len
-  for(const b of this.balls){
-   if(!b.on||b===from||skip.includes(b))continue
-   const t=(b.x-from.x)*ux+(b.y-from.y)*uy
-   if(t<=0||t>=len)continue
-   if(Math.abs((b.x-from.x)*-uy+(b.y-from.y)*ux)<2*R-.5)return false
+ resolve(){
+  const shooter=this.turn
+  const v=judgeShot(this)
+  if(v.winner){this.finish(v.winner);this.phase='aim';this.sync();return}
+  if(v.assign){
+   this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
+   this.flash(`${v.assign==='solid'?'Solids':'Stripes'} are yours`)
   }
-  return true
- }
- // Where the cue ball has to be at contact to send `t` along (dx,dy).
- // A plain ghost ball is not enough: friction between the two balls throws the
- // object ball a few degrees off the line of centres on any cut, so the line of
- // centres has to be rotated back by the same amount. Real players make the
- // same allowance, and the correction is solved in one pass because the throw
- // angle barely moves once the cut is roughly known.
- aimFor(cue,t,dx,dy){
-  let nx=dx,ny=dy,out=null
-  for(let pass=0;pass<2;pass++){
-   const gx=t.x-nx*2*R,gy=t.y-ny*2*R
-   const cx=gx-cue.x,cy=gy-cue.y,cd=Math.hypot(cx,cy)
-   if(cd<1)return null
-   const ux=cx/cd,uy=cy/cd
-   out={gx,gy,cd,cut:ux*dx+uy*dy,angle:Math.atan2(cy,cx)}
-   if(pass)break
-   const cross=ux*ny-uy*nx
-   const throwAngle=Math.sign(cross)*Math.min(THROW_MAX,THROW_K*Math.abs(cross))
-   const c=Math.cos(throwAngle),s=Math.sin(throwAngle)
-   nx=dx*c-dy*s;ny=dx*s+dy*c
-  }
-  return out
- }
- // Ghost-ball planner: for every legal ball and every pocket, work out where
- // the cue ball has to be at contact, reject blocked or near-90-degree cuts,
- // and take the best remaining shot.
- bestShot(){
-  const cue=this.balls[0],g=this.group('b')
-  const legal=this.balls.filter(b=>b.on&&b.k!=='cue'&&(g?(this.remaining(g)?b.k===g:b.k==='eight'):b.k!=='eight'))
-  let best=null
-  for(const t of legal)for(let pi=0;pi<POCKETS.length;pi++){
-   const[px,py]=POCKETS[pi]
-   const ax=px-t.x,ay=py-t.y,ad=Math.hypot(ax,ay)
-   if(!ad)continue
-   const aim=this.aimFor(cue,t,ax/ad,ay/ad)
-   if(!aim)continue
-   if(aim.cut<=.15)continue
-   if(!this.pathClear(cue,aim.gx,aim.gy,[t])||!this.pathClear(t,px,py,[cue]))continue
-   const score=aim.cut*1.7-aim.cd/900-ad/700
-   if(!best||score>best.score)best={score,cut:aim.cut,angle:aim.angle,pocket:pi,target:t,power:Math.min(92,32+aim.cd/16+ad/20)}
-  }
-  return best
- }
- // Ball in hand was being ignored entirely: the AI shot from wherever the foul
- // left the cue and never cleared the flag, so the human inherited a ball in
- // hand they had not earned. Use it instead, on the spot that opens up the
- // best shot.
- placeCueBall(){
-  const cue=this.balls[0]
-  let best={score:-Infinity,x:cue.x,y:cue.y}
-  for(let i=1;i<8;i++)for(let j=1;j<5;j++){
-   const p={x:MINX+(MAXX-MINX)*i/8,y:MINY+(MAXY-MINY)*j/5}
-   if(!this.validCueSpot(p))continue
-   cue.x=p.x;cue.y=p.y
-   const plan=this.bestShot()
-   const score=plan?plan.score:-1
-   if(score>best.score)best={score,x:p.x,y:p.y}
-  }
-  cue.x=best.x;cue.y=best.y
-  this.ballInHand=false;this.placed=false
- }
- // When no pot is on, the old fallback shoved the cue at the nearest legal
- // ball's centre with no regard for what was in the way -- which is how it
- // ended up crashing into the eight. Prefer a ball it can actually reach.
- // Snookered: no legal ball has a clear straight path. Rather than approximate
- // a bank off the mirror line -- which this cushion model would not obey, since
- // it sheds normal speed and keeps tangential -- roll the cue ball forward
- // through the real physics and keep the first angle that makes a legal hit.
- // Only the cue moves before first contact, so each trial is cheap.
- simulateFirstHit(angle,power){
-  const cue={...this.balls[0]},others=this.balls.filter((b,i)=>i>0&&b.on)
-  strike(cue,Math.cos(angle)*shotSpeed(power),Math.sin(angle)*shotSpeed(power))
-  const dt=1/60
-  for(let t=0;t<3.5;t+=dt){
-   const n=substeps([cue],dt)
-   for(let k=0;k<n;k++){
-    integrate(cue,dt/n)
-    for(const q of POCKETS)if(Math.hypot(cue.x-q[0],cue.y-q[1])<PR)return null   // scratch
-    railBounce(cue)
-    for(const o of others)if(Math.hypot(o.x-cue.x,o.y-cue.y)<2*R)return o
-   }
-   if(atRest(cue))return null
-  }
-  return null
- }
- escapeShot(want){
-  const start=Math.random()*Math.PI*2
-  for(const power of [52,74]){
-   for(let i=0;i<40;i++){
-    const angle=start+i*Math.PI*2/40
-    const hit=this.simulateFirstHit(angle,power)
-    if(hit&&(want?hit.k===want:hit.k!=='eight'))return{angle,power}
-   }
-  }
-  return null
- }
- safetyTarget(){
-  const cue=this.balls[0],g=this.group('b')
-  const legal=this.balls.filter(b=>b.on&&b.k!=='cue'&&(g?b.k===(this.remaining(g)?g:'eight'):b.k!=='eight'))
-  return legal.map(t=>{
-   const d=Math.hypot(t.x-cue.x,t.y-cue.y)||1
-   const cx=t.x-(t.x-cue.x)/d*2*R,cy=t.y-(t.y-cue.y)/d*2*R
-   return{t,d,clear:this.pathClear(cue,cx,cy,[t])?1:0}
-  }).sort((a,b)=>b.clear-a.clear||a.d-b.d)[0]
+  if(v.foul)this.foul()
+  else if(v.nextTurn!==shooter){this.turn=v.nextTurn;this.calledPocket=null}
+  this.breakShot=false;this.balls.forEach(clearMotion);this.phase='aim';this.sync()
+  if(this.practice&&!this.over&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
-  if(this.ballInHand)this.placeCueBall()
-  const cue=this.balls[0],shot=this.bestShot()
-  let angle,power
-  if(shot){
-   angle=shot.angle+(Math.random()-.5)*.03/Math.max(.45,shot.cut)
-   power=shot.power
-   if(shot.target.k==='eight')this.calledPocket=shot.pocket
-  }else{
-   // nothing on: roll safe at a legal ball it has a clear path to
-   const pick=this.safetyTarget()
-   if(!pick)return
-   const t=pick.t
-   if(t.k==='eight')this.calledPocket=this.nearestPocket(t)
-   if(pick.clear){
-    angle=Math.atan2(t.y-cue.y,t.x-cue.x)+(Math.random()-.5)*.05
-    power=26+Math.random()*14
-   }else{
-    const g=this.group('b')
-    const esc=this.escapeShot(g?(this.remaining(g)?g:'eight'):null)
-    if(esc){angle=esc.angle;power=esc.power}
-    else{angle=Math.atan2(t.y-cue.y,t.x-cue.x);power=30}
-   }
-  }
+  const plan=chooseShot(this.balls,this.group('b'),this.ballInHand)
+  if(!plan)return
+  if(plan.place){this.ballInHand=false;this.placed=false}
+  if(plan.pocket!=null)this.calledPocket=plan.pocket
   this.startShot()
-  strike(cue,Math.cos(angle)*shotSpeed(power),Math.sin(angle)*shotSpeed(power))
+  const s=shotSpeed(plan.power)
+  strike(this.balls[0],Math.cos(plan.angle)*s,Math.sin(plan.angle)*s)
  }
  guide(){const c=this.balls[0],dx=Math.cos(this.angle),dy=Math.sin(this.angle),rail=rayToRail(c.x,c.y,dx,dy);let hit=null,t=rail;for(let i=1;i<this.balls.length;i++){const b=this.balls[i];if(!b.on)continue;const ox=b.x-c.x,oy=b.y-c.y,p=ox*dx+oy*dy,s=ox*ox+oy*oy-p*p;if(p>R&&s<=4*R*R){const z=p-Math.sqrt(4*R*R-s);if(z<t){t=z;hit=b}}}return{c,dx,dy,t,hit,banks:!hit?bankPath(c.x,c.y,dx,dy,2):[]}}
  draw(dt=.016){this.renderer.draw(this,dt);this.updateHud()}

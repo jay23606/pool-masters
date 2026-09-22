@@ -1,0 +1,74 @@
+import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
+
+// Eight-ball rules, as pure functions over a plain state object. Nothing here
+// touches the DOM, the network or a renderer, so a game can be judged, tested
+// or replayed without any of them.
+
+export const other=t=>t==='a'?'b':'a'
+export const kind=n=>n===8?'eight':n<8?'solid':'stripe'
+export const opposite=g=>g==='solid'?'stripe':'solid'
+
+const shuffle=a=>a.sort(()=>Math.random()-.5)
+export function rack(){
+ const nums=shuffle([...Array(7)].map((_,i)=>i+1).concat([...Array(7)].map((_,i)=>i+9)))
+ nums.splice(4,0,8)
+ const a=[{x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}]
+ let q=0
+ for(let row=0;row<5;row++)for(let i=0;i<=row;i++){
+  const n=nums[q++]
+  a.push({x:420+row*15.66,y:190+(i-row/2)*18,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})
+ }
+ return a
+}
+
+export const groupOf=(s,player)=>s.groups[player]
+export const remaining=(balls,group)=>balls.filter(b=>b.on&&b.k===group).length
+export const nearestPocket=p=>POCKETS.reduce((best,x,i)=>{
+ const d=Math.hypot(p.x-x[0],p.y-x[1])
+ return d<best.d?{i,d}:best
+},{i:0,d:Infinity}).i
+export const validCueSpot=(balls,p)=>
+ p.x>=MINX&&p.x<=MAXX&&p.y>=MINY&&p.y<=MAXY&&
+ !balls.some(b=>b.k!=='cue'&&b.on&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
+
+// What a finished shot means, decided without changing anything. The caller
+// applies the verdict and owns the side effects -- the flash, the sync, the
+// cue ball coming back.
+//
+// Takes: turn, groups, breakShot, potted, scratch, firstHit, calledPocket,
+// eightPocket, and `before` -- how many of the shooter's own balls were on the
+// table when the shot was taken.
+export function judgeShot(s){
+ const shooter=s.turn,group=s.groups[shooter],open=!group
+ const black=s.potted.some(b=>b.k==='eight')
+ const onTheEight=s.before===0
+ const wrongFirst=!!s.firstHit&&(open
+  ? s.firstHit.k==='eight'
+  : s.firstHit.k!==(onTheEight?'eight':group))
+
+ if(black){
+  // the eight on the break is a win here rather than a re-rack
+  const legal=s.breakShot
+   ? !s.scratch
+   : !!group&&onTheEight&&!s.scratch&&s.calledPocket===s.eightPocket
+  return {winner:legal?shooter:other(shooter),foul:false,assign:null,nextTurn:shooter}
+ }
+ if(s.scratch||wrongFirst)return {winner:null,foul:true,assign:null,nextTurn:other(shooter)}
+
+ // An open table is decided only when a single group goes down. It used to be
+ // decided by whichever ball happened to be first in the potted list, whose
+ // order is the rack order rather than the order things actually fell -- so
+ // potting one of each could hand you the group you were not shooting at, and
+ // every shot after that was a foul. One of each now leaves the table open,
+ // which is what the break already did.
+ let assign=null
+ if(open){
+  const groups=[...new Set(s.potted.filter(b=>b.k==='solid'||b.k==='stripe').map(b=>b.k))]
+  if(groups.length===1)assign=groups[0]
+ }
+ // potting anything of your own keeps you at the table; while the table is
+ // open, any object ball counts
+ const madeOwn=group?s.potted.some(b=>b.k===group)
+                    :s.potted.some(b=>b.k==='solid'||b.k==='stripe')
+ return {winner:null,foul:false,assign,nextTurn:madeOwn?shooter:other(shooter)}
+}
