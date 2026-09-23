@@ -20,7 +20,7 @@ function ballTexture(THREE,kind,n){
   g.fillStyle=white;g.fillRect(0,0,TW,TH)
   // solids are colour everywhere but the poles; stripes keep a white band top and bottom
   g.fillStyle=col
-  if(kind==='stripe')g.fillRect(0,TH*.27,TW,TH*.46)
+  if(kind==='stripe')g.fillRect(0,TH*.39,TW,TH*.22)
   else g.fillRect(0,TH*cap,TW,TH*(1-2*cap))
   // number discs, pre-warped into the two polar caps
   const nc=document.createElement('canvas');nc.width=nc.height=128
@@ -55,7 +55,7 @@ function numberCap(THREE,n,kind){
  if(kind==='stripe'){
   g.fillStyle='#f7f4e9';g.beginPath();g.arc(48,48,42,0,Math.PI*2);g.fill()
   g.save();g.beginPath();g.arc(48,48,42,0,Math.PI*2);g.clip()
-  g.fillStyle=COLORS[n];g.fillRect(4,31,88,34);g.restore()
+  g.fillStyle=COLORS[n];g.fillRect(4,39,88,18);g.restore()
  }
  g.fillStyle='#f7f4e9';g.beginPath();g.arc(48,48,kind==='stripe'?20:34,0,Math.PI*2);g.fill()
  g.strokeStyle='#152018';g.lineWidth=3;g.stroke()
