@@ -83,6 +83,12 @@ test('scratching while potting the eight loses even when it was legal otherwise'
  assert.equal(g.result,'b')
 })
 
+test('when the AI claims stripes, the human is assigned solids',()=>{
+ const g=shot({turn:'b',potted:[ball('stripe',11)],firstObjectPotted:ball('stripe',11)})
+ assert.equal(g.groups.b,'stripe')
+ assert.equal(g.groups.a,'solid')
+})
+
 test('missing every object ball is a foul',()=>{
  const g=shot({groups:{a:'solid',b:'stripe'},before:3,firstHit:null})
  assert.equal(g.turn,'b');assert.equal(g.ballInHand,true)

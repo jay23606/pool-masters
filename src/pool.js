@@ -98,7 +98,9 @@ export class PoolGame{
   if(v.winner){this.finish(v.winner);this.phase='aim';this.sync();return}
   if(v.assign){
    this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
-   this.flash(`${v.assign==='solid'?'Solids':'Stripes'} are yours`)
+   const claimed=v.assign==='solid'?'Solids':'Stripes',mine=this.groups[this.me]==='solid'?'Solids':'Stripes'
+   const actor=shooter===this.me?'You':this.practice?'AI Coach':'Opponent'
+   this.flash(`${actor} claimed ${claimed} · You: ${mine}`)
   }
   if(v.foul)this.foul(v.reason)
   else if(v.nextTurn!==shooter){this.turn=v.nextTurn;this.calledPocket=null}
