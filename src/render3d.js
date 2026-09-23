@@ -46,10 +46,18 @@ function ballTexture(THREE,kind,n){
 // The UV number discs look natural from an angled camera but collapse into a
 // highlight in the top view. A small static cap keeps each ball identifiable
 // without bringing back the distracting full-ball spin animation.
-function numberCap(THREE,n){
+function numberCap(THREE,n,kind){
  const c=document.createElement('canvas');c.width=c.height=96
  const g=c.getContext('2d');g.clearRect(0,0,96,96)
- g.fillStyle='#f7f4e9';g.beginPath();g.arc(48,48,34,0,Math.PI*2);g.fill()
+ // In the top camera a physical stripe lies near the ball's silhouette.
+ // Draw its face explicitly: a broad white field with a colour belt makes
+ // striped balls recognizable even at phone scale.
+ if(kind==='stripe'){
+  g.fillStyle='#f7f4e9';g.beginPath();g.arc(48,48,42,0,Math.PI*2);g.fill()
+  g.save();g.beginPath();g.arc(48,48,42,0,Math.PI*2);g.clip()
+  g.fillStyle=COLORS[n];g.fillRect(4,31,88,34);g.restore()
+ }
+ g.fillStyle='#f7f4e9';g.beginPath();g.arc(48,48,kind==='stripe'?20:34,0,Math.PI*2);g.fill()
  g.strokeStyle='#152018';g.lineWidth=3;g.stroke()
  g.fillStyle='#111';g.font='bold 44px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(String(n),48,51)
  const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace
@@ -145,7 +153,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   }
   let badge=null
   if(b.k!=='cue'){
-   badge=numberCap(THREE,b.n);badge.rotation.x=-Math.PI/2;badge.position.set(tx(b.x),R+.24,tz(b.y));badge.renderOrder=3;scene.add(badge)
+   badge=numberCap(THREE,b.n,b.k);badge.rotation.x=-Math.PI/2;badge.position.set(tx(b.x),R+.24,tz(b.y));badge.renderOrder=3;scene.add(badge)
   }
   mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
   scene.add(mesh)
