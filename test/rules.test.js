@@ -83,6 +83,13 @@ test('scratching while potting the eight loses even when it was legal otherwise'
  assert.equal(g.result,'b')
 })
 
+test('scratching while playing the eight loses even when it stays up',()=>{
+ const g=shot({groups:{a:'solid',b:'stripe'},before:0,scratch:true,firstHit:ball('eight',8),
+               potted:[],calledPocket:2})
+ assert.equal(g.over,true)
+ assert.equal(g.result,'b')
+})
+
 test('the eight on the break wins, and is not treated as an early eight',()=>{
  const g=shot({breakShot:true,potted:[ball('eight',8)],eightPocket:1})
  assert.equal(g.over,true);assert.equal(g.result,'a')

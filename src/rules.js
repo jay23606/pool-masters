@@ -49,11 +49,14 @@ export function judgeShot(s){
   ? s.firstHit.k==='eight'
   : s.firstHit.k!==(onTheEight?'eight':group))
 
- if(black){
+ // APA 8-ball: scratching while playing the 8 is loss of game, even when
+ // the eight stays on the table. A normal scratch on any other shot remains
+ // ball in hand below.
+ if(black||(s.scratch&&s.firstHit?.k==='eight')){
   // the eight on the break is a win here rather than a re-rack
-  const legal=s.breakShot
+  const legal=black&& (s.breakShot
    ? !s.scratch
-   : !!group&&onTheEight&&!s.scratch&&s.calledPocket===s.eightPocket
+   : !!group&&onTheEight&&!s.scratch&&s.calledPocket===s.eightPocket)
   return {winner:legal?shooter:other(shooter),foul:false,assign:null,nextTurn:shooter}
  }
  if(s.scratch||wrongFirst)return {winner:null,foul:true,assign:null,nextTurn:other(shooter)}
