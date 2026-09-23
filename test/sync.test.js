@@ -18,3 +18,12 @@ test('a next-rack request is host-authoritative',()=>{
  g.receive({t:'next-rack'})
  assert.equal(started,1)
 })
+
+test('a called eight-ball pocket survives while the shot is rolling',()=>{
+ const g=Object.create(PoolGame.prototype)
+ Object.assign(g,{calledPocket:4,phase:'roll',canCallEight:()=>false})
+ g.clearInvalidCall()
+ assert.equal(g.calledPocket,4)
+ g.phase='aim';g.clearInvalidCall()
+ assert.equal(g.calledPocket,null)
+})

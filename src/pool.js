@@ -117,7 +117,10 @@ export class PoolGame{
  }
  guide(){const c=this.balls[0],dx=Math.cos(this.angle),dy=Math.sin(this.angle),rail=rayToRail(c.x,c.y,dx,dy);let hit=null,t=rail;for(let i=1;i<this.balls.length;i++){const b=this.balls[i];if(!b.on)continue;const ox=b.x-c.x,oy=b.y-c.y,p=ox*dx+oy*dy,s=ox*ox+oy*oy-p*p;if(p>R&&s<=4*R*R){const z=p-Math.sqrt(4*R*R-s);if(z<t){t=z;hit=b}}}return{c,dx,dy,t,hit,banks:!hit?bankPath(c.x,c.y,dx,dy,2):[]}}
  draw(dt=.016){this.renderer.draw(this,dt);this.updateHud()}
- updateHud(){if(this.calledPocket!=null&&!this.canCallEight())this.calledPocket=null;const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table';const count=p=>{const g=this.group(p);return g?(this.remaining(g)||'ON 8'):''}
+ clearInvalidCall(){if(this.calledPocket!=null&&this.phase==='aim'&&!this.canCallEight())this.calledPocket=null}
+ updateHud(){// A called pocket remains part of a shot after aiming ends; only
+  // discard it while setting up an illegal call, never while balls are rolling.
+  this.clearInvalidCall();const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table';const count=p=>{const g=this.group(p);return g?(this.remaining(g)||'ON 8'):''}
   const tag=(x,p)=>{const c=count(p);return label(x).toUpperCase()+(c?` · ${c}`:'')}
   if(this.groupStatus){const text=!mine&&!their?'TABLE OPEN':`YOU: ${tag(mine,this.me)} · THEM: ${tag(their,other(this.me))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
