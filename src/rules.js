@@ -59,7 +59,7 @@ export function judgeShot(s){
    : !!group&&onTheEight&&!s.scratch&&s.calledPocket===s.eightPocket)
   return {winner:legal?shooter:other(shooter),foul:false,assign:null,nextTurn:shooter}
  }
- if(s.scratch||wrongFirst)return {winner:null,foul:true,assign:null,nextTurn:other(shooter)}
+ if(s.scratch||wrongFirst)return {winner:null,foul:true,reason:s.scratch?'scratch':'wrong-first',assign:null,nextTurn:other(shooter)}
 
  // APA keeps the table open after every break, no matter what drops. On the
  // first later legal scoring shot, the first object ball pocketed decides the
@@ -73,5 +73,5 @@ export function judgeShot(s){
  // open, any object ball counts
  const madeOwn=group?s.potted.some(b=>b.k===group)
                     :s.potted.some(b=>b.k==='solid'||b.k==='stripe')
- return {winner:null,foul:false,assign,nextTurn:madeOwn?shooter:other(shooter)}
+ return {winner:null,foul:false,reason:null,assign,nextTurn:madeOwn?shooter:other(shooter)}
 }
