@@ -1,6 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,rack,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite} from './rules.js'
+import {other,rack,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup} from './rules.js'
 import {chooseShot} from './ai.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*.5
@@ -43,7 +43,7 @@ export class PoolGame{
  setReady(v){this.ready=v;this.draw()}
  newRack(){if(!this.over)return;this.round++;this.resetRack();this.ready=true;this.sync()}
  requestRack(){if(!this.over)return;if(this.host)this.newRack();else this.send({t:'next-rack'})}
- group(player=this.turn){return this.groups[player]}
+ group(player=this.turn){return normalizeGroup(this.groups[player])}
  remaining(group){return countLeft(this.balls,group)}
  // The eight is only legal once your own group is gone. Nothing used to say so:
  // a tap meant to call a pocket was simply swallowed.

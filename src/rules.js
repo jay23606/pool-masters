@@ -7,6 +7,9 @@ import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 export const other=t=>t==='a'?'b':'a'
 export const kind=n=>n===8?'eight':n<8?'solid':'stripe'
 export const opposite=g=>g==='solid'?'stripe':'solid'
+// Older room state may have used the display labels. Normalize at the rules
+// boundary so a stale peer can never make a remaining stripe invisible.
+export const normalizeGroup=g=>g==='solids'?'solid':g==='stripes'?'stripe':g
 
 const shuffle=a=>a.sort(()=>Math.random()-.5)
 export function rack(){
@@ -39,7 +42,7 @@ export const validCueSpot=(balls,p)=>
 // eightPocket, and `before` -- how many of the shooter's own balls were on the
 // table when the shot was taken.
 export function judgeShot(s){
- const shooter=s.turn,group=s.groups[shooter],open=!group
+ const shooter=s.turn,group=normalizeGroup(s.groups[shooter]),open=!group
  const black=s.potted.some(b=>b.k==='eight')
  const onTheEight=s.before===0
  const wrongFirst=!!s.firstHit&&(open

@@ -27,3 +27,11 @@ test('a called eight-ball pocket survives while the shot is rolling',()=>{
  g.phase='aim';g.clearInvalidCall()
  assert.equal(g.calledPocket,null)
 })
+
+test('legacy plural group names cannot make a stripe disappear from the count',()=>{
+ const g=Object.create(PoolGame.prototype)
+ Object.assign(g,{balls:[{on:true,k:'cue'},{on:true,k:'stripe'},{on:true,k:'eight'}],groups:{a:'stripes',b:'solids'},turn:'a',me:'a',phase:'aim',over:false})
+ assert.equal(g.group(),'stripe')
+ assert.equal(g.remaining(g.group()),1)
+ assert.equal(g.canCallEight(),false)
+})
