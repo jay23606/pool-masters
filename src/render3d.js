@@ -43,6 +43,19 @@ function ballTexture(THREE,kind,n){
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t
 }
 
+// The UV number discs look natural from an angled camera but collapse into a
+// highlight in the top view. A small static cap keeps each ball identifiable
+// without bringing back the distracting full-ball spin animation.
+function numberCap(THREE,n){
+ const c=document.createElement('canvas');c.width=c.height=96
+ const g=c.getContext('2d');g.clearRect(0,0,96,96)
+ g.fillStyle='#f7f4e9';g.beginPath();g.arc(48,48,34,0,Math.PI*2);g.fill()
+ g.strokeStyle='#152018';g.lineWidth=3;g.stroke()
+ g.fillStyle='#111';g.font='bold 44px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(String(n),48,51)
+ const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace
+ return new THREE.Mesh(new THREE.PlaneGeometry(R*1.18,R*1.18),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false}))
+}
+
 export async function createRenderer3D(canvas,camera3d='top',options={}){
  const THREE=await import('three')
  const {RoomEnvironment}=await import('three/examples/jsm/environments/RoomEnvironment.js')
@@ -130,9 +143,13 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
    stripe=new THREE.Mesh(new THREE.TorusGeometry(R*.58,R*.17,10,32),std('#f7f4e9',.32))
    stripe.rotation.x=Math.PI/2;stripe.position.set(tx(b.x),R+.16,tz(b.y));stripe.castShadow=true;scene.add(stripe)
   }
+  let badge=null
+  if(b.k!=='cue'){
+   badge=numberCap(THREE,b.n);badge.rotation.x=-Math.PI/2;badge.position.set(tx(b.x),R+.24,tz(b.y));badge.renderOrder=3;scene.add(badge)
+  }
   mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
   scene.add(mesh)
-  return balls[i]={mesh,mat,stripe,shown:{x:b.x,y:b.y},sink:0}
+  return balls[i]={mesh,mat,stripe,badge,shown:{x:b.x,y:b.y},sink:0}
  }
 
  // ---- aim overlays ----
@@ -211,8 +228,9 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     }
     e.mesh.position.x=mx;e.mesh.position.z=mz
     if(e.stripe){e.stripe.position.x=mx;e.stripe.position.z=mz}
-    if(b.on){e.sink=0;e.mesh.position.y=R;e.mesh.scale.setScalar(1);e.mesh.visible=true;if(e.stripe){e.stripe.position.y=R+.16;e.stripe.scale.setScalar(1);e.stripe.visible=true}}
-    else{e.sink=Math.min(1,e.sink+dt*4);e.mesh.position.y=R-e.sink*34;e.mesh.scale.setScalar(1-e.sink*.35);e.mesh.visible=e.sink<1;if(e.stripe){e.stripe.position.y=R-e.sink*34+.16;e.stripe.scale.setScalar(1-e.sink*.35);e.stripe.visible=e.sink<1}}
+    if(e.badge){e.badge.position.x=mx;e.badge.position.z=mz}
+    if(b.on){e.sink=0;e.mesh.position.y=R;e.mesh.scale.setScalar(1);e.mesh.visible=true;if(e.stripe){e.stripe.position.y=R+.16;e.stripe.scale.setScalar(1);e.stripe.visible=true}if(e.badge){e.badge.position.y=R+.24;e.badge.scale.setScalar(1);e.badge.visible=true}}
+    else{e.sink=Math.min(1,e.sink+dt*4);e.mesh.position.y=R-e.sink*34;e.mesh.scale.setScalar(1-e.sink*.35);e.mesh.visible=e.sink<1;if(e.stripe){e.stripe.position.y=R-e.sink*34+.16;e.stripe.scale.setScalar(1-e.sink*.35);e.stripe.visible=e.sink<1}if(e.badge){e.badge.position.y=R-e.sink*34+.24;e.badge.scale.setScalar(1-e.sink*.35);e.badge.visible=e.sink<1}}
    })
    ring.visible=game.calledPocket!=null
    if(ring.visible){const[px,py]=POCKETS[game.calledPocket];ring.position.x=tx(px);ring.position.z=tz(py)}
