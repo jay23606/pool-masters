@@ -61,7 +61,11 @@ function numberCap(THREE,n,kind){
  g.strokeStyle='#152018';g.lineWidth=3;g.stroke()
  g.fillStyle='#111';g.font='bold 44px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(String(n),48,51)
  const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace
- return new THREE.Mesh(new THREE.PlaneGeometry(R*1.18,R*1.18),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false}))
+ // A stripe has to cover the visible top of the sphere. The old number-sized
+ // decal left the coloured sphere exposed around it, so a 12 or 14 looked like
+ // a solid despite its correct game data.
+ const size=kind==='stripe'?R*2.03:R*1.18
+ return new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false}))
 }
 
 export async function createRenderer3D(canvas,camera3d='top',options={}){
