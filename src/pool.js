@@ -107,10 +107,12 @@ export class PoolGame{
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
-  const plan=chooseShot(this.balls,this.group('b'),this.ballInHand)
-  if(!plan)return
-  if(plan.place){this.ballInHand=false;this.placed=false}
-  if(plan.pocket!=null)this.calledPocket=plan.pocket
+ const plan=chooseShot(this.balls,this.group('b'),this.ballInHand)
+ if(!plan)return
+ if(plan.place){this.ballInHand=false;this.placed=false}
+  // The planner may receive old room state; never show an 8-ball call unless
+  // the live game state confirms the AI has cleared its own group.
+  if(plan.pocket!=null&&this.remaining(this.group('b'))===0)this.calledPocket=plan.pocket
   this.startShot()
   const s=shotSpeed(plan.power)
   strike(this.balls[0],Math.cos(plan.angle)*s,Math.sin(plan.angle)*s)

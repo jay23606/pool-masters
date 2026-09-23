@@ -1,6 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 import {integrate,railBounce,substeps,atRest,strike,shotSpeed} from './physics.js'
-import {remaining,validCueSpot,nearestPocket} from './rules.js'
+import {remaining,validCueSpot,nearestPocket,normalizeGroup} from './rules.js'
 
 // The practice opponent, as pure functions over a ball array. It never touches
 // the game object, so it can be run, measured and tested on its own -- which is
@@ -137,6 +137,7 @@ export function bestCueSpot(balls,group){
 // pocket to call, and the shot itself. Returns null only if there is nothing
 // legal left to hit at all.
 export function chooseShot(balls,group,ballInHand){
+ group=normalizeGroup(group)
  const place=ballInHand?bestCueSpot(balls,group):null
  if(place){balls[0].x=place.x;balls[0].y=place.y}
  const cue=balls[0]

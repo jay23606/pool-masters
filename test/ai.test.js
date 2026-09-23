@@ -162,3 +162,10 @@ test('once the group is cleared the eight is callable again',()=>{
  assert.equal(g.eightBlocked(),0)
  assert.equal(g.canCallEight(),true)
 })
+
+test('a legacy plural group name cannot make the AI call the eight early',()=>{
+ const balls=[ball(120,190,'cue',0),ball(420,190,'solid',3),ball(560,100,'eight',8)]
+ const plan=chooseShot(balls,'solids',false)
+ assert.ok(plan)
+ assert.equal(plan.pocket,null)
+})
