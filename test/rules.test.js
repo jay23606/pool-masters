@@ -10,17 +10,17 @@ function shot(o){
   balls:o.balls||[ball('cue',0),ball('solid',1),ball('stripe',9),ball('eight',8)],
   groups:o.groups||{a:null,b:null},turn:o.turn||'a',me:'a',phase:'roll',over:false,result:'',
   finished:false,round:1,practice:false,ballInHand:false,placed:false,
-  breakShot:!!o.breakShot,potted:o.potted||[],scratch:!!o.scratch,firstHit:o.firstHit??null,
+  breakShot:!!o.breakShot,potted:o.potted||[],firstObjectPotted:o.firstObjectPotted??null,scratch:!!o.scratch,firstHit:o.firstHit??null,
   before:o.before??null,calledPocket:o.calledPocket??null,eightPocket:o.eightPocket??null})
  g.flash=()=>{};g.sync=()=>{};g.onFinish=()=>{}
  g.resolve()
  return g
 }
 
-test('a break that drops one group only assigns it, and the shooter carries on',()=>{
+test('a break that drops one group keeps the table open, and the shooter carries on',()=>{
  const g=shot({breakShot:true,potted:[ball('solid',1)]})
- assert.equal(g.groups.a,'solid');assert.equal(g.groups.b,'stripe')
- assert.equal(g.turn,'a','potting your own keeps you at the table')
+ assert.equal(g.groups.a,null);assert.equal(g.groups.b,null)
+ assert.equal(g.turn,'a','potting an object ball keeps you at the table')
 })
 
 test('dropping one of each leaves the table open and you stay at it',()=>{
@@ -30,7 +30,7 @@ test('dropping one of each leaves the table open and you stay at it',()=>{
 })
 
 test('on an open table after the break, the first ball down decides the groups',()=>{
- const g=shot({potted:[ball('stripe',11)]})
+ const g=shot({potted:[ball('solid',2),ball('stripe',11)],firstObjectPotted:ball('stripe',11)})
  assert.equal(g.groups.a,'stripe');assert.equal(g.groups.b,'solid')
  assert.equal(g.turn,'a')
 })
@@ -102,17 +102,12 @@ test('the break flag is cleared and motion stops once a shot is judged',()=>{
  assert.ok(g.balls.every(b=>b.vx===0&&b.vy===0&&b.wz===0))
 })
 
-test('potting one of each on an open table does not hand you a group',()=>{
- // This was the bug: the group came from whichever ball happened to be first
- // in the potted list, and that list is in rack order, not the order things
- // fell. You could pot a solid and be put on stripes -- after which every shot
- // you aimed at a solid was a foul.
- for(const potted of [[ball('solid',1),ball('stripe',9)],[ball('stripe',9),ball('solid',1)]]){
-  const g=shot({potted})
-  assert.equal(g.groups.a,null,`potted ${potted.map(b=>b.k).join('+')} should leave it open`)
-  assert.equal(g.groups.b,null)
-  assert.equal(g.turn,'a','and you keep shooting')
- }
+test('mixed pots use the first ball to fall, never rack-array order',()=>{
+ const solid=ball('solid',1),stripe=ball('stripe',9)
+ const g=shot({potted:[solid,stripe],firstObjectPotted:stripe})
+ assert.equal(g.groups.a,'stripe')
+ assert.equal(g.groups.b,'solid')
+ assert.equal(g.turn,'a')
 })
 
 test('the group you get does not depend on the order balls are listed',()=>{

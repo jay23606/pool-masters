@@ -61,17 +61,14 @@ export function judgeShot(s){
  }
  if(s.scratch||wrongFirst)return {winner:null,foul:true,assign:null,nextTurn:other(shooter)}
 
- // An open table is decided only when a single group goes down. It used to be
- // decided by whichever ball happened to be first in the potted list, whose
- // order is the rack order rather than the order things actually fell -- so
- // potting one of each could hand you the group you were not shooting at, and
- // every shot after that was a foul. One of each now leaves the table open,
- // which is what the break already did.
+ // APA keeps the table open after every break, no matter what drops. On the
+ // first later legal scoring shot, the first object ball pocketed decides the
+ // groups. `firstObjectPotted` is recorded by the simulation at the pocket,
+ // rather than inferred from the rack's array order after the shot.
  let assign=null
- if(open){
-  const groups=[...new Set(s.potted.filter(b=>b.k==='solid'||b.k==='stripe').map(b=>b.k))]
-  if(groups.length===1)assign=groups[0]
- }
+ const firstObject=s.firstObjectPotted||s.potted.find(b=>b.k==='solid'||b.k==='stripe')
+ if(open&&!s.breakShot)assign=firstObject?.k==='solid'||firstObject?.k==='stripe'
+  ?firstObject.k:null
  // potting anything of your own keeps you at the table; while the table is
  // open, any object ball counts
  const madeOwn=group?s.potted.some(b=>b.k===group)

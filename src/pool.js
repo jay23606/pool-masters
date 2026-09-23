@@ -53,7 +53,7 @@ export class PoolGame{
  canControl(){return this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
  takeShot(){if(!this.canAim()||!this.aiming)return;if(this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
- startShot(){this.placed=false;this.potted=[];this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
+ startShot(){this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
  receive(m){
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
   if(m.t==='next-rack'&&this.host)return this.newRack()
@@ -81,7 +81,7 @@ export class PoolGame{
   for(const b of this.balls){
    if(!b.on)continue
    integrate(b,dt)
-   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else this.potted.push(b);if(b.k==='eight')this.eightPocket=p;this.flash(b.k==='cue'?'Scratch!':b.k==='eight'?'8-ball potted!':`${b.k==='solid'?'Solid':'Stripe'} ${b.n} potted!`);break}
+   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(b.k==='cue'?'Scratch!':b.k==='eight'?'8-ball potted!':`${b.k==='solid'?'Solid':'Stripe'} ${b.n} potted!`);break}
    if(!b.on)continue
    railBounce(b)
   }
