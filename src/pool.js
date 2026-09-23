@@ -10,7 +10,7 @@ const STEP=1/120       // fixed simulation step, so frame pacing cannot change a
 const CATCHUP=3        // never make up more than this much time in one go
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){this.balls=rack();this.turn='a';this.phase='aim';this.over=false;this.result='';this.finished=false;this.aiming=false;this.groups={a:null,b:null};this.breakShot=true;this.calledPocket=null;this.ballInHand=false;this.placed=false;this.setSpin(0,0)}
+ resetRack(){this.balls=rack();this.turn='a';this.phase='aim';this.over=false;this.result='';this.finished=false;this.aiming=false;this.groups={a:null,b:null};this.assignment=null;this.breakShot=true;this.calledPocket=null;this.ballInHand=false;this.placed=false;this.setSpin(0,0)}
  bind(){this.handlers={power:()=>this.powerOut.textContent=this.power.value+'%',down:e=>{if(!this.canControl())return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(this.ballInHand){if(!this.validCueSpot(p))return;cue.x=p.x;cue.y=p.y;this.ballInHand=false;this.placed=true;this.pendingPlace=[p.x,p.y];this.flash('Ball in hand placed · tap again to aim');return}if(this.canCallEight()&&this.calledPocket==null){this.calledPocket=this.nearestPocket(p);this.flash('8-ball pocket marked · tap again to aim');return}const pa=Math.atan2(p.y-cue.y,p.x-cue.x);if(!this.aiming)this.angle=pa;this.aiming=true;this.drag=true;this.pointerAngle=pa;this.surface.setPointerCapture?.(e.pointerId)},move:e=>{if(!this.drag)return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(Math.hypot(p.x-cue.x,p.y-cue.y)<5)return;const a=Math.atan2(p.y-cue.y,p.x-cue.x);this.angle=aimStep(this.angle,this.pointerAngle,a);this.pointerAngle=a},up:e=>{this.handlers.move(e);this.drag=false;this.surface.releasePointerCapture?.(e.pointerId)},shoot:()=>this.takeShot(),
    // Both of these are one tap away from being set wrong by accident, so
    // neither is final until the shot is actually taken.
@@ -65,7 +65,7 @@ export class PoolGame{
   this.balls=m.b.map(x=>({x:x[0],y:x[1],on:x[2],k:x[3],n:x[4],vx:0,vy:0,wx:0,wy:0,wz:0}))
   this.turn=m.turn;this.phase=m.phase;this.over=m.over;this.round=m.round
   if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}
-  this.groups=m.groups||this.groups;this.breakShot=!!m.breakShot;this.ballInHand=!!m.ballInHand
+  this.groups=m.groups||this.groups;this.assignment=m.assignment||null;this.breakShot=!!m.breakShot;this.ballInHand=!!m.ballInHand
   if(this.ballInHand)this.placed=false
   this.calledPocket=m.calledPocket
   if(!this.canCallEight())this.calledPocket=null
@@ -76,7 +76,7 @@ export class PoolGame{
   this.calledPocket=this.canCallEight()?(m.called??null):null
   this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
  }
- sync(){if(this.host)this.send({t:'state',b:this.balls.map(b=>[Math.round(b.x),Math.round(b.y),b.on,b.k,b.n]),turn:this.turn,phase:this.phase,over:this.over,result:this.result||'',round:this.round,groups:this.groups,breakShot:this.breakShot,ballInHand:this.ballInHand,calledPocket:this.calledPocket})}
+ sync(){if(this.host)this.send({t:'state',b:this.balls.map(b=>[Math.round(b.x),Math.round(b.y),b.on,b.k,b.n]),turn:this.turn,phase:this.phase,over:this.over,result:this.result||'',round:this.round,groups:this.groups,assignment:this.assignment,breakShot:this.breakShot,ballInHand:this.ballInHand,calledPocket:this.calledPocket})}
  sub(dt){
   for(const b of this.balls){
    if(!b.on)continue
@@ -98,6 +98,7 @@ export class PoolGame{
   if(v.winner){this.finish(v.winner);this.phase='aim';this.sync();return}
   if(v.assign){
    this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
+   this.assignment={player:shooter,ball:this.firstObjectPotted?.n||null,group:v.assign}
    const claimed=v.assign==='solid'?'Solids':'Stripes',mine=this.groups[this.me]==='solid'?'Solids':'Stripes'
    const actor=shooter===this.me?'You':this.practice?'AI Coach':'Opponent'
    this.flash(`${actor} claimed ${claimed} · You: ${mine}`)
@@ -126,7 +127,7 @@ export class PoolGame{
   // discard it while setting up an illegal call, never while balls are rolling.
   this.clearInvalidCall();const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table';const count=p=>{const g=this.group(p);return g?(this.remaining(g)||'ON 8'):''}
   const tag=(x,p)=>{const c=count(p);return label(x).toUpperCase()+(c?` · ${c}`:'')}
-  if(this.groupStatus){const totals=`SOLIDS ${this.remaining('solid')} · STRIPES ${this.remaining('stripe')}`;const text=!mine&&!their?`OPEN TABLE · ${totals}`:`YOU: ${tag(mine,this.me)} · THEM: ${tag(their,other(this.me))} · ${totals}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
+  if(this.groupStatus){const totals=`ON TABLE: SOLIDS ${this.remaining('solid')} · STRIPES ${this.remaining('stripe')}`;const band=x=>x==='solid'?'1–7':x==='stripe'?'9–15':'';const shown=(x,p)=>`${tag(x,p)}${x?` (${band(x)})`:''}`;const set=this.assignment?` · SET BY ${this.assignment.player===this.me?'YOU':'THEM'}: #${this.assignment.ball} ${this.assignment.group.toUpperCase()}`:'';const text=!mine&&!their?`OPEN TABLE · ${totals}`:`YOU: ${shown(mine,this.me)} · THEM: ${shown(their,other(this.me))}${set} · ${totals}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
   if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.aimingAtEight()&&this.eightBlocked()?`The 8 is not yours yet · ${this.eightBlocked()} ${label(mine).toLowerCase()} still to pot`:this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`}

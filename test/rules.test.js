@@ -32,6 +32,7 @@ test('dropping one of each leaves the table open and you stay at it',()=>{
 test('on an open table after the break, the first ball down decides the groups',()=>{
  const g=shot({potted:[ball('solid',2),ball('stripe',11)],firstObjectPotted:ball('stripe',11)})
  assert.equal(g.groups.a,'stripe');assert.equal(g.groups.b,'solid')
+ assert.deepEqual(g.assignment,{player:'a',ball:11,group:'stripe'})
  assert.equal(g.turn,'a')
 })
 
@@ -81,6 +82,13 @@ test('scratching while potting the eight loses even when it was legal otherwise'
  const g=shot({groups:{a:'solid',b:'stripe'},before:0,scratch:true,firstHit:ball('eight',8),
                potted:[ball('eight',8)],calledPocket:2,eightPocket:2})
  assert.equal(g.result,'b')
+})
+
+test('a later solid pocket cannot reassign a player who owns stripes',()=>{
+ const g=shot({groups:{a:'stripe',b:'solid'},before:3,firstHit:ball('stripe',9),potted:[ball('solid',2)]})
+ assert.equal(g.groups.a,'stripe')
+ assert.equal(g.groups.b,'solid')
+ assert.equal(g.turn,'b')
 })
 
 test('when the AI claims stripes, the human is assigned solids',()=>{
