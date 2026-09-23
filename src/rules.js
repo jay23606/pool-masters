@@ -45,6 +45,7 @@ export function judgeShot(s){
  const shooter=s.turn,group=normalizeGroup(s.groups[shooter]),open=!group
  const black=s.potted.some(b=>b.k==='eight')
  const onTheEight=s.before===0
+ const noContact=!s.firstHit
  const wrongFirst=!!s.firstHit&&(open
   ? s.firstHit.k==='eight'
   : s.firstHit.k!==(onTheEight?'eight':group))
@@ -59,7 +60,7 @@ export function judgeShot(s){
    : !!group&&onTheEight&&!s.scratch&&s.calledPocket===s.eightPocket)
   return {winner:legal?shooter:other(shooter),foul:false,assign:null,nextTurn:shooter}
  }
- if(s.scratch||wrongFirst)return {winner:null,foul:true,reason:s.scratch?'scratch':'wrong-first',assign:null,nextTurn:other(shooter)}
+ if(s.scratch||wrongFirst||noContact)return {winner:null,foul:true,reason:s.scratch?'scratch':wrongFirst?'wrong-first':'no-contact',assign:null,nextTurn:other(shooter)}
 
  // APA keeps the table open after every break, no matter what drops. On the
  // first later legal scoring shot, the first object ball pocketed decides the

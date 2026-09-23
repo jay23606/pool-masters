@@ -90,7 +90,7 @@ export class PoolGame{
    if(!a.on||!b.on)continue
    if(ballCollide(a,b)&&!this.firstHit){if(a.k==='cue')this.firstHit=b;else if(b.k==='cue')this.firstHit=a}
   }}
- foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`:'Foul · ball in hand')}
+ foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`:reason==='no-contact'?'Foul · no object ball contacted · ball in hand':'Foul · ball in hand')}
  finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(winner===this.me?'You win!':'You lose')}
  resolve(){
   const shooter=this.turn

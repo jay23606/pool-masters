@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict'
 import {PoolGame} from '../src/pool.js'
 import {strike} from '../src/physics.js'
+import {R} from '../src/table.js'
 
 // A bare game with the simulation wired up but nothing else: advance() is the
 // only thing under test.
@@ -46,4 +47,13 @@ test('time is not invented when nothing is rolling',()=>{
  const before=snap(g)
  g.advance(0);g.advance(5000)
  assert.deepEqual(snap(g),before)
+})
+
+test('the live collision path records the solid as the first hit',()=>{
+ const g=Object.create(PoolGame.prototype)
+ const ball=(x,k,n)=>({x,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k,n})
+ g.balls=[ball(200,'cue',0),ball(200+R*1.9,'solid',1),ball(500,'stripe',9)]
+ g.firstHit=null;g.potted=[];g.scratch=false;g.flash=()=>{}
+ g.sub(0)
+ assert.equal(g.firstHit?.k,'solid')
 })

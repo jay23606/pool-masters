@@ -10,7 +10,7 @@ function shot(o){
   balls:o.balls||[ball('cue',0),ball('solid',1),ball('stripe',9),ball('eight',8)],
   groups:o.groups||{a:null,b:null},turn:o.turn||'a',me:'a',phase:'roll',over:false,result:'',
   finished:false,round:1,practice:false,ballInHand:false,placed:false,
-  breakShot:!!o.breakShot,potted:o.potted||[],firstObjectPotted:o.firstObjectPotted??null,scratch:!!o.scratch,firstHit:o.firstHit??null,
+  breakShot:!!o.breakShot,potted:o.potted||[],firstObjectPotted:o.firstObjectPotted??null,scratch:!!o.scratch,firstHit:o.firstHit===undefined?(o.potted||[]).find(b=>b.k!=='cue')||null:o.firstHit,
   before:o.before??null,calledPocket:o.calledPocket??null,eightPocket:o.eightPocket??null})
  g.flash=()=>{};g.sync=()=>{};g.onFinish=()=>{}
  g.resolve()
@@ -81,6 +81,11 @@ test('scratching while potting the eight loses even when it was legal otherwise'
  const g=shot({groups:{a:'solid',b:'stripe'},before:0,scratch:true,firstHit:ball('eight',8),
                potted:[ball('eight',8)],calledPocket:2,eightPocket:2})
  assert.equal(g.result,'b')
+})
+
+test('missing every object ball is a foul',()=>{
+ const g=shot({groups:{a:'solid',b:'stripe'},before:3,firstHit:null})
+ assert.equal(g.turn,'b');assert.equal(g.ballInHand,true)
 })
 
 test('scratching while playing the eight loses even when it stays up',()=>{
