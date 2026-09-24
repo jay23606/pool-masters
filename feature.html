@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pool Masters — Feature Roadmap</title>
+<style>
+:root{
+ font-family:Inter,ui-sans-serif,system-ui,sans-serif;
+ --bg:#07110d;--panel:#0d1d16;--panel2:#10241a;--line:#20372c;
+ --green:#42d983;--text:#ecf6ef;--muted:#8fa89a;--muted2:#6d8175;
+ --yes:#42d983;--yes-bg:#123526;--partial:#ffc957;--partial-bg:#2b230f;
+ --no:#5a6b62;--no-bg:transparent;--star-bg:#1d4a34;--star:#8ff0bb;
+}
+*{box-sizing:border-box}
+body{
+ margin:0;color:var(--text);background:radial-gradient(circle at 20% 0,#123526 0,transparent 36%),var(--bg);
+ line-height:1.5;padding-bottom:80px;
+}
+header{
+ max-width:1180px;margin:0 auto;padding:clamp(40px,7vw,80px) clamp(20px,4vw,32px) 20px;
+}
+.eyebrow{color:var(--green);font-size:.72rem;font-weight:900;letter-spacing:.17em;text-transform:uppercase}
+h1{font-size:clamp(2.2rem,5vw,3.4rem);line-height:1.05;letter-spacing:-.03em;margin:14px 0 18px}
+h1 em{font-style:normal;color:#93bda6}
+header>p{color:var(--muted);max-width:680px;font-size:1.05rem;margin:0 0 8px}
+.meta{color:var(--muted2);font-size:.82rem;margin-top:18px}
+
+main{max-width:1180px;margin:0 auto;padding:0 clamp(20px,4vw,32px)}
+section{margin-bottom:56px}
+h2{font-size:1.3rem;margin:0 0 6px;letter-spacing:-.01em}
+h2 .n{color:var(--green);margin-right:8px}
+.section-sub{color:var(--muted);font-size:.9rem;margin:0 0 20px;max-width:760px}
+
+/* verdict cards */
+.verdict-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.card{background:linear-gradient(145deg,var(--panel2),#0a1711);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 20px 50px #0005}
+.card h3{margin:0 0 8px;font-size:.95rem;display:flex;align-items:center;gap:8px}
+.card p{margin:0;color:var(--muted);font-size:.85rem}
+.card.strength h3::before{content:"●";color:var(--green)}
+.card.gap h3::before{content:"●";color:var(--partial)}
+
+/* roadmap list */
+.roadmap{display:grid;gap:10px}
+.rm{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px}
+.rm .rank{font-size:1.4rem;font-weight:900;color:var(--green);min-width:28px}
+.rm h4{margin:0 0 4px;font-size:.95rem}
+.rm p{margin:0;color:var(--muted);font-size:.83rem}
+.rm .tag{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap;align-self:start}
+.tag.high{background:#2b1414;color:#ff9d9d;border:1px solid #5a2a2a}
+.tag.med{background:var(--partial-bg);color:var(--partial);border:1px solid #4a3a1a}
+.tag.low{background:#132018;color:#9fc4ab;border:1px solid #2a4636}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:18px;font-size:.8rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.dot{width:11px;height:11px;border-radius:4px;display:inline-block}
+.dot.yes{background:var(--yes)}
+.dot.partial{background:var(--partial)}
+.dot.no{background:var(--no)}
+.dot.star{background:var(--star)}
+
+/* comparison table */
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:920px;font-size:.83rem}
+thead th{
+ position:sticky;top:0;background:#0f2117;z-index:2;
+ padding:14px 12px;text-align:left;border-bottom:1px solid var(--line);
+ font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+}
+thead th.ours{color:var(--green)}
+thead th small{display:block;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted2);margin-top:3px;font-size:.7rem}
+tbody th{
+ position:sticky;left:0;background:var(--panel);z-index:1;
+ text-align:left;padding:10px 14px;font-weight:600;font-size:.83rem;
+ border-bottom:1px solid #182a20;white-space:nowrap;
+}
+tbody td{padding:10px 12px;border-bottom:1px solid #182a20;text-align:center}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td,tbody tr:hover th{background:#0f2117}
+td.ours,th.ours-col{background:#0e2118}
+.cat-row th{
+ position:static;background:var(--panel2)!important;color:var(--green);
+ font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;padding:9px 14px;
+ border-bottom:1px solid var(--line);border-top:1px solid var(--line);
+}
+.cat-row td{background:var(--panel2)}
+.pill{display:inline-flex;width:22px;height:22px;border-radius:7px;align-items:center;justify-content:center;font-size:.75rem;font-weight:900}
+.pill.yes{background:var(--yes-bg);color:var(--yes)}
+.pill.partial{background:var(--partial-bg);color:var(--partial)}
+.pill.no{color:var(--no)}
+.pill.star{background:var(--star-bg);color:var(--star)}
+
+.sources{color:var(--muted2);font-size:.78rem;line-height:1.9}
+.sources a{color:#8ed0ad;text-decoration:none}
+.sources a:hover{text-decoration:underline}
+footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);border-top:1px solid var(--line);color:var(--muted2);font-size:.8rem}
+
+@media (max-width:640px){
+ table{font-size:.76rem}
+ thead th,tbody td{padding:8px}
+}
+</style>
+</head>
+<body>
+
+<header>
+ <p class="eyebrow">Pool Masters · Competitive Landscape</p>
+ <h1>Where we stand,<br><em>and where to go next.</em></h1>
+ <p>A feature-by-feature comparison of Pool Masters against five other pool/billiards
+ games — two open source, three closed source — built to turn "what should we build
+ next" into an evidence-based list rather than a guess.</p>
+ <p class="meta">Compiled September 2026 from each project's own documentation, store
+ listings and public repositories. Closed-source entries are necessarily based on
+ what's publicly visible — see Sources at the end.</p>
+</header>
+
+<main>
+
+<section>
+ <h2><span class="n">01</span>The field</h2>
+ <p class="section-sub">Six pool games, chosen to cover the range: a technically serious
+ open-source physics sim, a research-grade simulator, the mass-market mobile leader, a
+ 3D/AR-forward mobile competitor, and a feature-rich desktop PC title.</p>
+ <div class="verdict-grid">
+  <div class="card">
+   <h3 style="color:var(--green)">Pool Masters</h3>
+   <p>This project. Browser-based 8-ball with real-time voice/video, host-authoritative
+   netcode with client-side prediction, and a from-scratch physics engine (angular
+   velocity, skid-to-roll, throw, spin-aware cushions).</p>
+  </div>
+  <div class="card">
+   <h3>tailuge/billiards</h3>
+   <p>Open source. In-browser 8/9-ball, snooker and 3-cushion carom with a serious
+   physics core, replay links, and tools to inspect and tweak the physics itself.</p>
+  </div>
+  <div class="card">
+   <h3>Pooltool</h3>
+   <p>Open source. A Python/Panda3D billiards simulator built for science and
+   engineering as much as play — event-based analytical physics, JIT-compiled, with a
+   documented API for shot analysis.</p>
+  </div>
+  <div class="card">
+   <h3>8 Ball Pool (Miniclip)</h3>
+   <p>Closed source. The market leader by scale: coin economy, tournaments, league
+   tiers, cue cosmetics, and cross-platform play including Messenger/iMessage.</p>
+  </div>
+  <div class="card">
+   <h3>Kings of Pool</h3>
+   <p>Closed source. Mobile-first with an AR mode that projects a life-size table onto
+   a real surface, plus customizable felt/decals within it.</p>
+  </div>
+  <div class="card">
+   <h3>Cue Club 2</h3>
+   <p>Closed source, desktop. The genre generalist: 8-ball, 9-ball, killer, speed pool
+   and snooker in one game, venue-unlock progression, and a physics-toy "slam" mode.</p>
+  </div>
+ </div>
+</section>
+
+<section>
+ <h2><span class="n">02</span>Where this points next</h2>
+ <p class="section-sub">The eight gaps below are the ones every competitor above has
+ that we don't, ranked by how much they'd change what the game can do versus how much
+ they'd cost to build.</p>
+ <div class="roadmap">
+
+  <div class="rm">
+   <div class="rank">1</div>
+   <div><h4>A second game mode — 9-ball</h4>
+   <p>Every other entry in this table supports more than one ruleset. 9-ball reuses the
+   entire physics/rendering/networking stack — it's a new <code>rules.js</code> variant
+   and a smaller rack, not a new engine. Highest ratio of reach to effort on this list.</p></div>
+   <span class="tag high">High impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">2</div>
+   <div><h4>Replay links</h4>
+   <p>tailuge/billiards already does this, and we did the hard part in September when
+   client-side prediction started transmitting velocity/spin, not just position — a
+   shot is now fully described by its starting conditions. Recording and replaying one
+   is close to free from here.</p></div>
+   <span class="tag high">High impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">3</div>
+   <div><h4>Trick-shot / practice drill library</h4>
+   <p>tailuge/billiards and Cue Club 2 both ship curated practice setups. We already
+   have ball-in-hand placement and a full physics sandbox in practice mode — this is
+   mostly content (a set of starting racks) plus a "load this setup" button.</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">4</div>
+   <div><h4>Achievements / trophies</h4>
+   <p>Elo and streaks exist, but there's no discrete "you did this" moment the way
+   Miniclip's and Cue Club 2's trophy cases give players. Cheap to add on top of the
+   stats we already track (break-and-runs, table-size records).</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">5</div>
+   <div><h4>Native mobile app wrapper</h4>
+   <p>Four of the five competitors are mobile-native or mobile-first. The PWA already
+   installs and works offline for practice; wrapping it (Capacitor/Tauri-style) for
+   app-store presence is packaging, not new engineering — but it's real ongoing work
+   (store review, push notifications, update cadence).</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">6</div>
+   <div><h4>Friends list / social graph</h4>
+   <p>Right now every match is a room code or matchmaking — there's no way to find
+   "that person I played last week" again on purpose. Miniclip's Messenger/iMessage
+   integration is the extreme version; even a simple friends list closes most of the
+   gap.</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">7</div>
+   <div><h4>Tournament mode</h4>
+   <p>Bracket play with escalating stakes is a Miniclip/Cue Club 2 staple and would put
+   our race-to-N match format and Elo system to more use. Needs real design work
+   (bracket state, byes, spectator flow for eliminated players) beyond a single PR.</p></div>
+   <span class="tag low">Lower priority</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">8</div>
+   <div><h4>Physics-constant inspector</h4>
+   <p>tailuge/billiards exposes its physics constants for tweaking; Pooltool goes
+   further with a full analytical model swap. A read-only debug panel showing our own
+   constants (already named and commented in <code>physics.js</code>) would be a fun,
+   low-cost nod to the same idea without touching the simulation itself.</p></div>
+   <span class="tag low">Lower priority</span>
+  </div>
+
+ </div>
+</section>
+
+<section>
+ <h2><span class="n">03</span>Full comparison</h2>
+ <p class="section-sub">Every feature below is scored against what each project
+ documents about itself or visibly ships. A star marks something we do that no other
+ entry in this table does.</p>
+
+ <div class="legend">
+  <span><i class="dot yes"></i> Has it</span>
+  <span><i class="dot partial"></i> Partial / limited</span>
+  <span><i class="dot no"></i> Doesn't have it</span>
+  <span><i class="dot star"></i> Ahead of the field</span>
+ </div>
+
+ <div class="table-scroll">
+ <table>
+  <thead>
+   <tr>
+    <th>Feature</th>
+    <th class="ours">Pool Masters<small>this project</small></th>
+    <th>tailuge/billiards<small>open source</small></th>
+    <th>Pooltool<small>open source</small></th>
+    <th>8 Ball Pool<small>Miniclip</small></th>
+    <th>Kings of Pool<small>closed source</small></th>
+    <th>Cue Club 2<small>closed source</small></th>
+   </tr>
+  </thead>
+  <tbody id="rows"></tbody>
+ </table>
+ </div>
+</section>
+
+<section>
+ <h2><span class="n">04</span>Sources</h2>
+ <p class="sources">
+  <a href="https://github.com/tailuge/billiards" target="_blank" rel="noopener">tailuge/billiards</a> — GitHub repository and live demo.<br>
+  <a href="https://ekiefl.github.io/projects/pooltool/" target="_blank" rel="noopener">Pooltool</a> — project page, JOSS paper and developer blog (ekiefl.github.io).<br>
+  <a href="https://en.wikipedia.org/wiki/8_Ball_Pool" target="_blank" rel="noopener">8 Ball Pool (Miniclip)</a> — Wikipedia, Miniclip support docs, app store listings.<br>
+  <a href="https://play.google.com/store/apps/details?id=com.uken.pool" target="_blank" rel="noopener">Kings of Pool</a> — Google Play listing and third-party reviews.<br>
+  <a href="https://en.wikipedia.org/wiki/Cue_Club_2" target="_blank" rel="noopener">Cue Club 2</a> — Wikipedia and Steam community discussions.
+ </p>
+</section>
+
+</main>
+
+<footer>Pool Masters feature roadmap · generated for internal planning, not for publication as a competitive claim.</footer>
+
+<script>
+// Each row: [category?, feature, [pm, tail, pool, mini, kings, cue], note?]
+// score: 'y' yes · 'p' partial · 'n' no · 's' star (yes, and ahead of the field)
+const rows = [
+['cat','Core rules & modes'],
+['Standard 8-ball rules', ['s','y','y','y','y','y'], 'Ours adds explicit foul-reason messaging and a live "on the 8" HUD state most others leave implicit.'],
+['9-ball', ['n','y','p','y','p','y']],
+['Snooker / carom variants', ['n','y','n','n','n','y']],
+['Other rule variants (killer, speed pool, etc.)', ['n','n','n','n','n','y']],
+['Trick-shot / practice drill library', ['n','y','p','p','n','y']],
+['Tournament / bracket mode', ['n','n','n','y','y','y']],
+['Single-player campaign or career', ['n','n','n','n','n','y']],
+['"Slam" / novelty physics mode', ['n','n','n','n','n','y']],
+
+['cat','Physics & simulation'],
+['Angular velocity model (true rolling, not just friction)', ['y','y','y','p','p','y']],
+['Skid-to-roll transition (stun/draw/follow emerge naturally)', ['y','y','y','p','p','y']],
+['Ball-on-ball throw', ['y','y','y','n','n','p']],
+['Speed-dependent cushion restitution + spin transfer', ['y','y','y','p','p','p']],
+['Frame-rate-independent shot outcome (tested)', ['s','p','y','n','n','n'], 'Verified by test: identical result at 240Hz, a jittery rate, and 1 update/sec.'],
+['Event-based / analytical physics engine', ['n','n','y','n','n','n'], 'We use fixed-substep integration; Pooltool solves motion analytically between events.'],
+['Physics constants exposed for inspection/tweaking', ['n','y','y','n','n','n']],
+['Real-world scaled units (documented)', ['y','p','y','n','n','n']],
+
+['cat','Multiplayer & networking'],
+['Peer-to-peer (no dedicated game server)', ['y','p','n','n','n','n']],
+['Host-authoritative anti-cheat model', ['y','p','n','y','y','n']],
+['Client-side prediction with server/host reconciliation', ['s','n','n','p','p','n'], 'Shipped this session — tested against the host in a live two-peer browser run.'],
+['Resumable rooms after disconnect', ['y','n','n','p','p','n']],
+['Spectator mode', ['y','y','n','p','p','n']],
+['Private room codes', ['y','p','n','y','y','n']],
+['Cross-platform play (incl. messaging apps)', ['n','n','n','y','n','n']],
+['Replay links / shareable match recordings', ['n','y','y','n','n','n']],
+
+['cat','Social'],
+['In-match voice call', ['s','n','n','n','n','n'], 'No competitor in this table offers live voice during a match.'],
+['In-match video call', ['s','n','n','n','n','n']],
+['Text chat', ['y','p','n','y','y','n']],
+['Friends list / social graph', ['n','n','n','y','y','n']],
+['Guilds / clans', ['n','n','n','p','n','n']],
+
+['cat','Progression & competitive'],
+['Skill rating (Elo or similar)', ['y','n','n','y','y','n']],
+['Dual-verified ranked result reporting', ['s','n','n','n','n','n'], 'Both players must independently confirm a result before it counts — closes an easy self-reporting exploit.'],
+['League / global leaderboard', ['y','n','n','y','y','n']],
+['Win/loss streak tracking', ['y','n','n','p','p','n']],
+['Break-and-run stat tracking', ['y','n','n','n','n','n']],
+['Stats broken out by table size', ['y','n','n','n','n','n']],
+['Recent match history', ['y','n','n','p','p','p']],
+['Achievements / trophies', ['n','n','n','y','y','y']],
+['Daily login rewards', ['n','n','n','y','n','n']],
+['Coin / currency economy', ['n','n','n','y','y','n']],
+
+['cat','Practice & AI'],
+['AI opponent', ['y','p','n','y','y','y']],
+['Multiple AI difficulty levels', ['y','n','n','y','y','y']],
+['Local unranked practice record', ['y','n','n','n','n','n']],
+
+['cat','Customization'],
+['Table size options', ['y','p','y','n','n','p']],
+['Felt / cloth color options', ['y','p','y','y','y','y']],
+['Cue skins or finishes', ['y','n','n','y','y','y']],
+['Table lighting / ambience presets', ['y','n','p','p','p','p']],
+['Adjustable aim sensitivity', ['y','n','n','p','p','p']],
+['Cosmetic unlocks via in-game currency', ['n','n','n','y','y','n']],
+['AR mode (real-world table projection)', ['n','n','n','n','y','n']],
+
+['cat','Presentation'],
+['3D rendering', ['y','y','y','y','y','y']],
+['Multiple switchable camera views', ['y','p','y','p','y','y']],
+['2D fallback rendering', ['y','n','n','n','n','n']],
+['Procedurally synthesized sound effects', ['y','p','n','n','n','n']],
+['Licensed streaming background music', ['s','n','n','n','n','n'], 'Live-licensed tracks via Jamendo/Openverse, with a procedural fallback if the fetch fails.'],
+['Crowd/ambience audio on match results', ['y','n','n','p','p','p']],
+
+['cat','Platform & access'],
+['Runs in-browser, no install', ['y','y','p','n','n','n']],
+['Installable PWA with offline practice', ['y','n','n','n','n','n']],
+['Native mobile app', ['n','n','n','y','y','n']],
+['Native desktop app', ['n','n','y','n','n','y']],
+
+['cat','Openness & engineering'],
+['Open source', ['y','y','y','n','n','n']],
+['Automated test suite', ['y','p','p','n','n','n']],
+['CI gating every change (lint/test/build)', ['y','n','n','n','n','n']],
+['No ads / no IAP monetization', ['y','y','y','n','n','n']],
+];
+
+const iconFor = c => c==='y' ? '<span class="pill yes">✓</span>'
+ : c==='s' ? '<span class="pill star">★</span>'
+ : c==='p' ? '<span class="pill partial">~</span>'
+ : '<span class="pill no">–</span>';
+
+const tbody = document.getElementById('rows');
+for (const row of rows) {
+ const tr = document.createElement('tr');
+ if (row[0] === 'cat') {
+  tr.className = 'cat-row';
+  tr.innerHTML = `<th colspan="7">${row[1]}</th>`;
+ } else {
+  const [feature, scores, note] = row;
+  tr.innerHTML = `<th>${feature}${note ? `<div style="font-weight:400;color:var(--muted2);font-size:.72rem;margin-top:3px;white-space:normal;max-width:280px">${note}</div>` : ''}</th>` +
+   scores.map((c,i) => `<td${i===0?' class="ours"':''}>${iconFor(c)}</td>`).join('');
+ }
+ tbody.appendChild(tr);
+}
+</script>
+</body>
+</html>
