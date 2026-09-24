@@ -51,6 +51,17 @@ export function createMusic(){
    o.connect(f);f.connect(g);g.connect(master);o.start(at);o.stop(at+duration+.04)
   }
  }
+ const lead=(at,duration,pitch,gain,preset)=>{
+  if(preset.lead==='ooh')return vocal(at,duration,pitch,gain*.55)
+  if(preset.lead==='bass')return note(at,duration*1.25,pitch/2,gain*.95,'sine')
+  if(preset.lead==='bell'){
+   note(at,duration*.72,pitch,gain*.72,'sine')
+   return note(at,duration*.42,pitch*2.76,gain*.27,'sine')
+  }
+  // The second, quieter partial gives the piano station a felt-hammer edge.
+  note(at,duration,pitch,gain*.82,'sine')
+  note(at,duration*.36,pitch*2,gain*.18,'triangle')
+ }
  const hz=n=>440*Math.pow(2,(n-69)/12)
  function schedule(){
   if(!enabled||!ctx||ctx.state!=='running')return
@@ -61,7 +72,7 @@ export function createMusic(){
   note(at,beat*.8,hz(p.root-12+(step%8===0?7:0)),.025,'sine')
   if(step%2===0){note(at,beat*.92,hz(p.root+scale[chord]),.013,p.wave);note(at,beat*.92,hz(p.root+scale[(chord+2)%scale.length]),.01,p.wave)}
   const melody=(step*3+p.variation*5)%11
-  if(melody<6){const pitch=hz(p.root+12+scale[melody%scale.length]);if(p.lead==='ooh'&&step%4===1)vocal(at+beat*.44,beat*.72,pitch,.008);else note(at+beat*.48,beat*.32,pitch,p.lead==='bell'?.012:.017,p.lead==='piano'?'sine':p.wave,(p.variation-1.5)*3)}
+  if(melody<6){const pitch=hz(p.root+12+scale[melody%scale.length]);if(p.lead!=='ooh'||step%4===1)lead(at+beat*.48,beat*.42,pitch,.017,p)}
   step=(step+1)%64
   timer=setTimeout(schedule,Math.max(80,beat*1000-20))
  }
