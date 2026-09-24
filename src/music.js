@@ -30,6 +30,8 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
+ let stream=null,loading=false,remoteTitle='',remoteCredit='',queue=[]
+ const searches=['lofi jazz','ambient music','piano loop','jazz lounge','electronic loop','funk groove','soul loop']
  const current=()=>MUSIC_PRESETS[index]
  const context=()=>{
   if(ctx)return ctx
@@ -79,14 +81,35 @@ export function createMusic(){
   step=(step+1)%64
   timer=setTimeout(schedule,Math.max(80,beat*1000-20))
  }
- const start=()=>{if(!enabled)return;const c=context();if(!c)return;c.resume().then(()=>{if(!enabled||timer)return;master.gain.cancelScheduledValues(c.currentTime);master.gain.linearRampToValueAtTime(volume,c.currentTime+.16);schedule()}).catch(()=>{})}
- const stop=()=>{clearTimeout(timer);timer=null;if(ctx)master.gain.linearRampToValueAtTime(.0001,ctx.currentTime+.12)}
+ const startSynth=()=>{if(!enabled)return;const c=context();if(!c)return;c.resume().then(()=>{if(!enabled||timer)return;master.gain.cancelScheduledValues(c.currentTime);master.gain.linearRampToValueAtTime(volume,c.currentTime+.16);schedule()}).catch(()=>{})}
+ const stopSynth=()=>{clearTimeout(timer);timer=null;if(ctx)master.gain.linearRampToValueAtTime(.0001,ctx.currentTime+.12)}
+ const stop=()=>{stopSynth();if(stream){stream.pause();stream.removeAttribute('src');stream.load();stream=null}}
+ const playTrack=track=>{
+  if(!enabled||!track)return
+  stream=new Audio(track.url);stream.volume=Math.min(1,volume);stream.preload='auto'
+  remoteTitle=track.title||'CC0 pool-hall radio';remoteCredit=track.creator?`CC0 audio by ${track.creator}`:'CC0 audio'
+  stream.addEventListener('ended',()=>{stream=null;startRadio()},{once:true})
+  stream.addEventListener('error',()=>{stream=null;startRadio()},{once:true})
+  stream.play().catch(()=>{stream=null;startSynth()})
+ }
+ async function startRadio(){
+  if(!enabled||stream||loading)return
+  const next=queue.pop();if(next)return playTrack(next)
+  loading=true
+  try{
+   const query=searches[Math.floor(Math.random()*searches.length)]
+   const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&license=cc0&source=freesound&page_size=20`)
+   const data=await response.json()
+   queue=(data.results||[]).filter(track=>track.url?.startsWith('https://')&&track.duration>=20000&&track.license==='cc0')
+   if(queue.length)playTrack(queue.pop());else startSynth()
+  }catch{startSynth()}finally{loading=false}
+ }
  return {
-  get enabled(){return enabled},get title(){return current().name},get lyric(){return current().lyric},get volume(){return volume},
-  setEnabled(value){enabled=!!value;if(enabled)start();else stop()},
-  setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
-  resume(){if(enabled)start()},
-  shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;if(enabled){stop();start()}return current().name},
+  get enabled(){return enabled},get title(){return remoteTitle||current().name},get credit(){return remoteCredit},get lyric(){return current().lyric},get volume(){return volume},
+  setEnabled(value){enabled=!!value;if(enabled)startRadio();else stop()},
+  setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(stream)stream.volume=volume;if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
+  resume(){if(enabled)startRadio()},
+  shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;remoteTitle='';remoteCredit='';if(enabled){stop();startRadio()}return current().name},
   destroy(){enabled=false;stop();ctx?.close().catch(()=>{})}
  }
 }
