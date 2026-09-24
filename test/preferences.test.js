@@ -6,7 +6,12 @@ test('table preferences reject stale or invalid values',()=>{
  const p=loadTablePrefs({getItem:k=>({
   'pool-masters:table-size':'12','pool-masters:felt':'#bad',
   'pool-masters:cue':'gold','pool-masters:lighting':'laser'}[k]??null)})
- assert.deepEqual(p,{size:7,felt:FELTS.green,cue:'classic',lighting:'hall'})
+ assert.deepEqual(p,{size:7,felt:FELTS.green,cue:'classic',lighting:'hall',aimSensitivity:.3})
+})
+test('an out-of-range aim sensitivity falls back to the default rather than clamping silently',()=>{
+ for(const bad of ['0','.05','1.4','not-a-number',null])
+  assert.equal(loadTablePrefs({getItem:k=>k==='pool-masters:aim-sensitivity'?bad:null}).aimSensitivity,.3,`${bad} should fall back`)
+ assert.equal(loadTablePrefs({getItem:k=>k==='pool-masters:aim-sensitivity'?'.65':null}).aimSensitivity,.65)
 })
 test('table preferences are normalized before persisting',()=>{
  const store=memory(),p=saveTablePrefs({size:9,felt:FELTS.blue,cue:'ebony',lighting:'warm'},store)
