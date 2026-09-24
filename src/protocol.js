@@ -10,7 +10,12 @@ export function isGameMessage(m){
  if(m.t==='table')return finite(m.size)&&typeof m.felt==='string'
  if(m.t==='shot')return finite(m.vx)&&finite(m.vy)&&(!m.spin||Array.isArray(m.spin)&&m.spin.every(finite))
  if(m.t!=='state'||!Array.isArray(m.b)||!player.has(m.turn)||!phase.has(m.phase)||!Number.isInteger(m.round))return false
- if(m.b.length!==16||!m.b.every(b=>Array.isArray(b)&&b.length===5&&finite(b[0])&&finite(b[1])&&typeof b[2]==='boolean'&&groups.has(b[3])&&Number.isInteger(b[4])&&b[4]>=0&&b[4]<=15&&b[3]===expectedGroup(b[4])))return false
+ // A ball tuple is either the plain v1 shape (position only) or the v2 shape
+ // with five more finite fields appended (velocity and spin) -- accepting
+ // both means a tab still running the old build a moment after a deploy
+ // degrades to no local prediction rather than dropping every state message.
+ const validBall=b=>Array.isArray(b)&&(b.length===5||b.length===10)&&finite(b[0])&&finite(b[1])&&typeof b[2]==='boolean'&&groups.has(b[3])&&Number.isInteger(b[4])&&b[4]>=0&&b[4]<=15&&b[3]===expectedGroup(b[4])&&(b.length===5||b.slice(5).every(finite))
+ if(m.b.length!==16||!m.b.every(validBall))return false
  if(new Set(m.b.map(b=>b[4])).size!==16)return false
  return m.groups&&['a','b'].every(p=>m.groups[p]===null||m.groups[p]==='solid'||m.groups[p]==='stripe')
 }

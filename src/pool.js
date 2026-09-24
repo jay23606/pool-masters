@@ -5,15 +5,14 @@ import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
 import {bindGameInput} from './game-input.js'
+import {createPredictor,STEP,CATCHUP} from './predict.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current,sensitivity=.3)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*sensitivity
 export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls[0].x)
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
-const STEP=1/120       // fixed simulation step, so frame pacing cannot change a shot
-const CATCHUP=3        // never make up more than this much time in one go
 export class PoolGame{
- constructor(o){Object.assign(this,o);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
+ constructor(o){Object.assign(this,o);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
  resetRack(){Object.assign(this,freshRackState());this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
@@ -48,6 +47,11 @@ export class PoolGame{
  receiveState(m){
   const freshRound=m.round>this.round
   applySnapshot(this,m)
+  // A snapshot never carries velocity, only position -- so every one of
+  // these is the anchor a locally predicted trajectory is rebuilt from,
+  // bounding how far the cosmetic copy can ever drift from the truth to
+  // one inter-snapshot gap (about 40ms), continuously re-corrected.
+  this.predicted=this.balls.map(b=>({...b}));this.predictor?.reset(performance.now())
   if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}
   if(this.ballInHand)this.placed=false
   if(!this.canCallEight())this.calledPocket=null
@@ -108,7 +112,17 @@ export class PoolGame{
   strike(this.balls[0],Math.cos(plan.angle)*s,Math.sin(plan.angle)*s)
  }
  guide(){const c=this.balls[0],dx=Math.cos(this.angle),dy=Math.sin(this.angle),rail=rayToRail(c.x,c.y,dx,dy);let hit=null,t=rail;for(let i=1;i<this.balls.length;i++){const b=this.balls[i];if(!b.on)continue;const ox=b.x-c.x,oy=b.y-c.y,p=ox*dx+oy*dy,s=ox*ox+oy*oy-p*p;if(p>R&&s<=4*R*R){const z=p-Math.sqrt(4*R*R-s);if(z<t){t=z;hit=b}}}return{c,dx,dy,t,hit,banks:!hit?bankPath(c.x,c.y,dx,dy,2):[]}}
- draw(dt=.016){this.renderer.draw(this,dt);this.updateHud()}
+ draw(dt=.016){
+  // While rolling, a non-host renders the locally predicted trajectory
+  // rather than the authoritative array, which only moves in ~40ms jumps --
+  // this.balls is swapped in only for the render call itself, since guide()
+  // and canAim() (which also read this.balls) are never invoked mid-roll.
+  const authoritative=this.balls
+  if(!this.host&&this.predicted&&this.phase==="roll")this.balls=this.predicted
+  this.renderer.draw(this,dt)
+  this.balls=authoritative
+  this.updateHud()
+ }
  clearInvalidCall(){if(this.calledPocket!=null&&this.phase==='aim'&&!this.canCallEight())this.calledPocket=null}
  updateHud(){// A called pocket remains part of a shot after aiming ends; only
   // discard it while setting up an illegal call, never while balls are rolling.
@@ -147,6 +161,7 @@ export class PoolGame{
   const frameDt=Math.min(.05,(now-(this.drawnAt??now))/1000)
   this.drawnAt=now
   const stepped=this.advance(now)
+  if(!this.host&&this.predicted&&this.phase==="roll")this.predictor.advance(this.predicted,now)
   // after a long catch-up the balls jump, and a jump reads as a collision
   if(stepped<.1)this.sfx?.update(this.balls)
   this.draw(frameDt)
