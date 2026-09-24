@@ -30,7 +30,7 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
- let stream=null,loading=false,remoteTitle='',remoteCredit='',queue=[]
+ let stream=null,loading=false,remoteTitle='',remoteCredit='',queue=[],duckTimer
  const listeners=new Set()
  // Jamendo's music collection provides actual tracks; general Openverse audio
  // results also include pets, ambience, and sound effects.
@@ -113,6 +113,13 @@ export function createMusic(){
   onTrack(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   setEnabled(value){enabled=!!value;if(enabled)startRadio();else stop()},
   setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(stream)stream.volume=volume;if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
+  duck(ms=1200){
+   if(!enabled)return
+   clearTimeout(duckTimer)
+   if(stream)stream.volume=Math.min(.22,volume)
+   if(ctx)master.gain.linearRampToValueAtTime(Math.min(.22,volume),ctx.currentTime+.04)
+   duckTimer=setTimeout(()=>{if(stream)stream.volume=volume;if(ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.12)},ms)
+  },
   resume(){if(enabled)startRadio()},
   shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;remoteTitle='';remoteCredit='';if(enabled){stop();startRadio()}return current().name},
   destroy(){enabled=false;stop();ctx?.close().catch(()=>{})}

@@ -91,10 +91,13 @@ export function createSfx(){
    tone(t,.05,700,260,.05+n*.2)},
   result(won){const t=ctx.currentTime
    if(won){
-    ;[0, .12, .25].forEach((d,i)=>tone(t+d,.25,523+i*131,523+i*131,.13,'sine'))
-    burst(t+.18,.16,1300,.8,.1)
+    ;[0, .12, .25].forEach((d,i)=>tone(t+d,.31,523+i*131,523+i*131,.24,'sine'))
+    burst(t+.18,.24,1300,.8,.22)
    }else{
-    tone(t,.32,260,150,.13,'sine');tone(t+.18,.42,196,92,.1,'triangle');burst(t+.18,.22,220,.7,.08,'lowpass')
+    // Two falling, slightly detuned voices plus a low crowd-like burst form a
+    // clear boo rather than another small table click.
+    tone(t,.46,230,115,.34,'sawtooth');tone(t+.04,.5,196,96,.28,'triangle')
+    burst(t+.06,.52,185,.65,.26,'lowpass')
    }}
  }
  let prev=null
@@ -104,7 +107,11 @@ export function createSfx(){
   setHaptics(v){haptics=!!v},
   // Called from a user gesture so the context is allowed to start.
   resume(){try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
-  result(won){buzz(won?22:35,won?1:1.25);if(!enabled||!audio()||ctx.state!=='running')return;try{play.result(won)}catch{}},
+  result(won){
+   buzz(won?22:35,won?1:1.25);if(!enabled||!audio())return
+   const playResult=()=>{try{if(ctx.state==='running')play.result(won)}catch{}}
+   if(ctx.state==='suspended')ctx.resume().then(playResult).catch(()=>{});else playResult()
+  },
   cue(v){buzz(7,.7+v*.45);if(!enabled||!audio()||ctx.state!=='running')return;try{play.cue(v)}catch{}},
   update(balls){
    const events=(enabled||haptics)?detectEvents(prev,balls):[]
