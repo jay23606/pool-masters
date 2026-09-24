@@ -87,7 +87,14 @@ export function createSfx(){
    tone(t+.02,.22,180,60,.22,'sine')},
   cue(v){const n=Math.min(1,v),t=ctx.currentTime
    burst(t,.03,1100,1.6,.12+n*.25)
-   tone(t,.05,700,260,.05+n*.2)}
+   tone(t,.05,700,260,.05+n*.2)},
+  result(won){const t=ctx.currentTime
+   if(won){
+    ;[0, .12, .25].forEach((d,i)=>tone(t+d,.25,523+i*131,523+i*131,.13,'sine'))
+    burst(t+.18,.16,1300,.8,.1)
+   }else{
+    tone(t,.32,260,150,.13,'sine');tone(t+.18,.42,196,92,.1,'triangle');burst(t+.18,.22,220,.7,.08,'lowpass')
+   }}
  }
  let prev=null
  return {
@@ -96,6 +103,7 @@ export function createSfx(){
   setHaptics(v){haptics=!!v},
   // Called from a user gesture so the context is allowed to start.
   resume(){try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
+  result(won){buzz(won?22:35,won?1:1.25);if(!enabled||!audio()||ctx.state!=='running')return;try{play.result(won)}catch{}},
   cue(v){buzz(7,.7+v*.45);if(!enabled||!audio()||ctx.state!=='running')return;try{play.cue(v)}catch{}},
   update(balls){
    const events=(enabled||haptics)?detectEvents(prev,balls):[]
