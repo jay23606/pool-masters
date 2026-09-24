@@ -147,7 +147,14 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  const ballGeo=new THREE.SphereGeometry(R,40,28)
  const balls=[]   // one entry per ball index, created lazily to match game.balls
  function ballFor(i,b){
-  if(balls[i])return balls[i]
+  // A new rack shuffles ball numbers while preserving their array positions.
+  // Reusing a mesh solely by index left the new physics state displaying the
+  // previous rack's number and group in that same slot.
+  if(balls[i]&&balls[i].n===b.n&&balls[i].k===b.k)return balls[i]
+  if(balls[i]){
+   const old=balls[i]
+   for(const part of [old.mesh,old.stripe,old.badge])if(part){scene.remove(part);if(part!==old.mesh)part.geometry?.dispose?.();const m=part.material;if(m)(Array.isArray(m)?m:[m]).forEach(x=>{x.map?.dispose?.();x.dispose?.()})}
+  }
  // A 9 shares yellow with the 1, and a 14 shares green with the 6. Keep the
  // stripe sphere white so category identity never depends on a tiny number or
  // a texture orientation.
@@ -166,7 +173,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   }
   mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
   scene.add(mesh)
-  return balls[i]={mesh,mat,stripe,badge,shown:{x:b.x,y:b.y},sink:0}
+  return balls[i]={mesh,mat,stripe,badge,n:b.n,k:b.k,shown:{x:b.x,y:b.y},sink:0}
  }
 
  // ---- aim overlays ----
