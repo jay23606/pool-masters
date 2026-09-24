@@ -81,7 +81,7 @@ export class PoolGame{
  resolve(){
   const shooter=this.turn
   const v=judgeShot(this)
-  if(v.winner){this.finish(v.winner);this.phase='aim';this.sync();return}
+  if(v.winner){this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:false,winner:v.winner});this.finish(v.winner);this.phase='aim';this.sync();return}
   if(v.assign){
    this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
    this.assignment={player:shooter,ball:this.firstObjectPotted?.n||null,group:v.assign}
@@ -89,6 +89,7 @@ export class PoolGame{
    const actor=shooter===this.me?'You':this.practice?'AI Coach':'Opponent'
    this.flash(`${actor} claimed ${claimed} · You: ${mine}`)
   }
+  this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:Boolean(v.foul),reason:v.reason||null,winner:null})
   if(v.foul)this.foul(v.reason)
   else if(v.nextTurn!==shooter){this.turn=v.nextTurn;this.calledPocket=null}
   this.breakShot=false;this.balls.forEach(clearMotion);this.phase='aim';this.sync()
