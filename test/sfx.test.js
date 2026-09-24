@@ -86,3 +86,27 @@ test('when the crowd-clip element exists but cloning or playing it fails, the re
   assert.doesNotThrow(()=>sfx.result(true))
  }finally{globalThis.window=realWindow;globalThis.Audio=realAudio}
 })
+
+test('priming the sound with new balls means the jump to them is not heard as a collision',()=>{
+ const savedWindow=globalThis.window,savedNav=globalThis.navigator,savedNow=performance.now
+ const buzzes=[]
+ // buzz() throttles to one per 55ms of performance.now(), which in a fresh test
+ // process can still be inside the first 55ms; pin the clock so this cannot flake
+ let clock=1e6;performance.now=()=>(clock+=1000)
+ globalThis.window={}
+ Object.defineProperty(globalThis,'navigator',{value:{vibrate:n=>buzzes.push(n)},configurable:true})
+ try{
+  const apart=[ball(100,190),ball(100+2*R+40,190)]
+  const touching=[ball(100,190),ball(100+2*R-.2,190)]
+  // without priming, arriving at a touching pair from an apart one is a collision
+  const heard=createSfx();heard.update(apart);heard.update(touching)
+  assert.equal(buzzes.length,1,'the move is heard as a hit')
+  buzzes.length=0
+  // a replay teleports the balls to its first frame; priming adopts them silently
+  const primed=createSfx();primed.update(apart);primed.prime(touching);primed.update(touching)
+  assert.equal(buzzes.length,0,'a primed jump makes no sound')
+ }finally{
+  globalThis.window=savedWindow;performance.now=savedNow
+  Object.defineProperty(globalThis,'navigator',{value:savedNav,configurable:true,writable:true})
+ }
+})

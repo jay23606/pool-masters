@@ -123,6 +123,9 @@ export function createSfx(){
   get enabled(){return enabled},get haptics(){return haptics},
   setEnabled(v){enabled=v;if(!v&&ctx)master.gain.value=0;else if(ctx)master.gain.value=level},
   setHaptics(v){haptics=!!v},
+  // Adopt a set of balls as "where things are" without hearing the move there.
+  // A replay starting or ending teleports every ball, and that is not a collision.
+  prime(balls){prev=snapshot(balls)},
   // Called from a user gesture so the context is allowed to start.
   resume(){preloadResults();try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
   result(won){
