@@ -29,7 +29,7 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 })))
 
 export function createMusic(){
- let ctx,master,enabled=false,volume=.28,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
+ let ctx,master,enabled=false,volume=.65,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
  const current=()=>MUSIC_PRESETS[index]
  const context=()=>{
   if(ctx)return ctx
@@ -69,10 +69,10 @@ export function createMusic(){
   // A quiet bass pulse, lounge chord tones, and a sparse melody make the music
   // feel like background atmosphere instead of competing with a shot.
   const chord=(Math.floor(step/4)+p.variation)%scale.length
-  note(at,beat*.8,hz(p.root-12+(step%8===0?7:0)),.025,'sine')
-  if(step%2===0){note(at,beat*.92,hz(p.root+scale[chord]),.013,p.wave);note(at,beat*.92,hz(p.root+scale[(chord+2)%scale.length]),.01,p.wave)}
+  note(at,beat*.8,hz(p.root-12+(step%8===0?7:0)),.065,'sine')
+  if(step%2===0){note(at,beat*.92,hz(p.root+scale[chord]),.035,p.wave);note(at,beat*.92,hz(p.root+scale[(chord+2)%scale.length]),.028,p.wave)}
   const melody=(step*3+p.variation*5)%11
-  if(melody<6){const pitch=hz(p.root+12+scale[melody%scale.length]);if(p.lead!=='ooh'||step%4===1)lead(at+beat*.48,beat*.42,pitch,.017,p)}
+  if(melody<6){const pitch=hz(p.root+12+scale[melody%scale.length]);if(p.lead!=='ooh'||step%4===1)lead(at+beat*.48,beat*.42,pitch,.048,p)}
   step=(step+1)%64
   timer=setTimeout(schedule,Math.max(80,beat*1000-20))
  }
@@ -81,7 +81,7 @@ export function createMusic(){
  return {
   get enabled(){return enabled},get title(){return current().name},get lyric(){return current().lyric},get volume(){return volume},
   setEnabled(value){enabled=!!value;if(enabled)start();else stop()},
-  setVolume(value){volume=Math.max(.04,Math.min(.6,Number(value)||.28));if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
+  setVolume(value){volume=Math.max(.1,Math.min(.9,Number(value)||.65));if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
   resume(){if(enabled)start()},
   shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;if(enabled){stop();start()}return current().name},
   destroy(){enabled=false;stop();ctx?.close().catch(()=>{})}
