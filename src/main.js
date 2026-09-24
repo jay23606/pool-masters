@@ -155,7 +155,7 @@ async function quickPlay(){
  const rooms=(await foyer.listRooms()).filter(r=>r.metadata?.game==='pool'&&!r.metadata?.seats?.b)
  if(rooms[0])return joinRoom(rooms[0].code);await createRoom()
 }
-async function joinRoom(code,intent='player'){code=String(code||'').trim().toUpperCase();if(!code)return toast('Enter a room code');try{await enterRoom(await foyer.join(code),intent)}catch(e){toast(e.message||'Could not join that room')}}
+async function joinRoom(code,intent='player'){code=String(code||'').trim().toUpperCase();if(!code)return toast('Enter a room code');try{const room=await foyer.join(code);if(intent==='player'&&room.metadata?.seats?.b){intent='spectator';toast('The table is full — requesting spectator access')}await enterRoom(room,intent)}catch(e){toast(e.message||'Could not join that room')}}
 async function enterRoom(room,intent='player'){
  // Do the fallible work first. A bad/expired invite must not tear down a game
  // the player is already in.
@@ -181,8 +181,9 @@ async function copyInvite(){
 function broadcastGame(data){state.peers.forEach(p=>p.send(JSON.stringify(data)))}
 function onPlayers(players){
  if(state.room?.isHost){const current=state.room.metadata?.seats?state.room.metadata:{...state.room.metadata,...spectatorMeta(foyer.player.id)};const next=reconcileSpectators(current,players);if(JSON.stringify(next)!==JSON.stringify(state.room.metadata))state.room.update({metadata:next}).catch(console.warn)}
- const seats=state.room?.metadata?.seats||{},mine=players.find(p=>p.id===foyer.player.id),other=players.find(p=>p.id===(state.room?.isHost?seats.b:seats.a));state.opponent=other||null
- $('#versus').innerHTML=`<span><b>${esc(mine?.name||foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>${esc(other?.name||'Waiting…')}</b><small>${other?'Opponent':'Share the code'}</small></span>`
+ const seats=state.room?.metadata?.seats||{},mine=players.find(p=>p.id===foyer.player.id),host=players.find(p=>p.id===seats.a),guest=players.find(p=>p.id===seats.b),other=players.find(p=>p.id===(state.room?.isHost?seats.b:seats.a));state.opponent=(state.role==='host'||state.role==='player')?other||null:null
+ if(state.role==='spectator'||state.role==='pending')$('#versus').innerHTML=`<span><b>${esc(host?.name||'Host')}</b><small>Host</small></span><i>vs</i><span><b>${esc(guest?.name||'Waiting…')}</b><small>${state.role==='spectator'?'You are watching':'Spectator request pending'}</small></span>`
+ else $('#versus').innerHTML=`<span><b>${esc(mine?.name||foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>${esc(other?.name||'Waiting…')}</b><small>${other?'Opponent':'Share the code'}</small></span>`
  // In Foyer, changing isOpen from true to false emits the terminal `closed`
  // event. A full table is still a live room, so mark its phase only.
  state.game?.setReady(state.role==='host'||state.role==='player'?Boolean(other):false);if(other&&state.room?.isHost)state.room.update({status:'playing'}).catch(()=>{})
