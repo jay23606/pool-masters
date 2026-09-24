@@ -8,6 +8,7 @@ import { createMusic } from './music.js'
 import { TABLE_SIZES,setTableSize } from './table.js'
 import { FELTS,loadTablePrefs,saveTablePrefs } from './preferences.js'
 import { parseGameMessage } from './protocol.js'
+import { snapshotOf } from './game-state.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
@@ -17,7 +18,7 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY)
 // authoritative host then sends the latest rack snapshot to the rejoined peer.
 const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostMigration:false,peerGraceMs:25000,reconnectAttempts:5,heartbeatMs:15000,staleSeconds:180})
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,rankings:[],profile:null}
+const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,rankings:[],profile:null,saveTimer:null,pendingSave:null,lastSave:0}
 document.documentElement.dataset.theme=localStorage.getItem('pool-masters:theme')||'dark'
 // The table button cycles three views. Top-down 3D is the default: the plan
 // view of the 2D renderer, but lit and shaded. New storage key: the old one
@@ -133,7 +134,20 @@ function bind(){
  $('#chat-form').onsubmit=async e=>{e.preventDefault();const input=$('#message'),body=input.value.trim();if(!body||!state.room)return;input.value='';await state.room.say(body)}
  window.addEventListener('popstate',()=>{if(!new URLSearchParams(location.search).get('room'))leaveRoom(false)})
 }
-async function createRoom(){try{const room=await foyer.createRoom({name:`${foyer.player.name}'s table`,metadata:{game:'pool',ranked:true},maxPlayers:2,status:'waiting'});await enterRoom(room);$('#room-name').value=room.name;$('#room-dialog').showModal()}catch(e){toast(e.message)}}
+const resumeExpiry=()=>new Date(Date.now()+4*60*60*1000).toISOString()
+async function persistMatch(snapshot,force=false){
+ // Network snapshots intentionally omit velocity. Saving during a rolling shot
+ // would restore balls with no motion, so persist stable between-shot states.
+ if(state.mode!=='online'||!state.room?.isHost||!snapshot||snapshot.phase!=='aim')return
+ state.pendingSave=snapshot
+ const write=async()=>{state.saveTimer=null;const saved=state.pendingSave;state.pendingSave=null;state.lastSave=Date.now()
+  try{await state.room.update({metadata:{...state.room.metadata,game:'pool',saved_state:saved,resume_until:resumeExpiry()}})}catch(error){console.warn('match save failed',error)}
+ }
+ if(force){clearTimeout(state.saveTimer);return write()}
+ if(state.saveTimer||Date.now()-state.lastSave<1000){if(!state.saveTimer)state.saveTimer=setTimeout(write,1000-(Date.now()-state.lastSave));return}
+ return write()
+}
+async function createRoom(){try{const room=await foyer.createRoom({name:`${foyer.player.name}'s table`,metadata:{game:'pool',ranked:true,resume_until:resumeExpiry()},maxPlayers:2,status:'waiting'});await enterRoom(room);$('#room-name').value=room.name;$('#room-dialog').showModal()}catch(e){toast(e.message)}}
 async function quickPlay(){
  const rooms=(await foyer.listRooms()).filter(r=>r.metadata?.game==='pool'&&r.playerCount<2)
  if(rooms[0])return joinRoom(rooms[0].code);await createRoom()
@@ -150,7 +164,8 @@ async function enterRoom(room){
  state.room=room;state.net=net;state.mode='online';showGame();$('.call-actions').hidden=false;$('#rename-room').hidden=!room.isHost;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=room.name||`Room ${room.code}`
  state.unsubs.push(room.on('players',players=>onPlayers(players)),room.on('message',appendMessage),room.on('closed',()=>{toast('The table closed');leaveRoom()}))
  roomHistory.forEach(appendMessage);net.on('data',({data})=>{const message=parseGameMessage(data);if(message)state.game?.receive(message)});net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});net.on('leave',id=>state.peers.delete(id))
- state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,practice:false,send:broadcastGame,onTable:m=>applyTablePrefs(m.size,m.felt,{fresh:false,remote:true}),onRack:()=>$('#next-rack').hidden=true,onFinish:result=>{music.duck();sfx.result(result.winner===state.game?.me);finishRanked(result);$('#next-rack').hidden=false}})
+ state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,practice:false,send:broadcastGame,onSave:persistMatch,onTable:m=>applyTablePrefs(m.size,m.felt,{fresh:false,remote:true}),onRack:()=>$('#next-rack').hidden=true,onFinish:result=>{music.duck();sfx.result(result.winner===state.game?.me);finishRanked(result);$('#next-rack').hidden=false}})
+ if(room.isHost&&state.game.restore(room.metadata?.saved_state))toast('Saved rack restored')
  onPlayers(room.players);await room.update?.({status:room.players.length>=2?'playing':'waiting'}).catch(()=>{})
  if(oldRoom&&oldRoom.id!==room.id)await oldRoom.leave().catch(()=>{})
 }
@@ -180,7 +195,7 @@ function recordAiResult(won){const r=aiRecord();r[won?'wins':'losses']=(r[won?'w
 async function startPractice(){state.game?.destroy();state.mode='practice';state.room=null;state.opponent={name:'AI Coach'};showGame();$('#game').classList.add('focus');history.replaceState({},'',location.pathname);$('#room-label').textContent='Unranked practice';$('#versus').innerHTML=`<span><b>${esc(foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>AI Coach</b><small>Practice</small></span>`;renderAiRecord();state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:true,practice:true,send:()=>{},onFinish:result=>{music.duck();sfx.result(result.winner==='a');recordAiResult(result.winner==='a');$('#next-rack').hidden=false}});$('.call-actions').hidden=true;$('#room-sidebar').hidden=true}
 function showGame(){if(localStorage.getItem('pool-masters:music')==='1')music.setEnabled(true);state.paintMusic?.();$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#game').classList.remove('focus');$('#focus-table').textContent='Focus table';$('#messages').innerHTML='';$('#room-sidebar').hidden=false;$('#practice-record').hidden=true;$('#next-rack').hidden=true}
 async function startCall(){if(!state.room)return;try{if(!state.media){state.media=state.room.media();state.media.onStream((_,s)=>{$('#remote-video').srcObject=s;$('#video-panel').classList.add('live')});state.media.onLeave(()=>{$('#remote-video').srcObject=null});const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#local-video').srcObject=stream;await state.media.start(stream);$('#call').textContent='End call';return}state.media.stop();state.media=null;$('#local-video').srcObject=null;$('#remote-video').srcObject=null;$('#call').textContent='Start call'}catch(e){toast('Camera or microphone unavailable')}}
-async function leaveRoom(push=true){music.setEnabled(false);state.paintMusic?.();state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
+async function leaveRoom(push=true){music.setEnabled(false);state.paintMusic?.();if(state.game&&state.room?.isHost)await persistMatch(snapshotOf(state.game),true);clearTimeout(state.saveTimer);state.saveTimer=null;state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
 // Registered after boot so it never delays first paint, and only in a build:
 // a worker in dev would just cache things you are actively editing.
 if(import.meta.env.PROD&&'serviceWorker'in navigator)

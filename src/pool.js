@@ -52,12 +52,16 @@ export class PoolGame{
   if(!this.canCallEight())this.calledPocket=null
   if(m.result&&!this.finished){this.finished=true;this.onFinish({winner:m.result,round:m.round})}
  }
+ restore(m){
+  if(!isGameMessage(m)||m.t!=='state')return false
+  applySnapshot(this,m);this.finished=Boolean(m.result);this.setSpin(0,0);return true
+ }
  receiveShot(m){
   if(m.place&&this.validCueSpot({x:m.place[0],y:m.place[1]})){this.balls[0].x=m.place[0];this.balls[0].y=m.place[1];this.ballInHand=false}
   this.calledPocket=this.canCallEight()?(m.called??null):null
   this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
  }
- sync(){if(this.host)this.send(snapshotOf(this))}
+ sync(){if(this.host){const state=snapshotOf(this);this.send(state);this.onSave?.(state)}}
  sub(dt){
   for(const b of this.balls){
    if(!b.on)continue
