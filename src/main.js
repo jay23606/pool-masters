@@ -104,7 +104,7 @@ async function refresh(){
  state.rankings=leaders.data||[];renderRooms(rooms.filter(r=>r.metadata?.game==='pool'));renderLeaders()
 }
 function renderRooms(rooms){$('#rooms').innerHTML=rooms.length?rooms.map(r=>`<button class="room" data-code="${r.code}"><span><b>${esc(r.name||r.hostName+"'s table")}</b><small>${esc(r.hostName)} · ${r.playerCount}/2</small></span><strong>${r.code}</strong></button>`).join(''):'<div class="empty">No open tables yet.<br>Create one or practice while you wait.</div>'}
-function renderLeaders(){const rows=state.rankings;$('#leaders').innerHTML=rows.length?rows.map((p,i)=>`<div class="leader"><i>${i+1}</i><span>${esc(p.username)}</span><b>${p.rating}</b><small>${p.wins+p.losses?Math.round(p.wins/(p.wins+p.losses)*100):0}%</small></div>`).join(''):'<div class="empty">The first match sets the board.</div>'}
+function renderLeaders(){const rows=state.rankings;$('#leaders').innerHTML=rows.length?rows.map((p,i)=>`<div class="leader"><i>${i+1}</i><span>${esc(p.username)}</span><b>${p.rating} Elo</b><small>${p.wins}W · ${p.losses}L<br>${p.wins+p.losses?Math.round(p.wins/(p.wins+p.losses)*100):0}% wins</small></div>`).join(''):'<div class="empty">The first match sets the board.</div>'}
 function bind(){
  const paintTheme=()=>{$('#theme-toggle').textContent=document.documentElement.dataset.theme==='dark'?'☼':'☾'}
  paintTheme()
