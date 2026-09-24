@@ -30,7 +30,7 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
- let stream=null,loading=false,remoteTitle='',remoteCredit='',queue=[],duckTimer
+ let stream=null,loading=false,remoteTitle='',remoteCredit='',remoteCreator='',remoteLicense='',queue=[],duckTimer
  const listeners=new Set()
  // Jamendo's music collection provides actual tracks; general Openverse audio
  // results also include pets, ambience, and sound effects.
@@ -90,8 +90,8 @@ export function createMusic(){
  const playTrack=track=>{
   if(!enabled||!track)return
   stream=new Audio(track.url);stream.volume=Math.min(1,volume);stream.preload='auto'
-  remoteTitle=track.title||'Pool Masters Radio';remoteCredit=track.creator?`${track.creator} · CC ${track.license?.toUpperCase()}`:`CC ${track.license?.toUpperCase()}`
-  listeners.forEach(listener=>listener({title:remoteTitle,credit:remoteCredit,url:track.foreign_landing_url||track.url}))
+  remoteTitle=track.title||'Pool Masters Radio';remoteCreator=track.creator||'Unknown artist';remoteLicense=`CC ${track.license?.toUpperCase()}`;remoteCredit=`${remoteCreator} · ${remoteLicense}`
+  listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
   stream.addEventListener('ended',()=>{stream=null;startRadio()},{once:true})
   stream.addEventListener('error',()=>{stream=null;startRadio()},{once:true})
   stream.play().catch(()=>{stream=null;startSynth()})
@@ -121,7 +121,7 @@ export function createMusic(){
    duckTimer=setTimeout(()=>{if(stream)stream.volume=volume;if(ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.12)},ms)
   },
   resume(){if(enabled)startRadio()},
-  shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;remoteTitle='';remoteCredit='';if(enabled){stop();startRadio()}return current().name},
+  shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;remoteTitle='';remoteCredit='';remoteCreator='';remoteLicense='';if(enabled){stop();startRadio()}return current().name},
   destroy(){enabled=false;stop();ctx?.close().catch(()=>{})}
  }
 }
