@@ -27,7 +27,6 @@ const music=createMusic()
 sfx.setEnabled(localStorage.getItem('pool-masters:muted')!=='1')
 sfx.setHaptics(localStorage.getItem('pool-masters:haptics')!=='0')
 music.setVolume(localStorage.getItem('pool-masters:music-volume')||1)
-music.setEnabled(localStorage.getItem('pool-masters:music')==='1')
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>{sfx.resume();music.resume()},{once:true})
 const view={mode:VIEWS.includes(stored)?stored:'top',renderer:null,switching:false}
@@ -120,6 +119,7 @@ function bind(){
  $('#mute-sfx').onclick=()=>{sfx.setEnabled(!sfx.enabled);localStorage.setItem('pool-masters:muted',sfx.enabled?'0':'1');paintSfx()}
  paintSfx()
  const paintMusic=()=>{$('#music-toggle').textContent=music.enabled?'♫':'♩';$('#music-toggle').classList.toggle('on',music.enabled);$('#music-toggle').title=`Background music: ${music.title}`;$('#music-volume').hidden=!music.enabled;$('#music-volume').value=Math.round(music.volume*100)}
+ state.paintMusic=paintMusic
  music.onTrack(track=>{const credit=$('#music-credit');credit.hidden=false;credit.href=track.url;credit.textContent=`♫ ${track.title} — ${track.creator}`;credit.title=`${track.license} · Open the track source`})
  $('#music-toggle').onclick=()=>{music.setEnabled(!music.enabled);localStorage.setItem('pool-masters:music',music.enabled?'1':'0');paintMusic()}
  $('#music-volume').oninput=e=>{music.setVolume(Number(e.target.value)/100);localStorage.setItem('pool-masters:music-volume',music.volume)}
@@ -175,9 +175,9 @@ function aiRecord(){try{return JSON.parse(localStorage.getItem('pool-masters:ai-
 function renderAiRecord(){const r=aiRecord(),games=r.wins+r.losses;$('#practice-record').hidden=false;$('#practice-record').textContent=`Against AI · ${r.wins}W–${r.losses}L${games?` · ${Math.round(r.wins/games*100)}% wins`:''}`}
 function recordAiResult(won){const r=aiRecord();r[won?'wins':'losses']=(r[won?'wins':'losses']||0)+1;localStorage.setItem('pool-masters:ai-record',JSON.stringify(r));renderAiRecord()}
 async function startPractice(){state.game?.destroy();state.mode='practice';state.room=null;state.opponent={name:'AI Coach'};showGame();$('#game').classList.add('focus');history.replaceState({},'',location.pathname);$('#room-label').textContent='Unranked practice';$('#versus').innerHTML=`<span><b>${esc(foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>AI Coach</b><small>Practice</small></span>`;renderAiRecord();state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:true,practice:true,send:()=>{},onFinish:result=>{music.duck();sfx.result(result.winner==='a');recordAiResult(result.winner==='a');$('#next-rack').hidden=false}});$('.call-actions').hidden=true;$('#room-sidebar').hidden=true}
-function showGame(){$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#game').classList.remove('focus');$('#focus-table').textContent='Focus table';$('#messages').innerHTML='';$('#room-sidebar').hidden=false;$('#practice-record').hidden=true;$('#next-rack').hidden=true}
+function showGame(){if(localStorage.getItem('pool-masters:music')==='1')music.setEnabled(true);state.paintMusic?.();$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#game').classList.remove('focus');$('#focus-table').textContent='Focus table';$('#messages').innerHTML='';$('#room-sidebar').hidden=false;$('#practice-record').hidden=true;$('#next-rack').hidden=true}
 async function startCall(){if(!state.room)return;try{if(!state.media){state.media=state.room.media();state.media.onStream((_,s)=>{$('#remote-video').srcObject=s;$('#video-panel').classList.add('live')});state.media.onLeave(()=>{$('#remote-video').srcObject=null});const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#local-video').srcObject=stream;await state.media.start(stream);$('#call').textContent='End call';return}state.media.stop();state.media=null;$('#local-video').srcObject=null;$('#remote-video').srcObject=null;$('#call').textContent='Start call'}catch(e){toast('Camera or microphone unavailable')}}
-async function leaveRoom(push=true){state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
+async function leaveRoom(push=true){music.setEnabled(false);state.paintMusic?.();state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
 // Registered after boot so it never delays first paint, and only in a build:
 // a worker in dev would just cache things you are actively editing.
 if(import.meta.env.PROD&&'serviceWorker'in navigator)

@@ -86,15 +86,23 @@ export function createMusic(){
  }
  const startSynth=()=>{if(!enabled)return;const c=context();if(!c)return;c.resume().then(()=>{if(!enabled||timer)return;master.gain.cancelScheduledValues(c.currentTime);master.gain.linearRampToValueAtTime(volume,c.currentTime+.16);schedule()}).catch(()=>{})}
  const stopSynth=()=>{clearTimeout(timer);timer=null;if(ctx)master.gain.linearRampToValueAtTime(.0001,ctx.currentTime+.12)}
- const stop=()=>{stopSynth();if(stream){stream.pause();stream.removeAttribute('src');stream.load();stream=null}}
+ const stop=()=>{
+  stopSynth()
+  if(stream){
+   const old=stream;stream=null
+   // Clearing src can emit an error. Detach the callbacks first so replacing a
+   // track never starts an extra song in the background.
+   old.onended=null;old.onerror=null;old.pause();old.removeAttribute('src');old.load()
+  }
+ }
  const playTrack=track=>{
   if(!enabled||!track)return
-  stream=new Audio(track.url);stream.volume=Math.min(1,volume);stream.preload='auto'
+  const audio=new Audio(track.url);stream=audio;audio.volume=Math.min(1,volume);audio.preload='auto'
   remoteTitle=track.title||'Pool Masters Radio';remoteCreator=track.creator||'Unknown artist';remoteLicense=`CC ${track.license?.toUpperCase()}`;remoteCredit=`${remoteCreator} · ${remoteLicense}`
   listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
-  stream.addEventListener('ended',()=>{stream=null;startRadio()},{once:true})
-  stream.addEventListener('error',()=>{stream=null;startRadio()},{once:true})
-  stream.play().catch(()=>{stream=null;startSynth()})
+  audio.onended=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
+  audio.onerror=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
+  audio.play().catch(()=>{if(stream===audio){stream=null;startSynth()}})
  }
  async function startRadio(){
   if(!enabled||stream||loading)return
