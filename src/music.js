@@ -31,7 +31,10 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
  let stream=null,loading=false,remoteTitle='',remoteCredit='',queue=[]
- const searches=['lofi jazz','ambient music','piano loop','jazz lounge','electronic loop','funk groove','soul loop']
+ // These are deliberately broad: radio should feel like a real mixed station,
+ // not twelve variations of pool-hall background music.  CC0 is kept as the
+ // hard requirement; sources include Freesound and Wikimedia Audio.
+ const searches=['indie rock song','folk song','hip hop beat','electronic song','soul music','jazz song','latin music','pop song','vocal song','ambient music','funk groove','piano song']
  const current=()=>MUSIC_PRESETS[index]
  const context=()=>{
   if(ctx)return ctx
@@ -98,9 +101,9 @@ export function createMusic(){
   loading=true
   try{
    const query=searches[Math.floor(Math.random()*searches.length)]
-   const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&license=cc0&source=freesound&page_size=20`)
+   const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&license=cc0&page_size=20`)
    const data=await response.json()
-   queue=(data.results||[]).filter(track=>track.url?.startsWith('https://')&&track.duration>=20000&&track.license==='cc0')
+   queue=(data.results||[]).filter(track=>track.url?.startsWith('https://')&&track.duration>=60000&&track.license==='cc0')
    if(queue.length)playTrack(queue.pop());else startSynth()
   }catch{startSynth()}finally{loading=false}
  }
