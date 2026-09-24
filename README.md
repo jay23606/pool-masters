@@ -128,6 +128,28 @@ the opponent ball in hand. The AI plays both games.
 Nine-ball is deliberately unranked for now: the ranking tables have no notion of
 which game a result came from, and mixing the two into one Elo would be wrong.
 
+## Replays
+
+Every shot is recorded as it plays and stays available until the next one
+finishes: **↺ Replay** and **Slow motion** play it back on your own table, and
+**Copy replay link** puts it in a URL that opens a table which does nothing but
+play that shot, with a *Play a game* button for whoever lands on it. A full
+16-ball break is about a thousand characters.
+
+The host records on its simulation clock, so a shot is as smooth as any other
+even if its tab was hidden and could only be stepped in coarse chunks. Guests and
+spectators record from the snapshots they are sent, the same ~25Hz stream, so a
+shot looks the same whoever shares it.
+
+A replay is a recording of positions, deliberately not a list of inputs to be
+re-simulated: two JavaScript engines are not obliged to agree to the last bit on
+`sin`, `cos` or `pow`, and billiards amplifies a last-bit difference into a
+visibly different shot. Recorded positions look identical on every browser.
+Positions are delta-coded and deflated (`src/replay.js`); a link is untrusted
+input, so decoding is bounded in size (including how far it may inflate), in
+range, and never treated as anything but numbers. A replay recorded on another
+table size is shown at that size and your own is put back afterwards.
+
 ## Rules and AI
 
 `src/rules.js` holds the eight-ball and nine-ball rules as plain functions over a ball array and
@@ -204,7 +226,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 142 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 185 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and
@@ -219,6 +241,7 @@ DOM, no renderer.
 |---|---|
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
+| `src/replay.js` | recording, the link format and its validation, and playback |
 | `src/ai.js` | the practice opponent, over a ball array |
 | `src/physics.js` | the contact model |
 | `src/game-input.js` | pointer/drag input, separated from match control |

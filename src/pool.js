@@ -1,11 +1,12 @@
-import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
+import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot} from './rules.js'
+import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
 import {bindGameInput} from './game-input.js'
 import {createPredictor,STEP,CATCHUP} from './predict.js'
+import {createRecorder,ballsAt,duration} from './replay.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current,sensitivity=.3)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*sensitivity
 export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls[0].x)
@@ -13,7 +14,7 @@ export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){Object.assign(this,freshRackState(this.mode));this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState(this.mode));this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -33,10 +34,10 @@ export class PoolGame{
  aimingAtEight(){return this.mode!=='9ball'&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
- canControl(){return !this.spectator&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
+ canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
  takeShot(){if(!this.canAim()||!this.aiming)return;if(this.mode!=='9ball'&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
- startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.phase='roll'}
+ startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
   if(!isGameMessage(m))return
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
@@ -52,6 +53,7 @@ export class PoolGame{
   // bounding how far the cosmetic copy can ever drift from the truth to
   // one inter-snapshot gap (about 40ms), continuously re-corrected.
   this.predicted=this.balls.map(b=>({...b}));this.predictor?.reset(performance.now())
+  this.noteRecording()
   if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}
   if(this.ballInHand)this.placed=false
   if(!this.canCallEight())this.calledPocket=null
@@ -66,7 +68,52 @@ export class PoolGame{
   this.calledPocket=this.canCallEight()?(m.called??null):null
   this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
  }
- sync(){if(this.host){const state=snapshotOf(this);this.send(state);this.onSave?.(state)}}
+ sync(){if(this.host){const state=snapshotOf(this);this.send(state);this.onSave?.(state);this.noteRecording()}}
+ // Every shot is recorded as it plays, by whoever is watching: the host from its
+ // own simulation, a guest or spectator from the snapshots it is sent. Both are
+ // the same 25Hz stream, so a shot looks the same whoever shares it.
+ //
+ // The host records on its simulation clock, not the wall clock, so a shot is
+ // just as smooth when its tab was hidden and it could only step in coarse
+ // chunks; its frames are taken inside advance(). A guest has only the snapshots.
+ noteRecording(force){
+  const now=this.host?(this.simClock||0):performance.now()
+  if(this.phase==='roll'){
+   // the last finished shot stays available while the next one plays, and is
+   // replaced only when that one finishes
+   if(!this.rec){this.stopReplay();this.rec=createRecorder(this.mode,tableSize)}
+   if(!this.host||force)this.rec.frame(now,this.balls)
+  }else if(this.rec){
+   this.rec.frame(now,this.balls)
+   const r=this.rec.finish();this.rec=null
+   if(r){this.lastReplay=r;this.onReplay?.(r)}
+  }
+ }
+ // Playback swaps recorded balls in for the render only; the game underneath
+ // carries on untouched, and a new shot cancels the replay.
+ // Refused while a shot is live: a replay over a real shot would be confusing.
+ startReplay(rec,speed=1){
+  if(this.phase==='roll'&&!this.replayOnly)return false
+  this.replay={rec,speed,at:performance.now()}
+  this.sfx?.prime?.(ballsAt(rec,0))
+  return true
+ }
+ stopReplay(){
+  if(!this.replay)return
+  this.replay=null
+  this.sfx?.prime?.(this.balls)
+ }
+ replayBalls(now){
+  const p=this.replay
+  if(!p)return null
+  const ms=(now-p.at)*p.speed,end=duration(p.rec)
+  if(ms>end+700){
+   // a shared shot holds its last frame; a replay inside a game returns to the game
+   if(this.replayOnly){p.finished=true;return ballsAt(p.rec,end)}
+   this.stopReplay();return null
+  }
+  return ballsAt(p.rec,ms)
+ }
  sub(dt){
   for(const b of this.balls){
    if(!b.on)continue
@@ -125,16 +172,22 @@ export class PoolGame{
   strike(this.balls[0],Math.cos(plan.angle)*s,Math.sin(plan.angle)*s)
  }
  guide(){const c=this.balls[0],dx=Math.cos(this.angle),dy=Math.sin(this.angle),rail=rayToRail(c.x,c.y,dx,dy);let hit=null,t=rail;for(let i=1;i<this.balls.length;i++){const b=this.balls[i];if(!b.on)continue;const ox=b.x-c.x,oy=b.y-c.y,p=ox*dx+oy*dy,s=ox*ox+oy*oy-p*p;if(p>R&&s<=4*R*R){const z=p-Math.sqrt(4*R*R-s);if(z<t){t=z;hit=b}}}return{c,dx,dy,t,hit,banks:!hit?bankPath(c.x,c.y,dx,dy,2):[]}}
- draw(dt=.016){
+ draw(dt=.016,replayed){
+  if(replayed===undefined)replayed=this.replayBalls(performance.now())
   // While rolling, a non-host renders the locally predicted trajectory
   // rather than the authoritative array, which only moves in ~40ms jumps --
   // this.balls is swapped in only for the render call itself, since guide()
   // and canAim() (which also read this.balls) are never invoked mid-roll.
   const authoritative=this.balls
-  if(!this.host&&this.predicted&&this.phase==="roll")this.balls=this.predicted
+  if(replayed)this.balls=replayed
+  else if(!this.host&&this.predicted&&this.phase==="roll")this.balls=this.predicted
   this.renderer.draw(this,dt)
   this.balls=authoritative
   this.updateHud()
+  const playing=this.replay&&!this.replay.finished
+  if(this.replayOnly&&this.groupStatus)this.groupStatus.textContent=`${MODES[this.mode].label} · SHARED SHOT`
+  if(playing){this.status.textContent=this.replayOnly?'Replaying the shot…':'Replaying the last shot…';if(!this.replayOnly&&this.groupStatus)this.groupStatus.textContent='REPLAY'}
+  else if(this.replayOnly)this.status.textContent='Shared shot · watch it again, or play a game'
  }
  clearInvalidCall(){if(this.calledPocket!=null&&this.phase==='aim'&&!this.canCallEight())this.calledPocket=null}
  // Nine-ball has no groups, counts or called pockets, so its HUD is its own.
@@ -176,6 +229,8 @@ export class PoolGame{
    const n=substeps(this.balls,STEP)
    for(let i=0;i<n;i++)this.sub(STEP/n)
    this.acc-=STEP;stepped+=STEP
+   this.simClock=(this.simClock||0)+STEP*1000
+   if(this.rec&&this.simClock-(this.recAt??-1e9)>=40){this.recAt=this.simClock;this.rec.frame(this.simClock,this.balls)}
    if(this.balls.every(b=>!b.on||atRest(b))){this.resolve();break}
   }
   if(stepped&&now-(this.sent||0)>40){this.sent=now;this.sync()}
@@ -187,9 +242,10 @@ export class PoolGame{
   this.drawnAt=now
   const stepped=this.advance(now)
   if(!this.host&&this.predicted&&this.phase==="roll")this.predictor.advance(this.predicted,now)
+  const replayed=this.replayBalls(now)
   // after a long catch-up the balls jump, and a jump reads as a collision
-  if(stepped<.1)this.sfx?.update(this.balls)
-  this.draw(frameDt)
+  if(stepped<.1)this.sfx?.update(replayed||this.balls)
+  this.draw(frameDt,replayed)
   this.raf=requestAnimationFrame(x=>this.loop(x))
  }
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}

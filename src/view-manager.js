@@ -32,6 +32,9 @@ export function createViewManager(deps){
   return createRenderer2D($('#table'),tablePrefs)
  }
  async function rebuildRenderer(){view.renderer?.destroy();view.renderer=null;await applyView(false)}
+ // Show a table of another size for a moment -- a shared replay was recorded on
+ // one -- without touching what the player chose or has saved.
+ async function previewTable(size){setTableSize(size);await rebuildRenderer()}
  async function applyTablePrefs(size=tablePrefs.size,felt=tablePrefs.felt,{fresh=true,remote=false}={}){
   tablePrefs.size=setTableSize(size);tablePrefs.felt=felt
   Object.assign(tablePrefs,saveTablePrefs(tablePrefs))
@@ -63,5 +66,5 @@ export function createViewManager(deps){
  function cycle(){view.mode=VIEWS[(VIEWS.indexOf(view.mode)+1)%VIEWS.length];applyView(true)}
  function forceView(mode){view.mode=mode;return applyView(false)}
 
- return {view,cameraFor,applyTablePrefs,applyView,ensureRenderer,cycle,forceView}
+ return {view,cameraFor,applyTablePrefs,previewTable,applyView,ensureRenderer,cycle,forceView}
 }
