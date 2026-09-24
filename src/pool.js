@@ -96,7 +96,7 @@ export class PoolGame{
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
- const plan=chooseShot(this.balls,this.group('b'),this.ballInHand)
+ const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel)
  if(!plan)return
  if(plan.place){this.ballInHand=false;this.placed=false}
   // The planner may receive old room state; never show an 8-ball call unless

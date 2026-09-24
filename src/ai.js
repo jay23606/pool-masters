@@ -10,6 +10,13 @@ import {remaining,validCueSpot,nearestPocket,normalizeGroup} from './rules.js'
 // saturates once ball-on-ball friction is fully mobilised, at about 3.4 degrees.
 const THROW_MAX=.06,THROW_K=.155
 
+export const AI_LEVELS={
+ beginner:{label:'Beginner',aimError:.13,powerError:12,safetyCut:.72},
+ league:{label:'League',aimError:.03,powerError:4,safetyCut:.34},
+ pro:{label:'Pro',aimError:.008,powerError:1,safetyCut:.16},
+}
+export const difficultyFor=level=>AI_LEVELS[level]||AI_LEVELS.league
+
 // which balls this player is allowed to hit first
 export function legalTargets(balls,group){
  return balls.filter(b=>b.on&&b.k!=='cue'&&
@@ -136,21 +143,22 @@ export function bestCueSpot(balls,group){
 // The whole turn in one call: where to put the cue ball if it is in hand, which
 // pocket to call, and the shot itself. Returns null only if there is nothing
 // legal left to hit at all.
-export function chooseShot(balls,group,ballInHand){
+export function chooseShot(balls,group,ballInHand,level='league'){
+ const difficulty=difficultyFor(level)
  group=normalizeGroup(group)
  const place=ballInHand?bestCueSpot(balls,group):null
  if(place){balls[0].x=place.x;balls[0].y=place.y}
  const cue=balls[0]
  const shot=bestShot(balls,group)
- if(shot){
-  return {place,angle:shot.angle+(Math.random()-.5)*.03/Math.max(.45,shot.cut),
-          power:shot.power,pocket:shot.target.k==='eight'?shot.pocket:null}
+ if(shot&&shot.cut>=difficulty.safetyCut){
+  return {place,angle:shot.angle+(Math.random()-.5)*difficulty.aimError/Math.max(.45,shot.cut),
+          power:shot.power+(Math.random()-.5)*difficulty.powerError,pocket:shot.target.k==='eight'?shot.pocket:null}
  }
  const pick=safetyTarget(balls,group)
  if(!pick)return null
  const t=pick.t,pocket=t.k==='eight'?nearestPocket(t):null
  if(pick.clear)return {place,pocket,
-  angle:Math.atan2(t.y-cue.y,t.x-cue.x)+(Math.random()-.5)*.05,power:26+Math.random()*14}
+  angle:Math.atan2(t.y-cue.y,t.x-cue.x)+(Math.random()-.5)*difficulty.aimError,power:26+Math.random()*14}
  const want=group?(remaining(balls,group)?group:'eight'):null
  const esc=escapeShot(balls,want)
  return esc?{place,pocket,angle:esc.angle,power:esc.power}
