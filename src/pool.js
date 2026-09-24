@@ -4,6 +4,7 @@ import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposi
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
+import {bindGameInput} from './game-input.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*.5
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
@@ -11,30 +12,9 @@ export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<boun
 const STEP=1/120       // fixed simulation step, so frame pacing cannot change a shot
 const CATCHUP=3        // never make up more than this much time in one go
 export class PoolGame{
- constructor(o){Object.assign(this,o);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
+ constructor(o){Object.assign(this,o);this.aimStep=aimStep;this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
  resetRack(){Object.assign(this,freshRackState());this.setSpin(0,0)}
- bind(){this.handlers={power:()=>this.powerOut.textContent=this.power.value+'%',down:e=>{if(!this.canControl())return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(this.ballInHand){if(!this.validCueSpot(p))return;cue.x=p.x;cue.y=p.y;this.ballInHand=false;this.placed=true;this.pendingPlace=[p.x,p.y];this.flash('Ball in hand placed · tap again to aim');return}if(this.canCallEight()&&this.calledPocket==null){this.calledPocket=this.nearestPocket(p);this.flash('8-ball pocket marked · tap again to aim');return}const pa=Math.atan2(p.y-cue.y,p.x-cue.x);if(!this.aiming)this.angle=pa;this.aiming=true;this.drag=true;this.pointerAngle=pa;this.surface.setPointerCapture?.(e.pointerId)},move:e=>{if(!this.drag)return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(Math.hypot(p.x-cue.x,p.y-cue.y)<5)return;const a=Math.atan2(p.y-cue.y,p.x-cue.x);this.angle=aimStep(this.angle,this.pointerAngle,a);this.pointerAngle=a},up:e=>{this.handlers.move(e);this.drag=false;this.surface.releasePointerCapture?.(e.pointerId)},shoot:()=>this.takeShot(),
-   // Both of these are one tap away from being set wrong by accident, so
-   // neither is final until the shot is actually taken.
-   moveCue:()=>{if(!this.canControl()||this.ballInHand||!this.placed)return;this.ballInHand=true;this.placed=false;this.aiming=false;this.drag=false;this.flash('Tap the table to place the cue ball')},
-   changePocket:()=>{if(!this.canControl()||this.ballInHand||!this.canCallEight()||this.calledPocket==null)return;this.calledPocket=null;this.aiming=false;this.drag=false;this.flash('Tap a pocket to mark the 8-ball')}};this.power.addEventListener('input',this.handlers.power);this.surface.addEventListener('pointerdown',this.handlers.down);this.surface.addEventListener('pointermove',this.handlers.move);this.surface.addEventListener('pointerup',this.handlers.up);this.shoot.addEventListener('click',this.handlers.shoot)
-  this.moveCue?.addEventListener('click',this.handlers.moveCue)
-  this.changePocket?.addEventListener('click',this.handlers.changePocket)
-  if(this.spinPad){
-   this.spinDot=this.spinPad.firstElementChild
-   Object.assign(this.handlers,{
-    spinDown:e=>{this.spinDragging=true;this.spinFrom(e);this.spinPad.setPointerCapture?.(e.pointerId)},
-    spinMove:e=>{if(this.spinDragging)this.spinFrom(e)},
-    spinUp:()=>{this.spinDragging=false},
-    spinReset:()=>this.setSpin(0,0)
-   })
-   this.spinPad.addEventListener('pointerdown',this.handlers.spinDown)
-   this.spinPad.addEventListener('pointermove',this.handlers.spinMove)
-   this.spinPad.addEventListener('pointerup',this.handlers.spinUp)
-   this.spinPad.addEventListener('dblclick',this.handlers.spinReset)
-   this.setSpin(0,0)
-  }}
- point(e){return this.renderer.point(e)}
+ bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
  // draw/follow; both are clamped inside the miscue limit by strike().
@@ -166,8 +146,5 @@ export class PoolGame{
   this.raf=requestAnimationFrame(x=>this.loop(x))
  }
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}
- destroy(){cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.power.removeEventListener('input',this.handlers.power);this.surface.removeEventListener('pointerdown',this.handlers.down);this.surface.removeEventListener('pointermove',this.handlers.move);this.surface.removeEventListener('pointerup',this.handlers.up);this.shoot.removeEventListener('click',this.handlers.shoot)
-  this.moveCue?.removeEventListener('click',this.handlers.moveCue)
-  this.changePocket?.removeEventListener('click',this.handlers.changePocket)
-  if(this.spinPad){this.spinPad.removeEventListener('pointerdown',this.handlers.spinDown);this.spinPad.removeEventListener('pointermove',this.handlers.spinMove);this.spinPad.removeEventListener('pointerup',this.handlers.spinUp);this.spinPad.removeEventListener('dblclick',this.handlers.spinReset)}}
+ destroy(){cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.unbindInput?.()}
 }
