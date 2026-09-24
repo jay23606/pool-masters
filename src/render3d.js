@@ -220,7 +220,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  resize()
 
  const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-R),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),hitPt=new THREE.Vector3()
- const up=new THREE.Vector3(0,1,0),axis=new THREE.Vector3(),spin=new THREE.Quaternion()
+ const axis=new THREE.Vector3(),spin=new THREE.Quaternion()
 
  return {
   mode:'3d',

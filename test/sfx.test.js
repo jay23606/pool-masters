@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict'
-import {detectEvents,snapshot} from '../src/sfx.js'
-import {R,MINX,MAXX} from '../src/table.js'
+import {detectEvents,snapshot,createSfx} from '../src/sfx.js'
+import {R,MAXX} from '../src/table.js'
 
 const ball=(x,y,on=true)=>({x,y,on,k:'solid',n:1})
 const step=(a,b)=>detectEvents(snapshot(a),b)
@@ -43,4 +43,46 @@ test('a still table is silent',()=>{
 
 test('the very first frame cannot invent events',()=>{
  assert.deepEqual(detectEvents(null,[ball(100,190)]),[])
+})
+
+// A minimal fake AudioContext, just enough for the synthesised sting fallback
+// to run without throwing.
+function fakeAudioContextClass(){
+ class Param{constructor(v=0){this.value=v}setValueAtTime(){}exponentialRampToValueAtTime(){}}
+ class Node{connect(){}}
+ return class{
+  constructor(){this.currentTime=0;this.sampleRate=44100;this.state='running';this.destination={}}
+  createGain(){const g=new Node();g.gain=new Param(1);return g}
+  createBufferSource(){const s=new Node();s.buffer=null;s.start=()=>{};s.stop=()=>{};return s}
+  createBiquadFilter(){const f=new Node();f.frequency=new Param();f.Q=new Param();return f}
+  createOscillator(){const o=new Node();o.frequency=new Param();o.start=()=>{};o.stop=()=>{};return o}
+  createBuffer(){return {getChannelData:()=>new Float32Array(10)}}
+  resume(){this.state='running';return Promise.resolve()}
+ }
+}
+
+test('when the browser will not construct an Audio element, the crowd clip is skipped and the result still plays',()=>{
+ const realWindow=globalThis.window,realAudio=globalThis.Audio
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ globalThis.Audio=class{constructor(){throw new Error('media playback disabled')}}
+ try{
+  const sfx=createSfx()
+  assert.doesNotThrow(()=>sfx.resume(),'preloading the crowd clip must not throw')
+  assert.doesNotThrow(()=>sfx.result(true),'a win with no clip available should still play the synth sting')
+  assert.doesNotThrow(()=>sfx.result(false))
+ }finally{globalThis.window=realWindow;globalThis.Audio=realAudio}
+})
+
+test('when the crowd-clip element exists but cloning or playing it fails, the result falls back to the synth sting',()=>{
+ const realWindow=globalThis.window,realAudio=globalThis.Audio
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ globalThis.Audio=class{
+  constructor(){this.preload=''}
+  cloneNode(){throw new Error('cloneNode unsupported in this webview')}
+ }
+ try{
+  const sfx=createSfx()
+  assert.doesNotThrow(()=>sfx.resume())
+  assert.doesNotThrow(()=>sfx.result(true))
+ }finally{globalThis.window=realWindow;globalThis.Audio=realAudio}
 })
