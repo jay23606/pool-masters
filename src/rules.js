@@ -15,11 +15,11 @@ const shuffle=a=>a.sort(()=>Math.random()-.5)
 export function rack(){
  const nums=shuffle([...Array(7)].map((_,i)=>i+1).concat([...Array(7)].map((_,i)=>i+9)))
  nums.splice(4,0,8)
- const a=[{x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}]
+ const a=[{id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}]
  let q=0
  for(let row=0;row<5;row++)for(let i=0;i<=row;i++){
   const n=nums[q++]
-  a.push({x:420+row*(R*Math.sqrt(3)),y:190+(i-row/2)*(2*R),vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})
+  a.push({id:n,x:420+row*(R*Math.sqrt(3)),y:190+(i-row/2)*(2*R),vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n})
  }
  return a
 }

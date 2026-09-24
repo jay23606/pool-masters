@@ -6,6 +6,7 @@ import { createRenderer2D } from './render2d.js'
 import { createSfx } from './sfx.js'
 import { TABLE_SIZES,setTableSize } from './table.js'
 import { FELTS,loadTablePrefs,saveTablePrefs } from './preferences.js'
+import { parseGameMessage } from './protocol.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
@@ -131,7 +132,7 @@ async function enterRoom(room){
  state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.())
  state.room=room;state.net=net;state.mode='online';showGame();$('.call-actions').hidden=false;$('#rename-room').hidden=!room.isHost;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=room.name||`Room ${room.code}`
  state.unsubs.push(room.on('players',players=>onPlayers(players)),room.on('message',appendMessage),room.on('closed',()=>{toast('The table closed');leaveRoom()}))
- roomHistory.forEach(appendMessage);net.on('data',({data})=>{try{state.game?.receive(JSON.parse(data))}catch{}});net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});net.on('leave',id=>state.peers.delete(id))
+ roomHistory.forEach(appendMessage);net.on('data',({data})=>{const message=parseGameMessage(data);if(message)state.game?.receive(message)});net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});net.on('leave',id=>state.peers.delete(id))
  state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,practice:false,send:broadcastGame,onTable:m=>applyTablePrefs(m.size,m.felt,{fresh:false,remote:true}),onRack:()=>$('#next-rack').hidden=true,onFinish:result=>{finishRanked(result);$('#next-rack').hidden=false}})
  onPlayers(room.players);await room.update?.({status:room.players.length>=2?'playing':'waiting'}).catch(()=>{})
  if(oldRoom&&oldRoom.id!==room.id)await oldRoom.leave().catch(()=>{})

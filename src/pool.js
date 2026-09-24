@@ -1,7 +1,9 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,rack,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup} from './rules.js'
+import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup} from './rules.js'
 import {chooseShot} from './ai.js'
+import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
+import {isGameMessage} from './protocol.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*.5
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
@@ -10,7 +12,7 @@ const STEP=1/120       // fixed simulation step, so frame pacing cannot change a
 const CATCHUP=3        // never make up more than this much time in one go
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){this.balls=rack();this.turn='a';this.phase='aim';this.over=false;this.result='';this.finished=false;this.aiming=false;this.groups={a:null,b:null};this.assignment=null;this.breakShot=true;this.calledPocket=null;this.ballInHand=false;this.placed=false;this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState());this.setSpin(0,0)}
  bind(){this.handlers={power:()=>this.powerOut.textContent=this.power.value+'%',down:e=>{if(!this.canControl())return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(this.ballInHand){if(!this.validCueSpot(p))return;cue.x=p.x;cue.y=p.y;this.ballInHand=false;this.placed=true;this.pendingPlace=[p.x,p.y];this.flash('Ball in hand placed · tap again to aim');return}if(this.canCallEight()&&this.calledPocket==null){this.calledPocket=this.nearestPocket(p);this.flash('8-ball pocket marked · tap again to aim');return}const pa=Math.atan2(p.y-cue.y,p.x-cue.x);if(!this.aiming)this.angle=pa;this.aiming=true;this.drag=true;this.pointerAngle=pa;this.surface.setPointerCapture?.(e.pointerId)},move:e=>{if(!this.drag)return;const p=this.point(e);if(!p)return;const cue=this.balls[0];if(Math.hypot(p.x-cue.x,p.y-cue.y)<5)return;const a=Math.atan2(p.y-cue.y,p.x-cue.x);this.angle=aimStep(this.angle,this.pointerAngle,a);this.pointerAngle=a},up:e=>{this.handlers.move(e);this.drag=false;this.surface.releasePointerCapture?.(e.pointerId)},shoot:()=>this.takeShot(),
    // Both of these are one tap away from being set wrong by accident, so
    // neither is final until the shot is actually taken.
@@ -55,6 +57,7 @@ export class PoolGame{
  takeShot(){if(!this.canAim()||!this.aiming)return;if(this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
  startShot(){this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
  receive(m){
+  if(!isGameMessage(m))return
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
   if(m.t==='next-rack'&&this.host)return this.newRack()
   if(m.t==='state'&&!this.host)return this.receiveState(m)
@@ -62,12 +65,9 @@ export class PoolGame{
  }
  receiveState(m){
   const freshRound=m.round>this.round
-  this.balls=m.b.map(x=>({x:x[0],y:x[1],on:x[2],k:x[3],n:x[4],vx:0,vy:0,wx:0,wy:0,wz:0}))
-  this.turn=m.turn;this.phase=m.phase;this.over=m.over;this.round=m.round
+  applySnapshot(this,m)
   if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}
-  this.groups=m.groups||this.groups;this.assignment=m.assignment||null;this.breakShot=!!m.breakShot;this.ballInHand=!!m.ballInHand
   if(this.ballInHand)this.placed=false
-  this.calledPocket=m.calledPocket
   if(!this.canCallEight())this.calledPocket=null
   if(m.result&&!this.finished){this.finished=true;this.onFinish({winner:m.result,round:m.round})}
  }
@@ -76,7 +76,7 @@ export class PoolGame{
   this.calledPocket=this.canCallEight()?(m.called??null):null
   this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
  }
- sync(){if(this.host)this.send({t:'state',b:this.balls.map(b=>[Math.round(b.x),Math.round(b.y),b.on,b.k,b.n]),turn:this.turn,phase:this.phase,over:this.over,result:this.result||'',round:this.round,groups:this.groups,assignment:this.assignment,breakShot:this.breakShot,ballInHand:this.ballInHand,calledPocket:this.calledPocket})}
+ sync(){if(this.host)this.send(snapshotOf(this))}
  sub(dt){
   for(const b of this.balls){
    if(!b.on)continue
