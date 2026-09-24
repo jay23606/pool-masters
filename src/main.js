@@ -14,6 +14,7 @@ import { AI_LEVELS } from './ai.js'
 import { emptyScore,scoreRack,scoreLine } from './match-score.js'
 import { occupancyLabel } from './room-summary.js'
 import { emptyPerformance,recordPerformance } from './performance.js'
+import { acceptsGameMessage } from './room-security.js'
 import { spectatorMeta,roleFor,reconcileSpectators,admitSpectator,removeSpectator } from './spectators.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
@@ -176,7 +177,7 @@ async function enterRoom(room,intent='player'){
  state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.())
  state.room=room;state.net=net;state.mode='online';state.matchScore={a:0,b:0};state.role=room.metadata?.seats?roleFor(room.metadata,foyer.player.id):(room.isHost?'host':'player');showGame();$('.call-actions').hidden=false;$('#rename-room').hidden=!room.isHost;history.replaceState({},'',`?room=${room.code}`);$('#room-label').textContent=room.name||`Room ${room.code}`
  state.unsubs.push(room.on('players',players=>onPlayers(players)),room.on('metadata',meta=>onMetadata(meta)),room.on('message',appendMessage),room.on('closed',()=>{toast('The table closed');leaveRoom()}))
- roomHistory.forEach(appendMessage);net.on('data',({from,data})=>{const message=parseGameMessage(data);if(message&&(!room.isHost||from===room.metadata?.seats?.b))state.game?.receive(message)});net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});net.on('leave',id=>state.peers.delete(id))
+ roomHistory.forEach(appendMessage);net.on('data',({from,data})=>{const message=parseGameMessage(data);if(message&&acceptsGameMessage({isHost:room.isHost,from,seatB:room.metadata?.seats?.b}))state.game?.receive(message)});net.on('peer',peer=>{state.peers.set(peer.id,peer);state.game?.sync()});net.on('leave',id=>state.peers.delete(id))
  await room.setPlayerState({poolRole:intent})
  state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,host:room.isHost,spectator:state.role!=='host'&&state.role!=='player',practice:false,send:broadcastGame,onSave:persistMatch,onTable:m=>applyTablePrefs(m.size,m.felt,{fresh:false,remote:true}),onRack:()=>$('#next-rack').hidden=true,onFinish:result=>{music.duck();sfx.result(result.winner===state.game?.me);finishRanked(result);recordRackPerformance(result);showRackResult(result);$('#next-rack').hidden=false}})
  if(room.isHost&&state.game.restore(room.metadata?.saved_state))toast('Saved rack restored')
