@@ -9,6 +9,7 @@ import { TABLE_SIZES,setTableSize } from './table.js'
 import { FELTS,loadTablePrefs,saveTablePrefs } from './preferences.js'
 import { parseGameMessage } from './protocol.js'
 import { snapshotOf } from './game-state.js'
+import { winnerForResult } from './ranking.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
@@ -185,7 +186,8 @@ function onPlayers(players){
 function appendMessage(m){const log=$('#messages');if(document.getElementById(`msg-${m.id}`))return;const row=document.createElement('div');row.id=`msg-${m.id}`;row.className=m.system?'system':'message';row.innerHTML=m.system?esc(m.body):`<b>${esc(m.playerName)}</b><span>${esc(m.body)}</span>`;log.append(row);log.scrollTop=log.scrollHeight}
 async function finishRanked(result){
  if(state.mode!=='online'||!state.room||!state.opponent)return
- const winner=result==='a'?(state.room.isHost?foyer.player.id:state.opponent.id):(state.room.isHost?state.opponent.id:foyer.player.id)
+ const winner=winnerForResult(result,state.room.isHost,foyer.player.id,state.opponent.id)
+ if(!winner)return
  const gameId=`${state.room.id}:${result.round}`;const {error}=await sb.rpc('pm_report_result',{p_game_id:gameId,p_room_id:state.room.id,p_winner:winner,p_loser:winner===foyer.player.id?state.opponent.id:foyer.player.id})
  if(error)console.warn(error);setTimeout(async()=>{await ensureLeagueProfile();await refresh()},900)
 }
