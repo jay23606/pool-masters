@@ -31,10 +31,10 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
  let stream=null,loading=false,remoteTitle='',remoteCredit='',queue=[]
- // These are deliberately broad: radio should feel like a real mixed station,
- // not twelve variations of pool-hall background music.  CC0 is kept as the
- // hard requirement; sources include Freesound and Wikimedia Audio.
- const searches=['indie rock song','folk song','hip hop beat','electronic song','soul music','jazz song','latin music','pop song','vocal song','ambient music','funk groove','piano song']
+ const listeners=new Set()
+ // Jamendo's music collection provides actual tracks; general Openverse audio
+ // results also include pets, ambience, and sound effects.
+ const searches=['indie rock','folk','hip hop','electronic','soul','jazz','latin','pop','vocal','ambient','funk','piano']
  const current=()=>MUSIC_PRESETS[index]
  const context=()=>{
   if(ctx)return ctx
@@ -90,7 +90,8 @@ export function createMusic(){
  const playTrack=track=>{
   if(!enabled||!track)return
   stream=new Audio(track.url);stream.volume=Math.min(1,volume);stream.preload='auto'
-  remoteTitle=track.title||'CC0 pool-hall radio';remoteCredit=track.creator?`CC0 audio by ${track.creator}`:'CC0 audio'
+  remoteTitle=track.title||'Pool Masters Radio';remoteCredit=track.creator?`${track.creator} · CC ${track.license?.toUpperCase()}`:`CC ${track.license?.toUpperCase()}`
+  listeners.forEach(listener=>listener({title:remoteTitle,credit:remoteCredit,url:track.foreign_landing_url||track.url}))
   stream.addEventListener('ended',()=>{stream=null;startRadio()},{once:true})
   stream.addEventListener('error',()=>{stream=null;startRadio()},{once:true})
   stream.play().catch(()=>{stream=null;startSynth()})
@@ -101,14 +102,15 @@ export function createMusic(){
   loading=true
   try{
    const query=searches[Math.floor(Math.random()*searches.length)]
-   const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&license=cc0&page_size=20`)
+   const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&source=jamendo&license=by,by-sa&page_size=20`)
    const data=await response.json()
-   queue=(data.results||[]).filter(track=>track.url?.startsWith('https://')&&track.duration>=60000&&track.license==='cc0')
+   queue=(data.results||[]).filter(track=>track.source==='jamendo'&&track.url?.startsWith('https://')&&track.duration>=90000&&['by','by-sa'].includes(track.license))
    if(queue.length)playTrack(queue.pop());else startSynth()
   }catch{startSynth()}finally{loading=false}
  }
  return {
   get enabled(){return enabled},get title(){return remoteTitle||current().name},get credit(){return remoteCredit},get lyric(){return current().lyric},get volume(){return volume},
+  onTrack(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   setEnabled(value){enabled=!!value;if(enabled)startRadio();else stop()},
   setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(stream)stream.volume=volume;if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
   resume(){if(enabled)startRadio()},
