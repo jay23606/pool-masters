@@ -26,7 +26,7 @@ const sfx=createSfx()
 const music=createMusic()
 sfx.setEnabled(localStorage.getItem('pool-masters:muted')!=='1')
 sfx.setHaptics(localStorage.getItem('pool-masters:haptics')!=='0')
-music.setVolume(localStorage.getItem('pool-masters:music-volume')||.65)
+music.setVolume(localStorage.getItem('pool-masters:music-volume')||1)
 music.setEnabled(localStorage.getItem('pool-masters:music')==='1')
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>{sfx.resume();music.resume()},{once:true})

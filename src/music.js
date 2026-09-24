@@ -29,13 +29,16 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 })))
 
 export function createMusic(){
- let ctx,master,enabled=false,volume=.65,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
+ let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
  const current=()=>MUSIC_PRESETS[index]
  const context=()=>{
   if(ctx)return ctx
   const C=window.AudioContext||window.webkitAudioContext
   if(!C)return null
-  ctx=new C();master=ctx.createGain();master.gain.value=0;master.connect(ctx.destination);return ctx
+  ctx=new C();master=ctx.createGain();master.gain.value=0
+  // Keep the full-volume setting musical when a bass, chord, and lead overlap.
+  limiter=ctx.createDynamicsCompressor();limiter.threshold.value=-10;limiter.knee.value=12;limiter.ratio.value=12;limiter.attack.value=.004;limiter.release.value=.16
+  master.connect(limiter);limiter.connect(ctx.destination);return ctx
  }
  const note=(at,duration,hz,gain,type,detune=0)=>{
   const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=hz;o.detune.value=detune
@@ -81,7 +84,7 @@ export function createMusic(){
  return {
   get enabled(){return enabled},get title(){return current().name},get lyric(){return current().lyric},get volume(){return volume},
   setEnabled(value){enabled=!!value;if(enabled)start();else stop()},
-  setVolume(value){volume=Math.max(.1,Math.min(.9,Number(value)||.65));if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
+  setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
   resume(){if(enabled)start()},
   shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;if(enabled){stop();start()}return current().name},
   destroy(){enabled=false;stop();ctx?.close().catch(()=>{})}
