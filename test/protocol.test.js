@@ -22,5 +22,7 @@ test('network protocol rejects malformed state and accepts valid snapshots',()=>
  assert.deepEqual(parseGameMessage(JSON.stringify(good)),good)
  assert.equal(parseGameMessage('{bad json'),null)
  assert.equal(isGameMessage({...good,b:[[0,0,true,'bogus',1]]}),false)
+ assert.equal(isGameMessage({...good,b:good.b.map((b,i)=>i?b:[...b.slice(0,4),9])}),false)
+ assert.equal(isGameMessage({...good,b:good.b.slice(1)}),false)
  assert.equal(isGameMessage({t:'shot',vx:'fast',vy:0}),false)
 })
