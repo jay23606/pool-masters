@@ -49,6 +49,9 @@ h2 .n{color:var(--green);margin-right:8px}
 .rm .tag{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap;align-self:start}
 .tag.high{background:#2b1414;color:#ff9d9d;border:1px solid #5a2a2a}
 .tag.med{background:var(--partial-bg);color:var(--partial);border:1px solid #4a3a1a}
+.tag.done{background:#123526;color:#8ff0bb;border:1px solid #2f6a4b}
+.rm.shipped{border-color:#2f6a4b;background:linear-gradient(145deg,#0f2a1d,#0b1c14)}
+.rm.shipped .rank{color:var(--star)}
 .tag.low{background:#132018;color:#9fc4ab;border:1px solid #2a4636}
 
 /* legend */
@@ -162,16 +165,19 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
  <h2><span class="n">02</span>Where this points next</h2>
  <p class="section-sub">The eight gaps below are the ones every competitor above has
  that we don't, ranked by how much they'd change what the game can do versus how much
- they'd cost to build.</p>
+ they'd cost to build. Green means it has shipped.</p>
  <div class="roadmap">
 
-  <div class="rm">
-   <div class="rank">1</div>
+  <div class="rm shipped">
+   <div class="rank">✓</div>
    <div><h4>A second game mode — 9-ball</h4>
-   <p>Every other entry in this table supports more than one ruleset. 9-ball reuses the
-   entire physics/rendering/networking stack — it's a new <code>rules.js</code> variant
-   and a smaller rack, not a new engine. Highest ratio of reach to effort on this list.</p></div>
-   <span class="tag high">High impact</span>
+   <p><strong>Shipped.</strong> Ten-ball diamond rack, lowest-ball-first, the cushion rule,
+   9-on-a-legal-shot wins (combinations included), 9 re-spotted on a foul, ball in hand
+   after any foul. It reused the whole physics/rendering/networking stack — this was a new
+   <code>rules.js</code> variant and a smaller rack, exactly as scoped. Available in
+   practice, private tables and quick play; unranked until the ranking tables know
+   which game a result came from.</p></div>
+   <span class="tag done">Shipped</span>
   </div>
 
   <div class="rm">
@@ -296,7 +302,7 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
 const rows = [
 ['cat','Core rules & modes'],
 ['Standard 8-ball rules', ['s','y','y','y','y','y'], 'Ours adds explicit foul-reason messaging and a live "on the 8" HUD state most others leave implicit.'],
-['9-ball', ['n','y','p','y','p','y']],
+['9-ball', ['y','y','p','y','p','y'], 'Standard WPA rules incl. the cushion rule and 9 re-spot; unranked for now.'],
 ['Snooker / carom variants', ['n','y','n','n','n','y']],
 ['Other rule variants (killer, speed pool, etc.)', ['n','n','n','n','n','y']],
 ['Trick-shot / practice drill library', ['n','y','p','p','n','y']],
