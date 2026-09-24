@@ -1,6 +1,9 @@
-// Pool Masters Radio is deliberately generated in the browser.  A track is a
-// tiny score, rather than a downloaded recording, which keeps the Pages build
-// small and lets the game offer a large, offline-friendly catalogue.
+// Pool Masters Radio streams real, actually-licensed tracks (CC BY / BY-SA,
+// fetched from Jamendo through the Openverse API) rather than shipping a fixed
+// playlist. The presets below are the offline/failure fallback: each one is a
+// tiny score rather than a downloaded recording, which keeps the Pages build
+// small and lets the fallback still offer a large, offline-friendly catalogue
+// when the network is down or nothing licensable turns up.
 const roots=[48,50,52,53,55,57,59,60]
 const scales={minor:[0,3,7,10],dorian:[0,3,5,7,10],major:[0,4,7,9],blues:[0,3,5,6,7,10],pentatonic:[0,3,5,7,10]}
 const moods=[
@@ -101,13 +104,19 @@ export function createMusic(){
  }
  const playTrack=track=>{
   if(!enabled||!track)return
-  const audio=new Audio(track.url);stream=audio;audio.volume=Math.min(1,volume);audio.preload='auto'
-  remember(track)
-  remoteTitle=track.title||'Pool Masters Radio';remoteCreator=track.creator||'Unknown artist';remoteLicense=`CC ${track.license?.toUpperCase()}`;remoteCredit=`${remoteCreator} · ${remoteLicense}`
-  listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
-  audio.onended=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
-  audio.onerror=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
-  audio.play().catch(()=>{if(stream===audio){stream=null;startSynth()}})
+  // One of this function's two callers (a queue already holding a fetched
+  // track) sits outside startRadio()'s try/catch, so a synchronous failure
+  // here -- disabled media, a locked-down CSP -- has to be handled locally
+  // rather than relying on that catch to still be in scope.
+  try{
+   const audio=new Audio(track.url);stream=audio;audio.volume=Math.min(1,volume);audio.preload='auto'
+   remember(track)
+   remoteTitle=track.title||'Pool Masters Radio';remoteCreator=track.creator||'Unknown artist';remoteLicense=`CC ${track.license?.toUpperCase()}`;remoteCredit=`${remoteCreator} · ${remoteLicense}`
+   listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
+   audio.onended=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
+   audio.onerror=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
+   audio.play().catch(()=>{if(stream===audio){stream=null;startSynth()}})
+  }catch{stream=null;startSynth()}
  }
  async function startRadio(){
   if(!enabled||stream||loading)return

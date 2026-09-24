@@ -63,7 +63,16 @@ export function createSfx(){
   for(let i=0;i<len;i++)d[i]=Math.random()*2-1
   return ctx
  }
- const preloadResults=()=>{if(typeof Audio==='undefined')return;for(const[key,url]of Object.entries(RESULT_CLIPS)){if(clips[key])continue;const clip=new Audio(url);clip.preload='auto';clips[key]=clip}}
+ // Freesound is a third party the game does not control -- a locked-down CSP,
+ // disabled media, or a blocked CDN should silently fall back to the synthesised
+ // sting below, never throw out of a rack result.
+ const preloadResults=()=>{
+  if(typeof Audio==='undefined')return
+  for(const[key,url]of Object.entries(RESULT_CLIPS)){
+   if(clips[key])continue
+   try{const clip=new Audio(url);clip.preload='auto';clips[key]=clip}catch{}
+  }
+ }
  const burst=(when,dur,freq,q,gain,type='bandpass')=>{
   const src=ctx.createBufferSource();src.buffer=noise
   const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q
@@ -121,9 +130,11 @@ export function createSfx(){
    const playResult=()=>{try{if(ctx.state==='running')play.result(won)}catch{}}
    const clip=clips[won?'win':'loss']
    if(clip){
-    const crowd=clip.cloneNode();crowd.volume=.95
-    crowd.play().then(()=>setTimeout(()=>{crowd.pause();crowd.src=''},won?2600:2300)).catch(()=>{const c=audio();if(c?.state==='suspended')c.resume().then(playResult).catch(()=>{});else playResult()})
-    return
+    try{
+     const crowd=clip.cloneNode();crowd.volume=.95
+     crowd.play().then(()=>setTimeout(()=>{crowd.pause();crowd.src=''},won?2600:2300)).catch(()=>{const c=audio();if(c?.state==='suspended')c.resume().then(playResult).catch(()=>{});else playResult()})
+     return
+    }catch{}
    }
    const c=audio();if(c?.state==='suspended')c.resume().then(playResult).catch(()=>{});else playResult()
   },

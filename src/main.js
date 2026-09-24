@@ -2,11 +2,11 @@ import './style.css'
 import { createClient } from '@supabase/supabase-js'
 import { createFoyer } from '@jay23606/foyer'
 import { PoolGame } from './pool.js'
-import { createRenderer2D } from './render2d.js'
 import { createSfx } from './sfx.js'
 import { createMusic } from './music.js'
-import { TABLE_SIZES,setTableSize } from './table.js'
-import { FELTS,loadTablePrefs,saveTablePrefs } from './preferences.js'
+import { setTableSize } from './table.js'
+import { FELTS,loadTablePrefs } from './preferences.js'
+import { createViewManager } from './view-manager.js'
 import { parseGameMessage } from './protocol.js'
 import { snapshotOf } from './game-state.js'
 import { winnerForResult } from './ranking.js'
@@ -27,12 +27,6 @@ const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostM
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,role:'pending',rankings:[],profile:null,matchScore:emptyScore(),saveTimer:null,pendingSave:null,lastSave:0}
 document.documentElement.dataset.theme=localStorage.getItem('pool-masters:theme')||'dark'
-// The table button cycles three views. Top-down 3D is the default: the plan
-// view of the 2D renderer, but lit and shaded. New storage key: the old one
-// was written on every load rather than on a deliberate switch, so a value
-// stored under it says nothing about what the player actually chose.
-const VIEWS=['top','3d','2d'],VIEW_LABEL={top:'TOP','3d':'3D','2d':'2D'}
-const stored=localStorage.getItem('pool-masters:table-view')
 const sfx=createSfx()
 const music=createMusic()
 sfx.setEnabled(localStorage.getItem('pool-masters:muted')!=='1')
@@ -40,7 +34,6 @@ sfx.setHaptics(localStorage.getItem('pool-masters:haptics')!=='0')
 music.setVolume(localStorage.getItem('pool-masters:music-volume')||1)
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>{sfx.resume();music.resume()},{once:true})
-const view={mode:VIEWS.includes(stored)?stored:'top',renderer:null,switching:false}
 const tablePrefs=loadTablePrefs()
 setTableSize(tablePrefs.size)
 
@@ -54,46 +47,11 @@ $('.view-buttons').insertAdjacentHTML('afterbegin','<button id="table-settings" 
 document.body.insertAdjacentHTML('beforeend','<dialog id="table-dialog"><form method="dialog"><h2>Set up the table</h2><p>Table size changes the ball-to-table proportion. Changing it starts a fresh rack.</p><label>Table size <select id="table-size"><option value="7">7 ft · bar</option><option value="8">8 ft · home</option><option value="9">9 ft · league</option></select></label><label>Felt <select id="felt"><option value="green">Classic green</option><option value="blue">Tournament blue</option><option value="burgundy">Burgundy</option><option value="charcoal">Charcoal</option></select></label><div><button value="cancel" class="ghost">Cancel</button><button id="save-table" value="default" class="primary">Apply</button></div></form></dialog>')
 $('#table-dialog form').insertAdjacentHTML('beforeend','<label>Cue finish <select id="cue-finish"><option value="classic">Classic maple</option><option value="ebony">Ebony</option><option value="midnight">Midnight blue</option></select></label><label>Room lighting <select id="lighting"><option value="hall">Pool hall</option><option value="warm">Warm lounge</option><option value="cool">Cool arena</option></select></label><label>Aim sensitivity <input id="aim-sensitivity" type="range" min="10" max="100" value="30"> <output id="aim-sensitivity-out"></output></label><label><input id="haptics" type="checkbox"> Haptic feedback</label>')
 
-// The renderer is swappable at any time: the game owns the simulation, the
-// renderer only draws it and maps pointer events back to table coordinates.
-const cameraFor=m=>m==='3d'?'angled':'top'
-async function buildRenderer(){
- if(view.mode!=='2d'){
-  try{const{createRenderer3D}=await import('./render3d.js');return await createRenderer3D($('#table3d'),cameraFor(view.mode),tablePrefs)}
-  catch(e){console.warn('3D renderer unavailable',e);view.mode='2d';toast('3D is unavailable on this device')}
- }
- return createRenderer2D($('#table'),tablePrefs)
-}
-async function rebuildRenderer(){view.renderer?.destroy();view.renderer=null;await applyView(false)}
-async function applyTablePrefs(size=tablePrefs.size,felt=tablePrefs.felt,{fresh=true,remote=false}={}){
- tablePrefs.size=setTableSize(size);tablePrefs.felt=felt
- Object.assign(tablePrefs,saveTablePrefs(tablePrefs))
- await rebuildRenderer()
- if(!remote&&state.mode==='online'&&state.room?.isHost)broadcastGame({t:'table',size:tablePrefs.size,felt:tablePrefs.felt})
- if(fresh&&state.game){state.game.resetRack();state.game.sync()}
- if(!remote)toast(`${TABLE_SIZES[tablePrefs.size].label} table ready`)
-}
-async function applyView(persist){
- if(view.switching)return
- view.switching=true
- try{
-  if(view.mode!=='2d'&&view.renderer?.mode==='3d')view.renderer.setCamera(cameraFor(view.mode))
-  else{
-   const next=await buildRenderer()
-   view.renderer?.destroy();view.renderer=next
-   state.game?.setRenderer(next)
-  }
-  const r=view.renderer
-  $('#table').hidden=r.mode!=='2d';$('#table3d').hidden=r.mode!=='3d'
-  $('#view-3d').textContent=VIEW_LABEL[view.mode]
-  $('#view-3d').classList.toggle('on',r.mode==='3d')
-  if(persist)localStorage.setItem('pool-masters:table-view',view.mode)
-  r.resize()
- }finally{view.switching=false}
-}
-async function ensureRenderer(){if(!view.renderer)await applyView();return view.renderer}
-
 function toast(text){const e=$('#toast');e.textContent=text;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2200)}
+const viewManager=createViewManager({$,tablePrefs,toast,
+ getGame:()=>state.game,broadcastGame:data=>broadcastGame(data),
+ isOnlineHost:()=>state.mode==='online'&&Boolean(state.room?.isHost)})
+const {view,ensureRenderer,applyTablePrefs}=viewManager
 async function boot(){
  let name=localStorage.getItem('pool-masters:name')||''
  if(!name){name=`Player ${Math.floor(100+Math.random()*900)}`;localStorage.setItem('pool-masters:name',name)}
@@ -144,7 +102,7 @@ function bind(){
  $('#music-volume').oninput=e=>{music.setVolume(Number(e.target.value)/100);localStorage.setItem('pool-masters:music-volume',music.volume)}
  $('#music-shuffle').onclick=()=>{const title=music.shuffle();toast(`Now playing: ${title}`);paintMusic()}
  paintMusic()
- $('#view-3d').onclick=()=>{view.mode=VIEWS[(VIEWS.indexOf(view.mode)+1)%VIEWS.length];applyView(true)}
+ $('#view-3d').onclick=()=>viewManager.cycle()
  $('#copy').onclick=copyInvite;$('#call').onclick=startCall;$('#mute').onclick=()=>{state.media?.toggleMuted();$('#mute').classList.toggle('on')};$('#camera').onclick=async()=>{if(!state.media)return startCall();state.media.toggleCamera();$('#camera').classList.toggle('on')}
  $('#chat-form').onsubmit=async e=>{e.preventDefault();const input=$('#message'),body=input.value.trim();if(!body||!state.room)return;input.value='';await state.room.say(body)}
  window.addEventListener('popstate',()=>{if(!new URLSearchParams(location.search).get('room'))leaveRoom(false)})
@@ -200,7 +158,7 @@ function onPlayers(players){
  // event. A full table is still a live room, so mark its phase only.
  state.game?.setReady(state.role==='host'||state.role==='player'?Boolean(other):false);if(other&&state.room?.isHost)state.room.update({status:'playing'}).catch(()=>{})
 }
-function onMetadata(meta){if(meta?.match_score){state.matchScore=meta.match_score;renderMatchScore()}state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');if(state.role==='spectator'&&view.mode==='top'){view.mode='3d';applyView(false)}onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean),watchers=(meta.spectators||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost?(requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join('')+watchers.map(p=>`<button class="ghost remove" data-remove="${p.id}">Remove ${esc(p.name)}</button>`).join('')):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live · angled camera</small>':''}
+function onMetadata(meta){if(meta?.match_score){state.matchScore=meta.match_score;renderMatchScore()}state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');if(state.role==='spectator'&&view.mode==='top')viewManager.forceView('3d');onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean),watchers=(meta.spectators||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost?(requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join('')+watchers.map(p=>`<button class="ghost remove" data-remove="${p.id}">Remove ${esc(p.name)}</button>`).join('')):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live · angled camera</small>':''}
 function appendMessage(m){const log=$('#messages');if(document.getElementById(`msg-${m.id}`))return;const row=document.createElement('div');row.id=`msg-${m.id}`;row.className=m.system?'system':'message';row.innerHTML=m.system?esc(m.body):`<b>${esc(m.playerName)}</b><span>${esc(m.body)}</span>`;log.append(row);log.scrollTop=log.scrollHeight}
 function renderMatchScore(){const game=state.game;if(!game)return;const theirs=game.me==='a'?'b':'a';$('#match-score').textContent=`Race to ${MATCH_TARGET} · ${state.matchScore[game.me]}–${state.matchScore[theirs]}`}
 function showRackResult(result){const game=state.game;if(!game||game.finishedResult===result.round)return;game.finishedResult=result.round;state.matchScore=scoreRack(state.matchScore,result.winner);const winner=matchWinner(state.matchScore),won=result.winner===game.me,opponent=state.opponent?.name||'AI Coach';renderMatchScore();$('#result-title').textContent=winner?(winner===game.me?'Match won!':'Match lost'):(won?'Rack won':'Rack lost');$('#result-summary').textContent=`Race to ${MATCH_TARGET} · ${scoreLine(state.matchScore,game.me,foyer.player.name,opponent)}`;$('#result-next').hidden=Boolean(winner);$('#result-next').textContent=state.mode==='practice'?'Next rack':'Play next rack';$('#result-dialog').showModal();if(state.room?.isHost)state.room.update({metadata:{...state.room.metadata,match_score:state.matchScore}}).catch(console.warn)}
@@ -217,7 +175,7 @@ function renderAiRecord(){const r=aiRecord(),games=r.wins+r.losses;$('#practice-
 function recordAiResult(won){const r=aiRecord();r[won?'wins':'losses']=(r[won?'wins':'losses']||0)+1;localStorage.setItem('pool-masters:ai-record',JSON.stringify(r));renderAiRecord()}
 async function startPractice(level='league'){state.game?.destroy();state.mode='practice';state.room=null;state.opponent={name:`${AI_LEVELS[level].label} AI`};showGame();$('#game').classList.add('focus');history.replaceState({},'',location.pathname);$('#room-label').textContent='Unranked practice';$('#versus').innerHTML=`<span><b>${esc(foyer.player.name)}</b><small>You</small></span><i>vs</i><span><b>${AI_LEVELS[level].label} AI</b><small>Practice</small></span>`;renderAiRecord();state.game=new PoolGame({renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,aimSensitivity:tablePrefs.aimSensitivity,host:true,practice:true,aiLevel:level,send:()=>{},onFinish:result=>{music.duck();sfx.result(result.winner==='a');recordAiResult(result.winner==='a');recordRackPerformance(result);showRackResult(result);$('#next-rack').hidden=false}});$('.call-actions').hidden=true;$('#room-sidebar').hidden=true}
 function showGame(){if(localStorage.getItem('pool-masters:music')==='1')music.setEnabled(true);state.paintMusic?.();$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#game').classList.remove('focus');$('#focus-table').textContent='Focus table';$('#messages').innerHTML='';$('#room-sidebar').hidden=false;$('#practice-record').hidden=true;$('#next-rack').hidden=true}
-async function startCall(){if(!state.room)return;try{if(!state.media){state.media=state.room.media();state.media.onStream((_,s)=>{$('#remote-video').srcObject=s;$('#video-panel').classList.add('live')});state.media.onLeave(()=>{$('#remote-video').srcObject=null});const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#local-video').srcObject=stream;await state.media.start(stream);$('#call').textContent='End call';return}state.media.stop();state.media=null;$('#local-video').srcObject=null;$('#remote-video').srcObject=null;$('#call').textContent='Start call'}catch(e){toast('Camera or microphone unavailable')}}
+async function startCall(){if(!state.room)return;try{if(!state.media){state.media=state.room.media();state.media.onStream((_,s)=>{$('#remote-video').srcObject=s;$('#video-panel').classList.add('live')});state.media.onLeave(()=>{$('#remote-video').srcObject=null});const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#local-video').srcObject=stream;await state.media.start(stream);$('#call').textContent='End call';return}state.media.stop();state.media=null;$('#local-video').srcObject=null;$('#remote-video').srcObject=null;$('#call').textContent='Start call'}catch{toast('Camera or microphone unavailable')}}
 async function leaveRoom(push=true){music.setEnabled(false);state.paintMusic?.();if(state.game&&state.room?.isHost)await persistMatch(snapshotOf(state.game),true);clearTimeout(state.saveTimer);state.saveTimer=null;state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
 // Registered after boot so it never delays first paint, and only in a build:
 // a worker in dev would just cache things you are actively editing.
