@@ -169,3 +169,40 @@ test('a legacy plural group name cannot make the AI call the eight early',()=>{
  assert.ok(plan)
  assert.equal(plan.pocket,null)
 })
+
+// ---- the AI looking at its own shot before it takes it ----
+import {rollout} from '../src/ai.js'
+
+test('a rollout reports exactly what the real game does with the same shot',()=>{
+ const layouts=[
+  [ball(350,300,'cue',0),ball(350,120,'solid',1),ball(500,80,'stripe',9)],
+  [ball(120,190,'cue',0),ball(400,190,'solid',1),ball(430,205,'solid',2),ball(430,175,'stripe',9)],
+  [ball(200,300,'cue',0),ball(330,337,'solid',2),ball(560,120,'solid',5)],
+ ]
+ let checked=0
+ for(const layout of layouts)for(const [angle,power] of [[-Math.PI/2,55],[0,70],[-.3,85],[.2,40],[-1.2,60]]){
+  const balls=layout.map(b=>({...b}))
+  const predicted=rollout(balls,angle,power)
+  // now the real thing, through the game's own stepping and bookkeeping
+  const g=Object.create(PoolGame.prototype)
+  Object.assign(g,{mode:'9ball',balls:layout.map(b=>({...b,id:b.n})),turn:'a',me:'a',host:true,phase:'aim',over:false,result:'',
+   finished:false,round:1,groups:{a:null,b:null},assignment:null,breakShot:false,calledPocket:null,ballInHand:false,placed:false,
+   practice:false,ready:true,shots:{a:0,b:0},acc:0,flash(){},sync(){},setSpin(){},onFinish(){}})
+  g.startShot()
+  strike(g.balls[0],Math.cos(angle)*shotSpeed(power),Math.sin(angle)*shotSpeed(power))
+  let now=0;for(let i=0;i<8000&&g.phase==='roll';i++){now+=1000/120;g.advance(now)}
+  assert.equal(predicted.scratch,g.scratch,`scratch, angle ${angle} power ${power}`)
+  assert.equal(predicted.firstHit?.n,g.firstHit?.n,`first hit, angle ${angle} power ${power}`)
+  assert.equal(predicted.railHit,g.railHit,`rail, angle ${angle} power ${power}`)
+  assert.deepEqual([...predicted.potted].sort(),g.potted.map(b=>b.n).sort(),`potted, angle ${angle} power ${power}`)
+  checked++
+ }
+ assert.equal(checked,15)
+})
+
+test('a rollout does not disturb the table it was given',()=>{
+ const balls=[ball(350,300,'cue',0),ball(350,120,'solid',1)]
+ const before=JSON.stringify(balls)
+ rollout(balls,-Math.PI/2,60)
+ assert.equal(JSON.stringify(balls),before)
+})

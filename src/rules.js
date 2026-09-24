@@ -1,8 +1,11 @@
 import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 
-// Eight-ball rules, as pure functions over a plain state object. Nothing here
-// touches the DOM, the network or a renderer, so a game can be judged, tested
-// or replayed without any of them.
+// Eight-ball and nine-ball rules, as pure functions over a plain state object.
+// Nothing here touches the DOM, the network or a renderer, so a game can be
+// judged, tested or replayed without any of them.
+
+export const MODES={'8ball':{label:'8-ball',balls:16},'9ball':{label:'9-ball',balls:10}}
+export const modeOf=m=>MODES[m]?m:'8ball'
 
 export const other=t=>t==='a'?'b':'a'
 export const kind=n=>n===8?'eight':n<8?'solid':'stripe'
@@ -12,7 +15,24 @@ export const opposite=g=>g==='solid'?'stripe':'solid'
 export const normalizeGroup=g=>g==='solids'?'solid':g==='stripes'?'stripe':g
 
 const shuffle=a=>a.sort(()=>Math.random()-.5)
-export function rack(){
+export function rack(mode='8ball'){
+ return modeOf(mode)==='9ball'?nineRack():eightRack()
+}
+
+// Diamond of ten: the 1 on the foot spot at the apex, the 9 in the middle, the
+// other seven anywhere -- five columns of 1, 2, 3, 2, 1.
+function nineRack(){
+ const cue={id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}
+ const slots=[[0,0],[1,-.5],[1,.5],[2,-1],[2,0],[2,1],[3,-.5],[3,.5],[4,0]]
+ const others=shuffle([2,3,4,5,6,7,8])
+ const nums=[1,...others.slice(0,3),9,...others.slice(3)]   // slot 4 is the middle of column 2
+ return [cue,...slots.map(([col,row],i)=>{
+  const n=nums[i]
+  return {id:n,x:420+col*(R*Math.sqrt(3)),y:190+row*(2*R),vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n}
+ })]
+}
+
+function eightRack(){
  const nums=shuffle([...Array(7)].map((_,i)=>i+1).concat([...Array(7)].map((_,i)=>i+9)))
  nums.splice(4,0,8)
  const a=[{id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}]
@@ -42,6 +62,7 @@ export const validCueSpot=(balls,p)=>
 // eightPocket, and `before` -- how many of the shooter's own balls were on the
 // table when the shot was taken.
 export function judgeShot(s){
+ if(modeOf(s.mode)==='9ball')return judgeNineBall(s)
  const shooter=s.turn,group=normalizeGroup(s.groups[shooter]),open=!group
  const black=s.potted.some(b=>b.k==='eight')
  const onTheEight=s.before===0
@@ -75,4 +96,43 @@ export function judgeShot(s){
  const madeOwn=group?s.potted.some(b=>b.k===group)
                     :s.potted.some(b=>b.k==='solid'||b.k==='stripe')
  return {winner:null,foul:false,reason:null,assign,nextTurn:madeOwn?shooter:other(shooter)}
+}
+
+// ---- nine-ball ----
+//
+// No groups and no called pockets. The cue ball must hit the lowest-numbered
+// ball on the table first, and the shot must then either pocket something or
+// drive some ball to a cushion. Pocketing the 9 on a legal shot wins the rack
+// -- including off a combination -- while the 9 pocketed on a foul comes back
+// to the table. Any foul gives the opponent ball in hand.
+
+// The ball that has to be hit first: the lowest number still on the table.
+export function lowestBall(balls){
+ let low=null
+ for(const b of balls)if(b.on&&b.k!=='cue'&&(low===null||b.n<low))low=b.n
+ return low
+}
+
+// Where a pocketed 9 goes back: the foot spot, or the next free spot behind it
+// if a ball is sitting there, so it can never reappear inside another ball.
+export function nineRespot(balls){
+ const free=p=>!balls.some(b=>b.on&&b.n!==9&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
+ for(let x=420;x<=MAXX;x+=R)if(free({x,y:190}))return {x,y:190}
+ for(let x=420;x>=MINX;x-=R)if(free({x,y:190}))return {x,y:190}
+ return {x:420,y:190}
+}
+
+// Takes: turn, potted (object balls only), scratch, firstHit, lowest (the
+// lowest ball when the shot was taken), railHit (a ball reached a cushion
+// after the first contact).
+export function judgeNineBall(s){
+ const shooter=s.turn,nine=s.potted.some(b=>b.n===9)
+ const reason=s.scratch?'scratch'
+  :!s.firstHit?'no-contact'
+  :s.firstHit.n!==s.lowest?'wrong-first'
+  :!s.potted.length&&!s.railHit?'no-rail'
+  :null
+ if(reason)return {winner:null,foul:true,reason,assign:null,nextTurn:other(shooter),respotNine:nine}
+ if(nine)return {winner:shooter,foul:false,reason:null,assign:null,nextTurn:shooter,respotNine:false}
+ return {winner:null,foul:false,reason:null,assign:null,nextTurn:s.potted.length?shooter:other(shooter),respotNine:false}
 }

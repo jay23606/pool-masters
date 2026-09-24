@@ -1,6 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup} from './rules.js'
+import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
@@ -12,8 +12,8 @@ export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
 export class PoolGame{
- constructor(o){Object.assign(this,o);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){Object.assign(this,freshRackState());this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
+ resetRack(){Object.assign(this,freshRackState(this.mode));this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -30,13 +30,13 @@ export class PoolGame{
  // The eight is only legal once your own group is gone. Nothing used to say so:
  // a tap meant to call a pocket was simply swallowed.
  eightBlocked(){const g=this.group(this.me);return g?this.remaining(g):null}
- aimingAtEight(){return this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
+ aimingAtEight(){return this.mode!=='9ball'&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
  canControl(){return !this.spectator&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;if(this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
- startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
+ takeShot(){if(!this.canAim()||!this.aiming)return;if(this.mode!=='9ball'&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
+ startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.phase='roll'}
  receive(m){
   if(!isGameMessage(m))return
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
@@ -71,20 +71,33 @@ export class PoolGame{
   for(const b of this.balls){
    if(!b.on)continue
    integrate(b,dt)
-   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(b.k==='cue'?'Scratch!':b.k==='eight'?'8-ball potted!':`${b.k==='solid'?'Solid':'Stripe'} ${b.n} potted!`);break}
+   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
    if(!b.on)continue
-   railBounce(b)
+   if(railBounce(b)&&this.firstHit)this.railHit=true
   }
   for(let i=0;i<this.balls.length;i++)for(let j=i+1;j<this.balls.length;j++){
    const a=this.balls[i],b=this.balls[j]
    if(!a.on||!b.on)continue
    if(ballCollide(a,b)&&!this.firstHit){if(a.k==='cue')this.firstHit=b;else if(b.k==='cue')this.firstHit=a}
   }}
- foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`:reason==='no-contact'?'Foul · no object ball contacted · ball in hand':'Foul · ball in hand')}
+ pottedMessage(b){
+  if(b.k==='cue')return 'Scratch!'
+  if(this.mode==='9ball')return b.n===9?'9-ball potted!':`Ball ${b.n} potted!`
+  return b.k==='eight'?'8-ball potted!':`${b.k==='solid'?'Solid':'Stripe'} ${b.n} potted!`
+ }
+ // A 9 pocketed on a foul goes back on the table rather than ending the rack.
+ respotNine(){
+  const nine=this.balls.find(b=>b.n===9)
+  if(!nine)return
+  const p=nineRespot(this.balls)
+  nine.on=true;nine.x=p.x;nine.y=p.y;clearMotion(nine)
+ }
+ foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(this.mode==='9ball'?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand')}
  finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(winner===this.me?'You win!':'You lose')}
  resolve(){
   const shooter=this.turn
   const v=judgeShot(this)
+  if(v.respotNine)this.respotNine()
   if(v.winner){this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:false,winner:v.winner});this.finish(v.winner);this.phase='aim';this.sync();return}
   if(v.assign){
    this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
@@ -101,12 +114,12 @@ export class PoolGame{
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
- const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel)
+ const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel,this.mode)
  if(!plan)return
  if(plan.place){this.ballInHand=false;this.placed=false}
   // The planner may receive old room state; never show an 8-ball call unless
   // the live game state confirms the AI has cleared its own group.
-  if(plan.pocket!=null&&this.remaining(this.group('b'))===0)this.calledPocket=plan.pocket
+  if(this.mode!=='9ball'&&plan.pocket!=null&&this.remaining(this.group('b'))===0)this.calledPocket=plan.pocket
   this.startShot()
   const s=shotSpeed(plan.power)
   strike(this.balls[0],Math.cos(plan.angle)*s,Math.sin(plan.angle)*s)
@@ -124,7 +137,19 @@ export class PoolGame{
   this.updateHud()
  }
  clearInvalidCall(){if(this.calledPocket!=null&&this.phase==='aim'&&!this.canCallEight())this.calledPocket=null}
- updateHud(){// A called pocket remains part of a shot after aiming ends; only
+ // Nine-ball has no groups, counts or called pockets, so its HUD is its own.
+ updateNineHud(){
+  const low=lowestBall(this.balls)
+  if(this.groupStatus){const text=low===null?'9-BALL':`9-BALL · LOWEST ON TABLE: ${low}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
+  this.shoot.disabled=!this.canAim()||!this.aiming
+  const live=this.canControl()&&!this.ballInHand
+  if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
+  if(this.changePocket)this.changePocket.hidden=true
+  this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · hit the ${low} first`):this.practice?'AI is lining up…':'Opponent’s turn'
+ }
+ updateHud(){
+  if(this.mode==='9ball')return this.updateNineHud()
+  // A called pocket remains part of a shot after aiming ends; only
   // discard it while setting up an illegal call, never while balls are rolling.
   this.clearInvalidCall();const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table';const count=p=>{const g=this.group(p);return g?(this.remaining(g)||'ON 8'):''}
   const tag=(x,p)=>{const c=count(p);return label(x).toUpperCase()+(c?` · ${c}`:'')}
