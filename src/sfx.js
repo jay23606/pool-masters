@@ -40,6 +40,7 @@ export const snapshot=balls=>balls.map(b=>({x:b.x,y:b.y,on:b.on}))
 
 export function createSfx(){
  let ctx=null,master=null,noise=null,enabled=true,haptics=true,lastBuzz=0
+ const level=.95
  const buzz=(ms,level=1)=>{if(!haptics||typeof navigator==='undefined'||!navigator.vibrate)return;const now=performance.now();if(now-lastBuzz<55)return;lastBuzz=now;try{navigator.vibrate(Math.round(ms*level))}catch{}}
  // The context can only start from a user gesture, so it is built on demand.
  function audio(){
@@ -47,7 +48,7 @@ export function createSfx(){
   const C=window.AudioContext||window.webkitAudioContext
   if(!C)return null
   ctx=new C()
-  master=ctx.createGain();master.gain.value=.5;master.connect(ctx.destination)
+  master=ctx.createGain();master.gain.value=level;master.connect(ctx.destination)
   const len=ctx.sampleRate*.4
   noise=ctx.createBuffer(1,len,ctx.sampleRate)
   const d=noise.getChannelData(0)
@@ -99,7 +100,7 @@ export function createSfx(){
  let prev=null
  return {
   get enabled(){return enabled},get haptics(){return haptics},
-  setEnabled(v){enabled=v;if(!v&&ctx)master.gain.value=0;else if(ctx)master.gain.value=.5},
+  setEnabled(v){enabled=v;if(!v&&ctx)master.gain.value=0;else if(ctx)master.gain.value=level},
   setHaptics(v){haptics=!!v},
   // Called from a user gesture so the context is allowed to start.
   resume(){try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
