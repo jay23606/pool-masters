@@ -14,7 +14,7 @@ const STEP=1/120       // fixed simulation step, so frame pacing cannot change a
 const CATCHUP=3        // never make up more than this much time in one go
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.spectator=Boolean(o.spectator);this.aimStep=aimStep;this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){Object.assign(this,freshRackState());this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState());this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -37,7 +37,7 @@ export class PoolGame{
  canControl(){return !this.spectator&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
  takeShot(){if(!this.canAim()||!this.aiming)return;if(this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
- startShot(){this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
+ startShot(){this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.phase='roll'}
  receive(m){
   if(!isGameMessage(m))return
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
