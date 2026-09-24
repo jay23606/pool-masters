@@ -11,7 +11,7 @@ import { parseGameMessage } from './protocol.js'
 import { snapshotOf } from './game-state.js'
 import { winnerForResult } from './ranking.js'
 import { AI_LEVELS } from './ai.js'
-import { spectatorMeta,roleFor,reconcileSpectators,admitSpectator } from './spectators.js'
+import { spectatorMeta,roleFor,reconcileSpectators,admitSpectator,removeSpectator } from './spectators.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
@@ -114,7 +114,7 @@ function bind(){
  $('#home').onclick=()=>leaveRoom();$('#leave').onclick=()=>leaveRoom();$('#refresh').onclick=refresh
  $('#create').onclick=createRoom;$('#quick').onclick=quickPlay;$('#practice').onclick=()=>startPractice($('#ai-level').value);$('#ai-level').value=localStorage.getItem('pool-masters:ai-level')||'league';$('#ai-level').onchange=e=>localStorage.setItem('pool-masters:ai-level',e.target.value);$('#join').onclick=()=>joinRoom($('#code').value)
  $('#code').oninput=e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z2-9]/g,'');$('#rooms').onclick=e=>{const b=e.target.closest('[data-code]'),watch=e.target.closest('[data-watch]');if(watch)joinRoom(watch.dataset.watch,'spectator');else if(b)joinRoom(b.dataset.code)}
- $('#spectator-requests').onclick=async e=>{const b=e.target.closest('[data-admit]');if(!b||!state.room?.isHost)return;await state.room.update({metadata:admitSpectator(state.room.metadata,b.dataset.admit)});toast('Spectator admitted')}
+ $('#spectator-requests').onclick=async e=>{const admit=e.target.closest('[data-admit]'),remove=e.target.closest('[data-remove]');if(!state.room?.isHost)return;if(admit){await state.room.update({metadata:admitSpectator(state.room.metadata,admit.dataset.admit)});toast('Spectator admitted')}if(remove){await state.room.update({metadata:removeSpectator(state.room.metadata,remove.dataset.remove)});await state.room.kick(remove.dataset.remove);toast('Spectator removed')}}
  $('#edit-name').onclick=()=>{$('#name').value=foyer.player.name;$('#name-dialog').showModal()}
  $('#save-name').onclick=async e=>{e.preventDefault();const n=$('#name').value.trim().slice(0,24);if(!n)return;await foyer.signIn(n);localStorage.setItem('pool-masters:name',n);await ensureLeagueProfile();$('#name-dialog').close();toast('Name saved')}
  $('#rename-room').onclick=()=>{if(!state.room?.isHost)return;$('#room-name').value=state.room.name||'';$('#room-dialog').showModal()}
@@ -189,7 +189,7 @@ function onPlayers(players){
  // event. A full table is still a live room, so mark its phase only.
  state.game?.setReady(state.role==='host'||state.role==='player'?Boolean(other):false);if(other&&state.room?.isHost)state.room.update({status:'playing'}).catch(()=>{})
 }
-function onMetadata(meta){state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost&&requests.length?requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join(''):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live</small>':''}
+function onMetadata(meta){state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');if(state.role==='spectator'&&view.mode==='top'){view.mode='3d';applyView(false)}onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean),watchers=(meta.spectators||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost?(requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join('')+watchers.map(p=>`<button class="ghost remove" data-remove="${p.id}">Remove ${esc(p.name)}</button>`).join('')):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live · angled camera</small>':''}
 function appendMessage(m){const log=$('#messages');if(document.getElementById(`msg-${m.id}`))return;const row=document.createElement('div');row.id=`msg-${m.id}`;row.className=m.system?'system':'message';row.innerHTML=m.system?esc(m.body):`<b>${esc(m.playerName)}</b><span>${esc(m.body)}</span>`;log.append(row);log.scrollTop=log.scrollHeight}
 async function finishRanked(result){
  if(state.mode!=='online'||!state.room||state.role==='spectator'||state.role==='pending'||!state.opponent)return

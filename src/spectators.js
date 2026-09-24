@@ -20,3 +20,6 @@ export function admitSpectator(meta,id){
  if(!(meta?.spectatorRequests||[]).includes(id))return meta
  return {...meta,spectators:unique([...(meta.spectators||[]),id]),spectatorRequests:meta.spectatorRequests.filter(x=>x!==id)}
 }
+export function removeSpectator(meta,id){
+ return {...meta,spectators:(meta?.spectators||[]).filter(x=>x!==id),spectatorRequests:(meta?.spectatorRequests||[]).filter(x=>x!==id)}
+}
