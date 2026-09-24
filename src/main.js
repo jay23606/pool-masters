@@ -12,7 +12,10 @@ import { parseGameMessage } from './protocol.js'
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
 const SUPABASE_KEY='sb_publishable_Tpkd3FzWhsfldMll-gIqfg_74YVroef'
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY)
-const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostMigration:false,peerGraceMs:5000})
+// Phone browsers can suspend a WebRTC connection while switching to another
+// app. Keep the seat and retry window long enough for an ordinary return; the
+// authoritative host then sends the latest rack snapshot to the rejoined peer.
+const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostMigration:false,peerGraceMs:25000,reconnectAttempts:5,heartbeatMs:15000,staleSeconds:180})
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,rankings:[],profile:null}
 document.documentElement.dataset.theme=localStorage.getItem('pool-masters:theme')||'dark'
