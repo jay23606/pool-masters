@@ -106,9 +106,12 @@ function cushion(b,nx,ny){
  b.vy=ny*vnOut+ty*vt
 }
 
+// Returns true if the ball touched a cushion this step.
 export function railBounce(b){
- if(b.x<MINX){b.x=MINX;cushion(b,1,0)}else if(b.x>MAXX){b.x=MAXX;cushion(b,-1,0)}
- if(b.y<MINY){b.y=MINY;cushion(b,0,1)}else if(b.y>MAXY){b.y=MAXY;cushion(b,0,-1)}
+ let hit=false
+ if(b.x<MINX){b.x=MINX;cushion(b,1,0);hit=true}else if(b.x>MAXX){b.x=MAXX;cushion(b,-1,0);hit=true}
+ if(b.y<MINY){b.y=MINY;cushion(b,0,1);hit=true}else if(b.y>MAXY){b.y=MAXY;cushion(b,0,-1);hit=true}
+ return hit
 }
 
 // Enough substeps that nothing moves more than a quarter of a radius per step.

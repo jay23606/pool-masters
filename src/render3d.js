@@ -256,6 +256,12 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     if(b.on){e.sink=0;e.mesh.position.y=R;e.mesh.scale.setScalar(1);e.mesh.visible=true;if(e.stripe){e.stripe.position.y=R+.16;e.stripe.scale.setScalar(1);e.stripe.visible=true}if(e.badge){e.badge.position.y=R+.24;e.badge.scale.setScalar(1);e.badge.visible=true}}
     else{e.sink=Math.min(1,e.sink+dt*4);e.mesh.position.y=R-e.sink*34;e.mesh.scale.setScalar(1-e.sink*.35);e.mesh.visible=e.sink<1;if(e.stripe){e.stripe.position.y=R-e.sink*34+.16;e.stripe.scale.setScalar(1-e.sink*.35);e.stripe.visible=e.sink<1}if(e.badge){e.badge.position.y=R-e.sink*34+.24;e.badge.scale.setScalar(1-e.sink*.35);e.badge.visible=e.sink<1}}
    })
+   // Meshes are cached by ball index. A ten-ball rack drawn after a sixteen-ball
+   // one leaves six meshes with no ball behind them, frozen where they were.
+   for(let i=game.balls.length;i<balls.length;i++){
+    const e=balls[i];if(!e)continue
+    e.mesh.visible=false;if(e.stripe)e.stripe.visible=false;if(e.badge)e.badge.visible=false
+   }
    ring.visible=game.calledPocket!=null
    if(ring.visible){const[px,py]=POCKETS[game.calledPocket];ring.position.x=tx(px);ring.position.z=tz(py)}
 

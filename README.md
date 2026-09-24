@@ -1,6 +1,6 @@
 # Pool Masters
 
-Minimal two-player eight-ball with persistent guest identities, room codes,
+Minimal two-player eight-ball and nine-ball with persistent guest identities, room codes,
 durable chat, voice/video calls, host-admitted spectators, Elo rankings, and
 unranked AI practice. Built with [Foyer](https://github.com/jay23606/foyer),
 Supabase, WebRTC, and GitHub Pages.
@@ -110,9 +110,27 @@ whatever the frame rate does. A host whose tab gets backgrounded — browsers
 throttle `requestAnimationFrame` there — keeps the physics moving on a coarse
 timer instead of freezing the game for both players.
 
+## Game modes
+
+The lobby's game picker chooses **8-ball** or **9-ball** for practice, for a new
+table, and for quick play (which only joins a table of the same game). A table
+carries its game in its room metadata and in every state snapshot, so a guest
+always ends up in the host's game, whatever it started as.
+
+Nine-ball is the standard WPA game: ten balls in a diamond with the 1 at the
+apex and the 9 in the middle, no groups and no called pockets. The cue ball must
+hit the lowest-numbered ball on the table first, and the shot must then pocket
+something or drive a ball to a cushion. Pocketing any ball on a legal shot
+keeps the turn. The 9 on a legal shot wins the rack, including off a
+combination; the 9 pocketed on a foul goes back to the foot spot. Any foul gives
+the opponent ball in hand. The AI plays both games.
+
+Nine-ball is deliberately unranked for now: the ranking tables have no notion of
+which game a result came from, and mixing the two into one Elo would be wrong.
+
 ## Rules and AI
 
-`src/rules.js` holds eight-ball rules as plain functions over a ball array and
+`src/rules.js` holds the eight-ball and nine-ball rules as plain functions over a ball array and
 a state object — no DOM, network, or game object anywhere in it. `judgeShot()`
 takes a shot's outcome (potted balls, first contact, scratch, called pocket)
 and returns a verdict; `src/pool.js`'s `PoolGame` applies it and owns the side
@@ -123,6 +141,14 @@ exact geometric aim misses cuts against this physics. When nothing is pottable
 it prefers a safety it can actually reach over the nearest ball regardless of
 what's in the way, and rolls candidate angles through the real physics to find
 a legal escape when snookered.
+
+Before it shoots, the AI plays its own shot out on a copy of the table using the
+game's real stepping (`rollout()`) and redraws if the shot would scratch, hit
+the wrong ball first, miss the cushion rule in nine-ball, or pot the 8 early.
+Ball-in-hand placement is screened the same way. Only fouls are screened, so a
+shot that merely misses its pot is still played and the difficulty levels keep
+their aim errors. This came out of self-play: from one layout the cue ball
+followed the object ball into a pocket on every single attempt.
 
 Keeping the rules and the AI as pure functions, independently testable without
 a game object, is what caught a real bug: group assignment on an open table
@@ -178,7 +204,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 82 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 142 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and
@@ -192,7 +218,7 @@ DOM, no renderer.
 | file | what it is |
 |---|---|
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
-| `src/rules.js` | eight-ball rules as pure functions |
+| `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/ai.js` | the practice opponent, over a ball array |
 | `src/physics.js` | the contact model |
 | `src/game-input.js` | pointer/drag input, separated from match control |
