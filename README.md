@@ -1,8 +1,47 @@
 # Pool Masters
 
-Minimal two-player pool with guest identities, room codes, durable chat, voice/video calls, Elo rankings, and unranked AI practice. Built with [Foyer](https://github.com/jay23606/foyer), Supabase, WebRTC, and GitHub Pages.
+Minimal two-player eight-ball with persistent guest identities, room codes,
+durable chat, voice/video calls, host-admitted spectators, Elo rankings, and
+unranked AI practice. Built with [Foyer](https://github.com/jay23606/foyer),
+Supabase, WebRTC, and GitHub Pages.
 
 Play it at **[jay23606.github.io/pool-masters](https://jay23606.github.io/pool-masters/)**, or install it — it is a PWA.
+
+## Play, watch, and resume
+
+Create a table or join one with its five-character code. The lobby shows each
+table's player occupancy (`0/2`, `1/2`, or `2/2`) and its admitted spectator
+count. A player can use **Watch** to request spectator access; the host sees an
+**Admit** button. Spectators receive the live table, chat, and call, but cannot
+take a player seat, shoot, advance a rack, or affect rankings.
+
+The host owns the game simulation. Only the assigned second seat can send it a
+shot request, and it broadcasts the authoritative state to the player and all
+admitted spectators. This keeps a viewer from controlling the rack even if
+they modify their browser locally.
+
+Rooms save stable between-shot state. A host can leave and return to the same
+table for up to four hours; the original host restores the saved rack when
+they return. This avoids inventing motion halfway through a shot.
+
+## League and practice
+
+League leaders are ordered by Elo rating. Each row also shows wins, losses,
+and win percentage. Both players must independently report the same ranked
+result before the database records it, so a single browser cannot award itself
+a win. New league profiles begin at 1000 Elo.
+
+Practice games against AI are stored only on the current device. They show a
+separate win/loss record and never change league rankings.
+
+## Calls, sound, and appearance
+
+Rooms support WebRTC voice and video calls. Use **Focus table** to hide the
+room sidebar and give the table more space. Background music is optional,
+shufflable, and has a separate volume control; table and match sounds have a
+separate toggle. Table settings include felt color, table size, cue finish,
+room lighting, and mobile haptics. Theme preference and table preferences are
+kept in local storage.
 
 ## Table views
 
