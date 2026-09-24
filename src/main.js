@@ -11,6 +11,7 @@ import { parseGameMessage } from './protocol.js'
 import { snapshotOf } from './game-state.js'
 import { winnerForResult } from './ranking.js'
 import { AI_LEVELS } from './ai.js'
+import { emptyScore,scoreRack,scoreLine } from './match-score.js'
 import { spectatorMeta,roleFor,reconcileSpectators,admitSpectator,removeSpectator } from './spectators.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
@@ -21,7 +22,7 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY)
 // authoritative host then sends the latest rack snapshot to the rejoined peer.
 const foyer=createFoyer({supabase:sb,url:SUPABASE_URL,anonKey:SUPABASE_KEY,hostMigration:false,peerGraceMs:25000,reconnectAttempts:5,heartbeatMs:15000,staleSeconds:180})
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,role:'pending',rankings:[],profile:null,matchScore:{a:0,b:0},saveTimer:null,pendingSave:null,lastSave:0}
+const state={room:null,net:null,peers:new Map(),game:null,media:null,unsubs:[],mode:'lobby',opponent:null,role:'pending',rankings:[],profile:null,matchScore:emptyScore(),saveTimer:null,pendingSave:null,lastSave:0}
 document.documentElement.dataset.theme=localStorage.getItem('pool-masters:theme')||'dark'
 // The table button cycles three views. Top-down 3D is the default: the plan
 // view of the 2D renderer, but lit and shaded. New storage key: the old one
@@ -195,7 +196,7 @@ function onPlayers(players){
 }
 function onMetadata(meta){state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');if(state.role==='spectator'&&view.mode==='top'){view.mode='3d';applyView(false)}onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean),watchers=(meta.spectators||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost?(requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join('')+watchers.map(p=>`<button class="ghost remove" data-remove="${p.id}">Remove ${esc(p.name)}</button>`).join('')):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live · angled camera</small>':''}
 function appendMessage(m){const log=$('#messages');if(document.getElementById(`msg-${m.id}`))return;const row=document.createElement('div');row.id=`msg-${m.id}`;row.className=m.system?'system':'message';row.innerHTML=m.system?esc(m.body):`<b>${esc(m.playerName)}</b><span>${esc(m.body)}</span>`;log.append(row);log.scrollTop=log.scrollHeight}
-function showRackResult(result){const game=state.game;if(!game||game.finishedResult===result.round)return;game.finishedResult=result.round;state.matchScore[result.winner]++;const won=result.winner===game.me,opponent=state.opponent?.name||'AI Coach',mine=state.matchScore[game.me],theirs=state.matchScore[game.me==='a'?'b':'a'];$('#result-title').textContent=won?'Rack won':'Rack lost';$('#result-summary').textContent=`${foyer.player.name} ${mine} — ${theirs} ${opponent}`;$('#result-next').textContent=state.mode==='practice'?'Next rack':'Play next rack';$('#result-dialog').showModal()}
+function showRackResult(result){const game=state.game;if(!game||game.finishedResult===result.round)return;game.finishedResult=result.round;state.matchScore=scoreRack(state.matchScore,result.winner);const won=result.winner===game.me,opponent=state.opponent?.name||'AI Coach';$('#result-title').textContent=won?'Rack won':'Rack lost';$('#result-summary').textContent=scoreLine(state.matchScore,game.me,foyer.player.name,opponent);$('#result-next').textContent=state.mode==='practice'?'Next rack':'Play next rack';$('#result-dialog').showModal()}
 async function shareResult(){const title=$('#result-title').textContent,text=`${title} · ${$('#result-summary').textContent} · Pool Masters`;try{if(navigator.share)await navigator.share({title:'Pool Masters',text});else await navigator.clipboard.writeText(text);toast('Result shared')}catch{}}
 async function finishRanked(result){
  if(state.mode!=='online'||!state.room||state.role==='spectator'||state.role==='pending'||!state.opponent)return
