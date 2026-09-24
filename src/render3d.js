@@ -65,7 +65,10 @@ function numberCap(THREE,n,kind){
  // decal left the coloured sphere exposed around it, so a 12 or 14 looked like
  // a solid despite its correct game data.
  const size=kind==='stripe'?R*2.03:R*1.18
- return new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false}))
+ // This is a visual identifier, not a physical object. It must render above
+ // the shaded sphere; with depth testing on, the sphere hid almost all of the
+ // white stripe face at some camera positions and made stripes read as solids.
+ return new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,depthTest:false}))
 }
 
 export async function createRenderer3D(canvas,camera3d='top',options={}){
@@ -157,7 +160,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   }
   let badge=null
   if(b.k!=='cue'){
-   badge=numberCap(THREE,b.n,b.k);badge.rotation.x=-Math.PI/2;badge.position.set(tx(b.x),R+.24,tz(b.y));badge.renderOrder=3;scene.add(badge)
+   badge=numberCap(THREE,b.n,b.k);badge.rotation.x=-Math.PI/2;badge.position.set(tx(b.x),R+1,tz(b.y));badge.renderOrder=10;scene.add(badge)
   }
   mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
   scene.add(mesh)
