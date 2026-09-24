@@ -7,6 +7,13 @@ import {R,MINX,MAXX,MINY,MAXY} from './table.js'
 
 const HIT=2*R+.6          // a pair this close, that was not, has just collided
 const RAIL=2.5            // how near a cushion counts as touching it
+// CC0 crowd recordings from Freesound. They are preloaded only after a player
+// interacts with the game, and the synthesised stings below remain the offline
+// fallback.  The previews are intentionally stopped after a short celebration.
+const RESULT_CLIPS={
+ win:'https://cdn.freesound.org/previews/333/333404_5884138-hq.mp3',
+ loss:'https://cdn.freesound.org/previews/333/333390_5884138-hq.mp3'
+}
 
 // Pure: given the previous and current ball state, what just happened?
 // Indexed by position, not by object identity, because the client rebuilds its
@@ -40,6 +47,7 @@ export const snapshot=balls=>balls.map(b=>({x:b.x,y:b.y,on:b.on}))
 
 export function createSfx(){
  let ctx=null,master=null,noise=null,enabled=true,haptics=true,lastBuzz=0
+ const clips={}
  const level=.95
  const buzz=(ms,level=1)=>{if(!haptics||typeof navigator==='undefined'||!navigator.vibrate)return;const now=performance.now();if(now-lastBuzz<55)return;lastBuzz=now;try{navigator.vibrate(Math.round(ms*level))}catch{}}
  // The context can only start from a user gesture, so it is built on demand.
@@ -55,6 +63,7 @@ export function createSfx(){
   for(let i=0;i<len;i++)d[i]=Math.random()*2-1
   return ctx
  }
+ const preloadResults=()=>{if(typeof Audio==='undefined')return;for(const[key,url]of Object.entries(RESULT_CLIPS)){if(clips[key])continue;const clip=new Audio(url);clip.preload='auto';clips[key]=clip}}
  const burst=(when,dur,freq,q,gain,type='bandpass')=>{
   const src=ctx.createBufferSource();src.buffer=noise
   const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q
@@ -106,11 +115,17 @@ export function createSfx(){
   setEnabled(v){enabled=v;if(!v&&ctx)master.gain.value=0;else if(ctx)master.gain.value=level},
   setHaptics(v){haptics=!!v},
   // Called from a user gesture so the context is allowed to start.
-  resume(){try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
+  resume(){preloadResults();try{const c=audio();if(c&&c.state==='suspended')c.resume()}catch{}},
   result(won){
-   buzz(won?22:35,won?1:1.25);if(!enabled||!audio())return
+   buzz(won?22:35,won?1:1.25);if(!enabled)return
    const playResult=()=>{try{if(ctx.state==='running')play.result(won)}catch{}}
-   if(ctx.state==='suspended')ctx.resume().then(playResult).catch(()=>{});else playResult()
+   const clip=clips[won?'win':'loss']
+   if(clip){
+    const crowd=clip.cloneNode();crowd.volume=.95
+    crowd.play().then(()=>setTimeout(()=>{crowd.pause();crowd.src=''},won?2600:2300)).catch(()=>{const c=audio();if(c?.state==='suspended')c.resume().then(playResult).catch(()=>{});else playResult()})
+    return
+   }
+   const c=audio();if(c?.state==='suspended')c.resume().then(playResult).catch(()=>{});else playResult()
   },
   cue(v){buzz(7,.7+v*.45);if(!enabled||!audio()||ctx.state!=='running')return;try{play.cue(v)}catch{}},
   update(balls){
