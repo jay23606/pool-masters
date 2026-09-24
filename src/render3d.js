@@ -148,14 +148,16 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  const balls=[]   // one entry per ball index, created lazily to match game.balls
  function ballFor(i,b){
   if(balls[i])return balls[i]
- const mat=new THREE.MeshStandardMaterial({map:ballTexture(THREE,b.k,b.n),roughness:.13,metalness:0,envMapIntensity:1.4})
+ // A 9 shares yellow with the 1, and a 14 shares green with the 6. Keep the
+ // stripe sphere white so category identity never depends on a tiny number or
+ // a texture orientation.
+ const mat=new THREE.MeshStandardMaterial({map:b.k==='stripe'?null:ballTexture(THREE,b.k,b.n),color:b.k==='stripe'?'#f7f4e9':'#ffffff',roughness:.13,metalness:0,envMapIntensity:1.4})
  const mesh=new THREE.Mesh(ballGeo,mat);mesh.castShadow=true;mesh.position.set(tx(b.x),R,tz(b.y))
-  // A spherical UV stripe mostly lives around the silhouette in a top-down
-  // camera, which made stripes look identical to solids. This small, fixed
-  // ivory inlay reads as the visible white band without rotating constantly.
+  // A fixed coloured ring on the white stripe base reads from both the top
+  // and angled views, without the distracting continuous spin animation.
   let stripe=null
   if(b.k==='stripe'){
-   stripe=new THREE.Mesh(new THREE.TorusGeometry(R*.58,R*.17,10,32),std('#f7f4e9',.32))
+   stripe=new THREE.Mesh(new THREE.TorusGeometry(R*.58,R*.17,10,32),std(COLORS[b.n],.32))
    stripe.rotation.x=Math.PI/2;stripe.position.set(tx(b.x),R+.16,tz(b.y));stripe.castShadow=true;scene.add(stripe)
   }
   let badge=null

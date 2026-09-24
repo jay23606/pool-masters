@@ -1,9 +1,15 @@
 import test from 'node:test';import assert from 'node:assert/strict'
 import {PoolGame} from '../src/pool.js'
+import {kind} from '../src/rules.js'
 
 // Characterisation tests: these pin down what resolve() already does, so the
 // split that follows can be shown not to change any of it.
 const ball=(k,n)=>({x:300,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k,n})
+
+test('ball numbers use standard solid and stripe groups',()=>{
+ for(const n of [1,2,3,4,5,6,7])assert.equal(kind(n),'solid')
+ for(const n of [9,10,11,12,13,14,15])assert.equal(kind(n),'stripe')
+})
 function shot(o){
  const g=Object.create(PoolGame.prototype)
  Object.assign(g,{
