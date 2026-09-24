@@ -12,6 +12,7 @@ import { snapshotOf } from './game-state.js'
 import { winnerForResult } from './ranking.js'
 import { AI_LEVELS } from './ai.js'
 import { emptyScore,scoreRack,scoreLine } from './match-score.js'
+import { occupancyLabel } from './room-summary.js'
 import { spectatorMeta,roleFor,reconcileSpectators,admitSpectator,removeSpectator } from './spectators.js'
 
 const SUPABASE_URL='https://zbtgonklxweikgukzukg.supabase.co'
@@ -107,7 +108,7 @@ async function refresh(){
  const [rooms,leaders]=await Promise.all([foyer.listRooms(),sb.from('pm_profiles').select('id,username,rating,wins,losses,current_streak').gt('wins','0').order('rating',{ascending:false}).limit(10)])
  state.rankings=leaders.data||[];renderRooms(rooms.filter(r=>r.metadata?.game==='pool'));renderLeaders()
 }
-function renderRooms(rooms){$('#rooms').innerHTML=rooms.length?rooms.map(r=>{const seats=r.metadata?.seats||{},count=seats.a?1+(seats.b?1:0):Math.min(r.playerCount,2),spectators=(r.metadata?.spectators||[]).length;return `<div class="room"><button data-code="${r.code}"><span><b>${esc(r.name||r.hostName+"'s table")}</b><small>${esc(r.hostName)} · ${count}/2 players${spectators?` · ${spectators} spectator${spectators===1?'':'s'}`:''}</small></span><strong>${r.code}</strong></button><button class="watch" data-watch="${r.code}">Watch</button></div>`}).join(''):'<div class="empty">No open tables yet.<br>Create one or practice while you wait.</div>'}
+function renderRooms(rooms){$('#rooms').innerHTML=rooms.length?rooms.map(r=>`<div class="room"><button data-code="${r.code}"><span><b>${esc(r.name||r.hostName+"'s table")}</b><small>${esc(r.hostName)} · ${occupancyLabel(r)}</small></span><strong>${r.code}</strong></button><button class="watch" data-watch="${r.code}">Watch</button></div>`).join(''):'<div class="empty">No open tables yet.<br>Create one or practice while you wait.</div>'}
 function renderLeaders(){const rows=state.rankings;$('#leaders').innerHTML=rows.length?rows.map((p,i)=>`<div class="leader"><i>${i+1}</i><span>${esc(p.username)}</span><b>${p.rating} Elo</b><small>${p.wins}W · ${p.losses}L<br>${p.wins+p.losses?Math.round(p.wins/(p.wins+p.losses)*100):0}% wins</small></div>`).join(''):'<div class="empty">The first match sets the board.</div>'}
 function bind(){
  const paintTheme=()=>{$('#theme-toggle').textContent=document.documentElement.dataset.theme==='dark'?'☼':'☾'}
