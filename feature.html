@@ -180,14 +180,17 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
    <span class="tag done">Shipped</span>
   </div>
 
-  <div class="rm">
-   <div class="rank">2</div>
+  <div class="rm shipped">
+   <div class="rank">✓</div>
    <div><h4>Replay links</h4>
-   <p>tailuge/billiards already does this, and we did the hard part in September when
-   client-side prediction started transmitting velocity/spin, not just position — a
-   shot is now fully described by its starting conditions. Recording and replaying one
-   is close to free from here.</p></div>
-   <span class="tag high">High impact</span>
+   <p><strong>Shipped.</strong> Every shot is recorded as it plays — by the host from its
+   simulation, by guests and spectators from the snapshots they receive — and
+   <em>Copy replay link</em> packs it into a URL. A full 16-ball break is about 1,000
+   characters. Anyone can open the link and watch it (at full or quarter speed), with
+   sound. It records positions rather than re-simulating inputs, on purpose: two
+   JavaScript engines needn't agree to the last bit on sin, cos or pow, and billiards
+   amplifies a last-bit difference into a different shot.</p></div>
+   <span class="tag done">Shipped</span>
   </div>
 
   <div class="rm">
@@ -328,7 +331,7 @@ const rows = [
 ['Spectator mode', ['y','y','n','p','p','n']],
 ['Private room codes', ['y','p','n','y','y','n']],
 ['Cross-platform play (incl. messaging apps)', ['n','n','n','y','n','n']],
-['Replay links / shareable match recordings', ['n','y','y','n','n','n']],
+['Replay links / shareable match recordings', ['y','y','y','n','n','n'], 'Recorded trajectories in a ~1,000-character link; plays back identically on any browser.'],
 
 ['cat','Social'],
 ['In-match voice call', ['s','n','n','n','n','n'], 'No competitor in this table offers live voice during a match.'],
