@@ -31,10 +31,14 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
  let stream=null,loading=false,remoteTitle='',remoteCredit='',remoteCreator='',remoteLicense='',queue=[],duckTimer
+ const played=[],playedSet=new Set();let searchBag=[]
  const listeners=new Set()
  // Jamendo's music collection provides actual tracks; general Openverse audio
  // results also include pets, ambience, and sound effects.
  const searches=['indie rock','folk','hip hop','electronic','soul','jazz','latin','pop','vocal','ambient','funk','piano']
+ const shuffled=items=>{const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]]}return out}
+ const nextSearch=()=>{if(!searchBag.length)searchBag=shuffled(searches);return searchBag.pop()}
+ const remember=track=>{const id=track.foreign_landing_url||track.url;if(playedSet.has(id))return;played.push(id);playedSet.add(id);if(played.length>80)playedSet.delete(played.shift())}
  const current=()=>MUSIC_PRESETS[index]
  const context=()=>{
   if(ctx)return ctx
@@ -98,6 +102,7 @@ export function createMusic(){
  const playTrack=track=>{
   if(!enabled||!track)return
   const audio=new Audio(track.url);stream=audio;audio.volume=Math.min(1,volume);audio.preload='auto'
+  remember(track)
   remoteTitle=track.title||'Pool Masters Radio';remoteCreator=track.creator||'Unknown artist';remoteLicense=`CC ${track.license?.toUpperCase()}`;remoteCredit=`${remoteCreator} · ${remoteLicense}`
   listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
   audio.onended=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
@@ -109,10 +114,13 @@ export function createMusic(){
   const next=queue.pop();if(next)return playTrack(next)
   loading=true
   try{
-   const query=searches[Math.floor(Math.random()*searches.length)]
+   const query=nextSearch()
    const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&source=jamendo&license=by,by-sa&page_size=20`)
    const data=await response.json()
-   queue=(data.results||[]).filter(track=>track.source==='jamendo'&&track.url?.startsWith('https://')&&track.duration>=90000&&['by','by-sa'].includes(track.license))
+   const candidates=(data.results||[]).filter(track=>track.source==='jamendo'&&track.url?.startsWith('https://')&&track.duration>=90000&&['by','by-sa'].includes(track.license))
+   // Do not replay a song until 80 other selections have been remembered.
+   queue=shuffled(candidates.filter(track=>!playedSet.has(track.foreign_landing_url||track.url)))
+   if(!queue.length)queue=shuffled(candidates)
    if(queue.length)playTrack(queue.pop());else startSynth()
   }catch{startSynth()}finally{loading=false}
  }
