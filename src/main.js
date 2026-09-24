@@ -11,7 +11,7 @@ import { parseGameMessage } from './protocol.js'
 import { snapshotOf } from './game-state.js'
 import { winnerForResult } from './ranking.js'
 import { AI_LEVELS } from './ai.js'
-import { emptyScore,scoreRack,scoreLine } from './match-score.js'
+import { emptyScore,scoreRack,scoreLine,matchWinner,MATCH_TARGET } from './match-score.js'
 import { occupancyLabel } from './room-summary.js'
 import { emptyPerformance,recordPerformance,tableRecord } from './performance.js'
 import { acceptsGameMessage } from './room-security.js'
@@ -161,7 +161,7 @@ async function persistMatch(snapshot,force=false){
  if(state.saveTimer||Date.now()-state.lastSave<1000){if(!state.saveTimer)state.saveTimer=setTimeout(write,1000-(Date.now()-state.lastSave));return}
  return write()
 }
-async function createRoom(){try{const room=await foyer.createRoom({name:`${foyer.player.name}'s table`,metadata:{game:'pool',ranked:true,resume_until:resumeExpiry(),...spectatorMeta(foyer.player.id)},maxPlayers:10,status:'waiting'});await enterRoom(room,'player');$('#room-name').value=room.name;$('#room-dialog').showModal()}catch(e){toast(e.message)}}
+async function createRoom(){try{const room=await foyer.createRoom({name:`${foyer.player.name}'s table`,metadata:{game:'pool',ranked:true,resume_until:resumeExpiry(),match_score:emptyScore(),match_target:MATCH_TARGET,...spectatorMeta(foyer.player.id)},maxPlayers:10,status:'waiting'});await enterRoom(room,'player');$('#room-name').value=room.name;$('#room-dialog').showModal()}catch(e){toast(e.message)}}
 async function quickPlay(){
  const rooms=(await foyer.listRooms()).filter(r=>r.metadata?.game==='pool'&&!r.metadata?.seats?.b)
  if(rooms[0])return joinRoom(rooms[0].code);await createRoom()
@@ -199,7 +199,7 @@ function onPlayers(players){
  // event. A full table is still a live room, so mark its phase only.
  state.game?.setReady(state.role==='host'||state.role==='player'?Boolean(other):false);if(other&&state.room?.isHost)state.room.update({status:'playing'}).catch(()=>{})
 }
-function onMetadata(meta){state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');if(state.role==='spectator'&&view.mode==='top'){view.mode='3d';applyView(false)}onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean),watchers=(meta.spectators||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost?(requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join('')+watchers.map(p=>`<button class="ghost remove" data-remove="${p.id}">Remove ${esc(p.name)}</button>`).join('')):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live · angled camera</small>':''}
+function onMetadata(meta){if(meta?.match_score)state.matchScore=meta.match_score;state.role=meta?.seats?roleFor(meta,foyer.player.id):(state.room?.isHost?'host':'player');state.game?.setSpectator(state.role!=='host'&&state.role!=='player');if(state.role==='spectator'&&view.mode==='top'){view.mode='3d';applyView(false)}onPlayers(state.room?.players||[]);const requests=(meta.spectatorRequests||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean),watchers=(meta.spectators||[]).map(id=>state.room?.players.find(p=>p.id===id)).filter(Boolean);$('#spectator-requests').innerHTML=state.room?.isHost?(requests.map(p=>`<button class="ghost admit" data-admit="${p.id}">Admit ${esc(p.name)}</button>`).join('')+watchers.map(p=>`<button class="ghost remove" data-remove="${p.id}">Remove ${esc(p.name)}</button>`).join('')):state.role==='pending'?'<small>Waiting for the host to admit you as a spectator.</small>':state.role==='spectator'?'<small>Watching live · angled camera</small>':''}
 function appendMessage(m){const log=$('#messages');if(document.getElementById(`msg-${m.id}`))return;const row=document.createElement('div');row.id=`msg-${m.id}`;row.className=m.system?'system':'message';row.innerHTML=m.system?esc(m.body):`<b>${esc(m.playerName)}</b><span>${esc(m.body)}</span>`;log.append(row);log.scrollTop=log.scrollHeight}
 function showRackResult(result){const game=state.game;if(!game||game.finishedResult===result.round)return;game.finishedResult=result.round;state.matchScore=scoreRack(state.matchScore,result.winner);const won=result.winner===game.me,opponent=state.opponent?.name||'AI Coach';$('#result-title').textContent=won?'Rack won':'Rack lost';$('#result-summary').textContent=scoreLine(state.matchScore,game.me,foyer.player.name,opponent);$('#result-next').textContent=state.mode==='practice'?'Next rack':'Play next rack';$('#result-dialog').showModal()}
 async function shareResult(){const title=$('#result-title').textContent,text=`${title} · ${$('#result-summary').textContent} · Pool Masters`;try{if(navigator.share)await navigator.share({title:'Pool Masters',text});else await navigator.clipboard.writeText(text);toast('Result shared')}catch{}}

@@ -10,3 +10,7 @@ export function scoreLine(score,me,myName,opponentName){
  const them=me==='a'?'b':'a'
  return `${myName} ${score[me]||0} — ${score[them]||0} ${opponentName}`
 }
+export const MATCH_TARGET=3
+export function matchWinner(score,target=MATCH_TARGET){
+ return score.a>=target?'a':score.b>=target?'b':null
+}
