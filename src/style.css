@@ -35,7 +35,8 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
 @media (orientation:portrait) and (max-width:600px){
  body:has(#game.active) header{display:none}
  #game .game-top{padding:6px 8px;min-height:0}
- #game #focus-table,#game #music-volume,#game .music-credit{display:none}
+ #game #focus-table,#game .music-credit{display:none}
+ #game .music-volume{width:64px;min-width:0}
  #game .play-layout{padding:0 4px 8px;gap:6px}
  #game .table-card{padding:5px 4px 6px;border-radius:10px}
  #versus{margin-bottom:2px;font-size:.85rem}
