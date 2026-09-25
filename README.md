@@ -155,6 +155,17 @@ the opponent ball in hand. The AI plays both games.
 Nine-ball is deliberately unranked for now: the ranking tables have no notion of
 which game a result came from, and mixing the two into one Elo would be wrong.
 
+## Two players, one device
+
+**Two players, one device** on the lobby is hot-seat: pass the phone. No room code, no account, no
+network, no ranking and no stats; it works offline, like practice. It is the practice game with a
+second person where the AI was: whoever's turn it is becomes "me" (every rule and control already
+speaks of the shooter that way), the HUD and status use *Player 1* and *Player 2*, a toast says whose
+turn it is after each change, and the result and race-to-3 line name the players. Both 8-ball and
+9-ball work, ball in hand goes to whoever is next, and the shot coach and replays work for either.
+The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
+shoots for a human (mutation-checked).
+
 ## Drills
 
 **Drills** on the lobby opens eleven one-shot exercises on fixed tables, in three
@@ -323,7 +334,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 292 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 299 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and
