@@ -234,6 +234,9 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  POCKETS.forEach(([x,y])=>{const r=new THREE.Mesh(rimGeo,leather);r.rotation.x=Math.PI/2;r.position.set(tx(x),7,tz(y));r.castShadow=true;scene.add(r)})
  const ring=new THREE.Mesh(new THREE.TorusGeometry(PR+3,1.7,8,36),new THREE.MeshBasicMaterial({color:'#ffd75d'}))
  ring.rotation.x=-Math.PI/2;ring.position.y=1.6;ring.visible=false;scene.add(ring)
+ // a softer white ring for the pocket the aim has snapped to
+ const snapRing=new THREE.Mesh(new THREE.TorusGeometry(PR+1,1.1,8,36),new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.7}))
+ snapRing.rotation.x=-Math.PI/2;snapRing.position.y=1.7;snapRing.visible=false;scene.add(snapRing)
 
  // ---- balls ----
  const ballGeo=new THREE.SphereGeometry(R,40,28)
@@ -406,6 +409,9 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     }
    }else if(shot.applied){frame();shot.applied=false}
    const marked=game.markedPocket?game.markedPocket():game.calledPocket
+   const snapped=game.snapMark?game.snapMark():null
+   snapRing.visible=snapped!=null
+   if(snapped!=null){const[sx,sy]=POCKETS[snapped];snapRing.position.x=tx(sx);snapRing.position.z=tz(sy)}
    ring.visible=marked!=null
    if(ring.visible){const[px,py]=POCKETS[marked];ring.position.x=tx(px);ring.position.z=tz(py)}
 

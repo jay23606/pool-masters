@@ -348,6 +348,7 @@ group and foul every shot after.
   (Pulling the cue back to shoot was tried and dropped: hard to do on a phone, easy to fire by accident.)
 - The **cue-ball dial** beside the power slider sets the tip contact point —
   drag it for draw, follow and English, double-click to centre it.
+- **Aim snapping:** when the line the object ball would take passes close to a pocket, the aim locks so the ball runs through the pocket's centre, and the pocket gets a soft white ring. It only nudges (never more than 3°), only toward a real shot (the same ball is still hit first, with nothing in the way), and your hand can always drag out of it: the drag turns an underlying aim and the snap is only what is shown (`src/snap.js`). Turn it off under TABLE → *Snap the aim to a pocket when it is close*.
 - Drag on the table to aim; how far the cue turns per pixel is the aim
   sensitivity table setting.
 - **Move cue ball** and **Change 8-ball pocket** appear only when they apply.
@@ -425,6 +426,7 @@ DOM, no renderer.
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
 | `src/career.js` | the career ladder: opponents, who is open, recording a win |
 | `src/coach.js` | the shot coach: grades a shot, finds the coach's shot, builds the replays |
+| `src/snap.js` | aim snapping: nudging an aim so the object ball runs through a pocket's centre |
 | `src/shot-cam.js` | the follow-the-shot camera's poses and blend |
 | `src/screen-point.js` | maps a pointer back to the table through the phone's quarter turn |
 | `src/ai.js` | the practice opponent, over a ball array |
