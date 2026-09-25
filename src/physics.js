@@ -30,7 +30,16 @@ export const speed=b=>Math.hypot(b.vx,b.vy)
 // point, so while it is skidding it both slows the ball and torques it toward
 // the rolling state — which is why a stun shot stops dead, a rolling cue ball
 // follows, and a ball with backspin still on it draws back.
+// A jump shot: the cue ball leaves the cloth. While it is off it (z above 0) it feels only gravity on its
+// height -- it keeps its sideways speed and spin, and touches no ball and no pocket -- until it comes down.
+export const airborne=b=>(b.z||0)>0
 export function integrate(b,dt){
+ if(airborne(b)){
+  b.vz=(b.vz||0)-G*dt;b.z+=b.vz*dt
+  b.x+=b.vx*dt;b.y+=b.vy*dt
+  if(b.z<=0){b.z=0;b.vz=0}
+  return
+ }
  b.x+=b.vx*dt;b.y+=b.vy*dt
  const[ux,uy]=slip(b),us=Math.hypot(ux,uy)
  if(us>SLIP_EPS){
@@ -52,10 +61,15 @@ export function integrate(b,dt){
 
 // Tip offset in ball radii: a is sideways (right positive), b is vertical
 // (above centre positive). Both are clamped well inside the miscue limit.
-export function strike(ball,vx,vy,a=0,bOff=0){
+// `jump` pops the ball off the cloth: a lift of half a ball to start it clear of a ball it touches, and a
+// vertical speed that grows with the shot, so a harder shot goes over more ground.
+export const JUMP_MIN=200,JUMP_MAX=380,JUMP_PER_SPEED=.5
+export const jumpSpeed=v=>Math.max(JUMP_MIN,Math.min(JUMP_MAX,v*JUMP_PER_SPEED))
+export function strike(ball,vx,vy,a=0,bOff=0,jump=false){
  const v=Math.hypot(vx,vy)
  ball.vx=vx;ball.vy=vy
  ball.wx=ball.wy=ball.wz=0
+ if(jump&&v){ball.z=R*.5;ball.vz=jumpSpeed(v)}else{ball.z=0;ball.vz=0}
  if(!v)return
  const dx=vx/v,dy=vy/v,k=5*v/(2*R)
  a=Math.max(-.5,Math.min(.5,a));bOff=Math.max(-.5,Math.min(.5,bOff))
@@ -66,6 +80,7 @@ export function strike(ball,vx,vy,a=0,bOff=0){
 
 // Equal masses, so impulses are written per unit mass.
 export function ballCollide(a,b){
+if((a.z||0)+(b.z||0)>R*.35)return false        // one of them is in the air, over the other
  const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)
  if(!(d>0&&d<2*R))return false
  const nx=dx/d,ny=dy/d,ov=2*R-d
@@ -125,5 +140,5 @@ export function substeps(balls,dt){
 // A ball at the top of a draw shot has almost no velocity but a great deal of
 // slip, and is about to come back — so resting means both are small.
 export const REST_SPEED=4.5          // units/s, below both linear and slip speed a ball counts as stopped
-export const atRest=b=>speed(b)<REST_SPEED&&slipSpeed(b)<REST_SPEED
+export const atRest=b=>!airborne(b)&&speed(b)<REST_SPEED&&slipSpeed(b)<REST_SPEED
 export const clearMotion=b=>{b.vx=b.vy=b.wx=b.wy=b.wz=0}

@@ -1,6 +1,7 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
 import {normalizeHouse,nextBreaker,placementLimit} from './house.js'
+import {airborne} from './physics.js'
 import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,targetFor,isRotation,MONEY,trianglePositions,kind} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
@@ -86,16 +87,26 @@ export class PoolGame{
  snapMark(){return this.aiming&&this.snapPocket!=null&&this.canAim()?this.snapPocket:null}
  // The pocket to ring on the table: the one called for the 8, or in one-pocket the shooter's own.
  markedPocket(){return this.mode==='onepocket'?ONE_POCKET[this.turn]:this.calledPocket}
+ // The Jump button shows only where the house allows jumps, and says whether the next shot will be one.
+ paintJump(){
+  const b=this.jumpBtn;if(!b)return
+  b.hidden=!this.jumpAllowed()
+  b.classList.toggle('on',Boolean(this.jumpOn));b.setAttribute('aria-pressed',String(Boolean(this.jumpOn)))
+ }
+ // Jump shots are a house rule, off unless the table was set up for them; drills and challenges never allow one.
+ jumpAllowed(){return Boolean(this.house&&this.house.jumps)&&!this.drill&&!this.chal}
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
  canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(this.eightBlockedMessage());return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill&&!this.chal)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);
+ takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(this.eightBlockedMessage());return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill&&!this.chal&&!(this.jumpAllowed()&&this.jumpOn))this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);
   // The pocket called for the 8 is read now, while the player is still aiming: startShot() begins the roll,
   // and calling is only allowed while aiming. Read after it, a guest always sent no call at all, and the host
   // judged every 8 a guest potted as a loss.
   const called=this.canCallEight()?this.calledPocket:null
-  this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called});this.pendingPlace=null}
+  const jump=this.jumpAllowed()&&Boolean(this.jumpOn)
+  this.jumpOn=false
+  this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1],jump);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called,...(jump?{jump:true}:{})});this.pendingPlace=null}
  startShot(){if(this.chal&&this.chal.startedAt==null)this.chal=startClock(this.chal,performance.now());this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
   if(!isGameMessage(m))return
@@ -146,7 +157,7 @@ export class PoolGame{
  receiveShot(m){
   if(m.place&&this.validCueSpot({x:m.place[0],y:m.place[1]})){this.balls[0].x=m.place[0];this.balls[0].y=m.place[1];this.ballInHand=false}
   this.calledPocket=this.canCallEight()?(m.called??null):null
-  this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
+  this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0,Boolean(m.jump)&&this.jumpAllowed())
  }
  // Hot-seat: two people share one device. Whoever's turn it is is "me" -- every rule and every
  // control already speaks of the shooter that way -- and the names are theirs, not You/AI.
@@ -233,7 +244,7 @@ export class PoolGame{
   for(const b of this.balls){
    if(!b.on)continue
    integrate(b,dt)
-   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
+   for(const[p,q]of POCKETS.entries())if(!airborne(b)&&Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
    if(!b.on)continue
    if(railBounce(b)){
     // which balls touched a cushion, and whether the cue did so before it
@@ -430,6 +441,7 @@ export class PoolGame{
   this.status.textContent=o?(o.ok?this.hinted?'Drill complete, with a hint':`Drill complete${this.attempts>1?` in ${this.attempts} attempts`:' first time'}`:REASONS[o.reason]):this.attempts?`Attempt ${this.attempts+1}`:'Your shot'
  }
  updateHud(){
+  this.paintJump()
   if(this.drill)return this.updateDrillHud()
   if(this.chal)return this.updateChallengeHud()
   if(isRotation(this.mode))return this.updateNineHud()

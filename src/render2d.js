@@ -29,7 +29,10 @@ export function createRenderer2D(canvas,options={}){
    const grad=g.createRadialGradient(350,170,10,350,190,400);grad.addColorStop(0,felt);grad.addColorStop(1,shade(felt,-.48));g.fillStyle=grad;g.fillRect(22,22,656,336)
    g.fillStyle='#07100c'
    POCKETS.forEach(([x,y],i)=>{g.beginPath();g.arc(x,y,PR-2,0,7);g.fill();if((game.markedPocket?game.markedPocket():game.calledPocket)===i){g.strokeStyle='#ffd75d';g.lineWidth=3;g.beginPath();g.arc(x,y,PR+3,0,7);g.stroke()}if(game.snapMark&&game.snapMark()===i){g.strokeStyle='#ffffffb0';g.lineWidth=2;g.beginPath();g.arc(x,y,PR+1,0,7);g.stroke()}})
-   for(const b of game.balls)if(b.on)drawBall(b)
+   for(const b of game.balls)if(b.on&&!(b.z>0))drawBall(b)
+   // A ball in the air is drawn on top of the rest and larger, growing as it climbs and shrinking as it comes down:
+   // seen from above, that is how height looks. Its shadow stays on the cloth.
+   for(const b of game.balls)if(b.on&&b.z>0){const k=1+Math.min(b.z,30)/40;g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(b.x+b.z*.15,b.y+b.z*.2,R,R*.85,0,0,7);g.fill();g.save();g.translate(b.x,b.y);g.scale(k,k);g.translate(-b.x,-b.y);drawBall(b);g.restore()}
    if(!(game.aiming&&game.canAim()))return
    const q=game.guide()
    g.lineWidth=1.2;g.setLineDash([7,6]);g.strokeStyle='#fff';g.beginPath();g.moveTo(q.c.x,q.c.y);g.lineTo(q.c.x+q.dx*q.t,q.c.y+q.dy*q.t);g.stroke()
