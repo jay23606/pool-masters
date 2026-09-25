@@ -108,3 +108,9 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
 #physics-dialog{width:min(680px,94vw);max-width:none}
 #physics-dialog form{width:100%;max-width:none}
 #physics-body{min-width:0;overflow-x:hidden}
+
+/* In a game the replay buttons live behind one button in the view buttons, opened as a
+   small menu, so they no longer take a row of their own under the controls. */
+#replay-bar.pop{display:none}
+#replay-bar.pop.open:not([hidden]){display:flex;width:max-content;min-width:170px;position:fixed;z-index:30;flex-direction:column;gap:2px;padding:6px;background:#0d1d16;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px #000a}
+#replay-bar.pop button{text-align:left;justify-content:flex-start}
