@@ -188,6 +188,34 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   diamond(tx(a),zz,false);diamond(tx(W-a),zz,false)
  }
  for(const k of[1,2,3])for(const xx of[-367,367])diamond(xx,tz(M0+(H-2*M0)*k/4),true)
+ // Corner caps: one rounded block over each place two rails meet, so the joint is
+ // hidden and the frame reads as one piece, topped with an engraved brass plate.
+ const brass=new THREE.MeshStandardMaterial({color:'#c9a24d',roughness:.3,metalness:.85})
+ const plateArt=document.createElement('canvas');plateArt.width=plateArt.height=256
+ {const g=plateArt.getContext('2d');g.translate(128,128);g.strokeStyle='#3a2508';g.fillStyle='#3a2508';g.lineCap='round'
+  g.lineWidth=5;g.strokeRect(-112,-112,224,224);g.lineWidth=2.5;g.strokeRect(-102,-102,204,204)
+  g.lineWidth=5
+  for(let k=0;k<4;k++){g.save();g.rotate(k*Math.PI/2)
+   g.beginPath();g.ellipse(0,-52,20,44,0,0,7);g.stroke()                    // petal
+   g.beginPath();g.arc(0,-100,6,0,7);g.fill()                                // bead at its tip
+   g.beginPath();g.moveTo(52,-52);g.bezierCurveTo(88,-52,88,-88,66,-88);g.bezierCurveTo(52,-88,52,-72,64,-72);g.stroke() // scroll in the corner
+   g.restore()}
+  g.beginPath();g.arc(0,0,22,0,7);g.stroke();g.beginPath();g.arc(0,0,8,0,7);g.fill()}
+ const plateMat=new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(plateArt),transparent:true,roughness:.5,metalness:.4,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2})
+ plateMat.map.colorSpace=THREE.SRGBColorSpace;plateMat.map.anisotropy=8
+ const plateGeo=new THREE.PlaneGeometry(35,35),rivetGeo=new THREE.SphereGeometry(1.5,10,8)
+ const capWood=new RoundedBoxGeometry(46,18,46,3,7),plateBase=new RoundedBoxGeometry(38,2.6,38,3,5)
+ for(const sx of[-1,1])for(const sz of[-1,1]){
+  const x=sx*361,z=sz*201
+  const cap=new THREE.Mesh(capWood,woodMat);cap.position.set(x,9,z);cap.castShadow=true;cap.receiveShadow=true;scene.add(cap)
+  const base=new THREE.Mesh(plateBase,brass);base.position.set(x,18.4,z);base.castShadow=true;scene.add(base)
+  const art=new THREE.Mesh(plateGeo,plateMat);art.rotation.x=-Math.PI/2;art.position.set(x,19.75,z);art.renderOrder=2;scene.add(art)
+  for(const[a,b]of[[-15,-15],[15,-15],[-15,15],[15,15]]){const r=new THREE.Mesh(rivetGeo,brass);r.position.set(x+a,19.7,z+b);scene.add(r)}
+ }
+ // fine brass inlay lines down each rail, either side of the diamonds
+ const inlay=(w,d,x,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,.5,d),brass);m.position.set(x,18.1,z);scene.add(m)}
+ for(const zz of[-207,207])for(const off of[-10,10])inlay(662,1.1,0,zz+off)
+ for(const xx of[-367,367])for(const off of[-10,10])inlay(1.1,326,xx+off,0)
  // the marks on the cloth: head string, and the head, centre and foot spots
  const marks=document.createElement('canvas');marks.width=W*2;marks.height=H*2
  {const mg=marks.getContext('2d');mg.scale(2,2);mg.strokeStyle='rgba(255,255,255,.16)';mg.fillStyle='rgba(255,255,255,.26)';mg.lineWidth=1
