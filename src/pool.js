@@ -47,8 +47,24 @@ export class PoolGame{
   if(m.t==='shot'&&this.host&&this.turn==='b'&&this.phase==='aim')this.receiveShot(m)
  }
  receiveState(m){
+  // the last state seen between shots is the baseline for the next one: the first
+  // snapshot of a shot arrives ~40ms in, by which time a ball hit hard toward a
+  // nearby pocket may already have dropped
+  if(this.phase==='aim'&&this.balls&&this.gotState)this.beforeState={on:this.balls.map(b=>b.on),turn:this.turn,breakShot:this.breakShot}
   const freshRound=m.round>this.round
+  const prior=this.phase==='aim'&&this.gotState&&!freshRound&&!this.rec?this.beforeState:null
   applySnapshot(this,m)
+  this.gotState=true
+  // A shot can be over before the host's first snapshot of it goes out (a cue ball
+  // hit into a pocket beside it): this side then never sees a roll, only a table
+  // that changed hands, and would report nothing. Turn or balls changing with no
+  // roll in between is that shot.
+  if(prior&&m.phase==='aim'&&prior.on.length===this.balls.length&&(prior.turn!==this.turn||prior.on.some((was,i)=>was!==this.balls[i].on))){
+   this.shotStart={...prior,mode:this.mode};this.noteShot()
+  }
+  // The result is not part of applySnapshot, so a guest never had one: the status
+  // line reads it, and told a guest who had won that the opponent had.
+  this.result=m.result||''
   // A snapshot never carries velocity, only position -- so every one of
   // these is the anchor a locally predicted trajectory is rebuilt from,
   // bounding how far the cosmetic copy can ever drift from the truth to
@@ -82,13 +98,33 @@ export class PoolGame{
   if(this.phase==='roll'){
    // the last finished shot stays available while the next one plays, and is
    // replaced only when that one finishes
-   if(!this.rec){this.stopReplay();this.rec=createRecorder(this.mode,tableSize)}
+   if(!this.rec){
+    this.stopReplay();this.rec=createRecorder(this.mode,tableSize)
+    // what the table looked like when the shot began, so that what it did can be
+    // worked out from how it ended: the same on both sides of the wire
+    const before=!this.host&&this.beforeState&&this.beforeState.on.length===this.balls.length?this.beforeState:null
+    this.shotStart={on:before?before.on:this.balls.map(b=>b.on),turn:before?before.turn:this.turn,
+     breakShot:before?before.breakShot:this.breakShot,mode:this.mode}
+   }
    if(!this.host||force)this.rec.frame(now,this.balls)
   }else if(this.rec){
    this.rec.frame(now,this.balls)
    const r=this.rec.finish();this.rec=null
    if(r){this.lastReplay=r;this.onReplay?.(r)}
+   this.noteShot()
   }
+ }
+ // A finished shot, described from its before and after. The host has resolve(),
+ // but a guest never does -- it only sees snapshots -- so this is derived from
+ // the two states rather than reported, and both sides get the same answer. A
+ // foul always gives the opponent ball in hand, and always passes the turn.
+ noteShot(){
+  const s=this.shotStart;this.shotStart=null
+  if(!s||this.drill||s.on.length!==this.balls.length)return
+  const potted=[]
+  s.on.forEach((was,i)=>{const b=this.balls[i];if(was&&!b.on&&b.n!==0)potted.push(b.n)})
+  this.onShot?.({by:s.turn,potted,foul:Boolean(this.ballInHand&&this.turn!==s.turn),
+   brk:s.breakShot,mode:s.mode,winner:this.over?this.result||null:null})
  }
  // Playback swaps recorded balls in for the render only; the game underneath
  // carries on untouched, and a new shot cancels the replay.

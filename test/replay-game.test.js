@@ -164,3 +164,28 @@ test('a shot recorded in a game round-trips through a link and plays back the sa
  assert.deepEqual(back,host.lastReplay)
  assert.equal(back.mode,'9ball');assert.equal(ballsAt(back,0).length,10)
 })
+
+// ---- a guest is told who won ----
+
+test('a guest who wins a rack is told so, and one who loses is told that',()=>{
+ for(const [winner,expected] of [['b','You won the rack'],['a','Opponent won the rack']]){
+  const {host,guest}=pair()
+  const el=()=>({textContent:'',className:'',hidden:false,disabled:false})
+  Object.assign(guest,{groupStatus:el(),status:el(),shoot:el(),moveCue:el(),changePocket:el()})
+  guest.onFinish=()=>{}
+  host.sync()
+  host.finish(winner);host.phase='aim';host.sync()
+  guest.updateHud()
+  assert.equal(guest.result,winner,'the guest has the result')
+  assert.equal(guest.status.textContent,expected)
+ }
+})
+
+test('the result clears when the next rack starts, so it cannot leak into it',()=>{
+ const {host,guest}=pair()
+ guest.onFinish=()=>{};guest.onRack=()=>{}
+ host.sync();host.finish('a');host.phase='aim';host.sync()
+ assert.equal(guest.result,'a')
+ host.round=2;host.resetRack();host.sync()
+ assert.equal(guest.result,'','a fresh rack has no result')
+})
