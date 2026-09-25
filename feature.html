@@ -206,13 +206,15 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
    <span class="tag done">Shipped</span>
   </div>
 
-  <div class="rm">
-   <div class="rank">4</div>
+  <div class="rm shipped">
+   <div class="rank">✓</div>
    <div><h4>Achievements / trophies</h4>
-   <p>Elo and streaks exist, but there's no discrete "you did this" moment the way
-   Miniclip's and Cue Club 2's trophy cases give players. Cheap to add on top of the
-   stats we already track (break-and-runs, table-size records).</p></div>
-   <span class="tag med">Medium impact</span>
+   <p><strong>Shipped.</strong> Twenty-five trophies in seven groups (racks, nine-ball, skill,
+   opponents, practice, social, league), each with a progress bar toward its target, a toast
+   when one unlocks and a trophy case in the header. Stats are derived from what happened on
+   the table, so host and guest agree, and kept per device. Building it also found and fixed
+   a real bug: a shot that ended before the host's first snapshot was invisible to a guest.</p></div>
+   <span class="tag done">Shipped</span>
   </div>
 
   <div class="rm">
@@ -352,7 +354,7 @@ const rows = [
 ['Break-and-run stat tracking', ['y','n','n','n','n','n']],
 ['Stats broken out by table size', ['y','n','n','n','n','n']],
 ['Recent match history', ['y','n','n','p','p','p']],
-['Achievements / trophies', ['n','n','n','y','y','y']],
+['Achievements / trophies', ['y','n','n','y','y','y']],
 ['Daily login rewards', ['n','n','n','y','n','n']],
 ['Coin / currency economy', ['n','n','n','y','y','n']],
 
