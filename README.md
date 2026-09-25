@@ -209,6 +209,22 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## House rules
+
+**House rules** on the lobby sets four things, kept in the browser and used for practice, two-player games and tables you host:
+
+- **Race to** 1, 2, 3 (standard), 4, 5 or 7 racks.
+- **After a foul:** ball in hand anywhere (standard), ball in hand only behind the head string (the kitchen), or none: the cue ball
+  stays where it stopped, and goes back on the head spot, clear of any ball sitting there, if it was potted.
+- **Who breaks:** the host always (standard), taking turns, the winner, or the loser. When the AI is due to break, it does.
+- **Straight pool is played to** 15, 30 (standard), 50 or 100 points.
+
+A rule that is not standard is named in the game's header. An online table carries its rules in its room settings, so both players
+play the same game; a table with house rules is never ranked, and *Find a game* skips tables that have them. Career opponents keep
+the standard rules. The rules are validated wherever they come from (`src/house.js`): a stored value, or another player's room
+settings, that is not one of the offered choices is replaced by the standard one. The AI places the cue ball behind the head string
+when the kitchen rule says so.
+
 ## Challenges
 
 **Challenges** on the lobby are three short scored games for one player, each with a best kept in the browser:
@@ -456,6 +472,7 @@ DOM, no renderer.
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/house.js` | house rules: the choices, validation, who breaks, where the cue ball may go |
 | `src/challenges.js` | the challenge games: scatter, scoring, clock, bests |
 | `src/career.js` | the career ladder: opponents, who is open, recording a win |
 | `src/coach.js` | the shot coach: grades a shot, finds the coach's shot, builds the replays |

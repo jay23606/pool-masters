@@ -1,5 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
+import {normalizeHouse,nextBreaker,placementLimit} from './house.js'
 import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,targetFor,isRotation,MONEY,trianglePositions,kind} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
@@ -15,7 +16,7 @@ export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
 export class PoolGame{
- constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
+ constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.house=normalizeHouse(o.house);this.breaker='a';this.scoreTarget=this.mode==='straight'?this.house.straightTo:(this.scoreTarget||targetFor(this.mode));this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
  // ---- challenge games (see challenges.js) ----
  // the cue ball on the head spot and a fresh scatter of balls
  challengeRack(keep){
@@ -57,9 +58,16 @@ export class PoolGame{
  setSpin(a,b){this.spin={a,b};if(this.spinDot)this.spinDot.style.transform=`translate(${a*32}px,${-b*32}px)`}
  spinFrom(e){const r=this.spinPad.getBoundingClientRect();let dx=(e.clientX-r.left)/r.width*2-1,dy=(e.clientY-r.top)/r.height*2-1;const m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m}this.setSpin(dx*.5,-dy*.5)}
  nearestPocket(p){return nearestPocket(p)}
- validCueSpot(p){return validCueSpot(this.balls,p)}
+ validCueSpot(p){return validCueSpot(this.balls,p,this.ballInHand?placementLimit(this.house):null)}
  setReady(v){this.ready=v;this.draw()}
- newRack(){if(!this.over)return;this.round++;this.resetRack();this.ready=true;this.sync()}
+ newRack(){
+  if(!this.over)return
+  const last={breaker:this.breaker||'a',winner:this.result}
+  this.round++;this.resetRack()
+  this.breaker=nextBreaker(this.house,last);this.turn=this.breaker
+  this.ready=true;this.sync()
+  if(this.practice&&!this.hotSeat&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
+ }
  requestRack(){if(!this.over)return;if(this.host)this.newRack();else this.send({t:'next-rack'})}
  group(player=this.turn){return normalizeGroup(this.groups[player])}
  remaining(group){return countLeft(this.balls,group)}
@@ -238,7 +246,20 @@ export class PoolGame{
   const p=nineRespot(this.balls,money)
   nine.on=true;nine.x=p.x;nine.y=p.y;clearMotion(nine)
  }
- foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(isRotation(this.mode)?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand')}
+ // The cue ball after a foul. By default it goes in hand, to be placed anywhere; a house rule can keep it
+ // behind the head string, or leave it where it stopped (and on the head spot if it was potted).
+ foul(reason){
+  const cue=this.balls[0],hit=this.firstHit?.k,bih=normalizeHouse(this.house).ballInHand
+  const wasOn=cue.on
+  clearMotion(cue);this.setSpin(0,0);this.placed=false;this.turn=other(this.turn);this.calledPocket=null
+  if(bih==='none'){
+   if(!wasOn){cue.on=true;cue.x=154;cue.y=190;for(let x=154;x>=MINX&&this.balls.some(b=>b!==cue&&b.on&&Math.hypot(b.x-x,b.y-190)<2*R);x-=R)cue.x=x-R}
+   this.ballInHand=false
+  }else{cue.on=true;cue.x=154;cue.y=190;this.ballInHand=true}
+  const say=m=>bih==='kitchen'?m.replace('ball in hand','ball in hand behind the head string'):bih==='none'?m.replace(' · ball in hand','').replace('ball in hand','next shot'):m
+  this.flash(say(this.foulMessage(reason,hit)))
+ }
+ foulMessage(reason,hit){return reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(isRotation(this.mode)?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand'}
  finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(this.hotSeat?`${this.nameOf(winner)} wins!`:winner===this.me?'You win!':'You lose')}
  // A drill is judged by its own rule, not by the rules of the game: nobody's turn
  // changes, nothing is won, and a failed attempt puts the table back.
@@ -295,7 +316,7 @@ export class PoolGame{
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
- const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel,this.mode,{player:'b'})
+ const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel,this.mode,{player:'b',limitX:placementLimit(this.house)})
  if(!plan)return
  if(plan.place){this.ballInHand=false;this.placed=false}
   // The planner may receive old room state; never show an 8-ball call unless
@@ -355,7 +376,7 @@ export class PoolGame{
   if(v.foul)return
   if(v.credited.length){
    const mine=v.credited.filter(c=>c.to===shooter).length,theirs=v.credited.length-mine
-   this.flash(theirs&&!mine?`${who(shooter)} sank it in ${who(other(shooter))}’s pocket`:mine?`${who(shooter)} scored${mine>1?` ${mine}`:''} · ${v.score[shooter]} of ${targetFor(this.mode)}`:'')
+   this.flash(theirs&&!mine?`${who(shooter)} sank it in ${who(other(shooter))}’s pocket`:mine?`${who(shooter)} scored${mine>1?` ${mine}`:''} · ${v.score[shooter]} of ${(this.scoreTarget||targetFor(this.mode))}`:'')
   }else if(v.wasted.length)this.flash(this.mode==='bank'?`No bank · ball ${v.wasted[0]} does not count`:`Wrong pocket · ball ${v.wasted[0]} does not count`)
  }
  // Bank pool and one-pocket: a score, and what counts, instead of groups.
@@ -364,7 +385,7 @@ export class PoolGame{
   const nm=p=>this.hotSeat?this.nameOf(p).toUpperCase():p===this.me?'YOU':this.practice?'AI':'THEM'
   const me=this.hotSeat?this.turn:this.me,opp=other(me)
   const label=this.mode==='bank'?'BANK POOL':this.mode==='straight'?'STRAIGHT POOL':'ONE-POCKET'
-  if(this.groupStatus){const text=`${label} · ${nm(me)} ${me==='a'?a:b} – ${opp==='a'?a:b} ${nm(opp)} · FIRST TO ${targetFor(this.mode)}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
+  if(this.groupStatus){const text=`${label} · ${nm(me)} ${me==='a'?a:b} – ${opp==='a'?a:b} ${nm(opp)} · FIRST TO ${(this.scoreTarget||targetFor(this.mode))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
   this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
