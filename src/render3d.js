@@ -5,7 +5,7 @@ import {tableFractions} from './screen-point.js'
 // WebGL renderer. Purely a view over the existing 2D simulation: it reads the
 // same {x,y,vx,vy,on,k,n} balls the 2D renderer does and never writes to them,
 // so physics and the network protocol are untouched.
-const CLOTH='#15794a',CUSHION='#0f6038',WOOD='#472616',WOOD_DARK='#2c180e'
+const CLOTH='#15794a',CUSHION='#0f6038',WOOD_DARK='#2c180e'
 const MOODS={hall:{bg:'#07110d',key:'#fff3dc',rim:'#9fd8ff'},warm:{bg:'#1a100c',key:'#ffe0a8',rim:'#d99b62'},cool:{bg:'#07131d',key:'#d9ebff',rim:'#70b9ff'}}
 const CUES={classic:{shaft:'#e6d6ab',butt:'#4a2a18',tip:'#4e8fa6'},ebony:{shaft:'#d8c49e',butt:'#171414',tip:'#d9b35d'},midnight:{shaft:'#c7d0d7',butt:'#102b52',tip:'#71c4e9'}}
 const tx=x=>x-W/2, tz=y=>y-H/2   // table coords -> world (y is up)
@@ -75,6 +75,7 @@ function numberCap(THREE,n,kind){
 export async function createRenderer3D(canvas,camera3d='top',options={}){
  const THREE=await import('three')
  const {RoomEnvironment}=await import('three/examples/jsm/environments/RoomEnvironment.js')
+ const {RoundedBoxGeometry}=await import('three/examples/jsm/geometries/RoundedBoxGeometry.js')
 
  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'})
  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75))
@@ -129,18 +130,77 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   ng.putImageData(img,0,0)}
  const clothBump=new THREE.CanvasTexture(noise)
  clothBump.wrapS=clothBump.wrapT=THREE.RepeatWrapping;clothBump.repeat.set(70,38)
- const clothMat=new THREE.MeshStandardMaterial({color:options.felt||CLOTH,roughness:.99,bumpMap:clothBump,bumpScale:1.5})
- const cushionMat=std(CUSHION,.95),woodMat=std(WOOD,.45),apronMat=std(WOOD_DARK,.6)
+ const feltCanvas=document.createElement('canvas');feltCanvas.width=feltCanvas.height=256
+ {const fg=feltCanvas.getContext('2d');fg.fillStyle='#e9e9e9';fg.fillRect(0,0,256,256)
+  // fibres: short random strokes in both directions read as woven baize up close
+  for(let i=0;i<5200;i++){const v=170+Math.random()*85;fg.strokeStyle=`rgba(${v},${v},${v},.35)`;fg.lineWidth=.6+Math.random()*.7;const x=Math.random()*256,y=Math.random()*256,l=2+Math.random()*5;fg.beginPath();fg.moveTo(x,y);if(Math.random()<.5)fg.lineTo(x+l,y+(Math.random()-.5)*2);else fg.lineTo(x+(Math.random()-.5)*2,y+l);fg.stroke()}}
+ const feltMap=new THREE.CanvasTexture(feltCanvas);feltMap.colorSpace=THREE.SRGBColorSpace;feltMap.wrapS=feltMap.wrapT=THREE.RepeatWrapping;feltMap.repeat.set(20,11);feltMap.anisotropy=8
+ const clothMat=new THREE.MeshStandardMaterial({color:options.felt||CLOTH,map:feltMap,roughness:.98,bumpMap:clothBump,bumpScale:1.5})
+ const tex=(c,rx=1,ry=1)=>{const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.anisotropy=8;return t}
+ // wavy, slightly varied lines along the long side: enough grain to read as varnished wood
+ const woodCanvas=(w,h,base,dark,light)=>{
+  const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,w,h)
+  for(let i=0;i<h*2.2;i++){
+   const y=Math.random()*h,amp=.5+Math.random()*2.4,ph=Math.random()*6,fr=.003+Math.random()*.008
+   g.strokeStyle=Math.random()<.62?dark:light;g.globalAlpha=.05+Math.random()*.16;g.lineWidth=.5+Math.random()*1.3
+   g.beginPath();for(let x=0;x<=w;x+=12){const yy=y+Math.sin(x*fr+ph)*amp;if(x)g.lineTo(x,yy);else g.moveTo(x,yy)}g.stroke()
+  }
+  g.globalAlpha=1;return c
+ }
+ const cushionMat=std(CUSHION,.93)
+ const woodMat=new THREE.MeshPhysicalMaterial({map:tex(woodCanvas(1024,48,'#5b2f19','#2a1208','#94582f')),roughness:.42,clearcoat:.55,clearcoatRoughness:.28})
+ const apronMat=std(WOOD_DARK,.6)
  const cloth=box(W,6,H,clothMat,0,-3,0);cloth.receiveShadow=true
  box(768,36,448,apronMat,0,-24,0)
- for(const[w,d,x,z]of[[768,34,0,-207],[768,34,0,207],[34,380,-367,0],[34,380,367,0]]){const m=box(w,18,d,woodMat,x,9,z);m.castShadow=true;m.receiveShadow=true}
- // cushions, in table coords, with gaps left at the six pockets
- for(const[x0,x1,y0,y1]of[[47,331,18,28],[369,653,18,28],[47,331,352,362],[369,653,352,362],[18,28,47,333],[672,682,47,333]]){
-  const m=box(x1-x0,13,y1-y0,cushionMat,tx((x0+x1)/2),6.5,tz((y0+y1)/2));m.castShadow=true;m.receiveShadow=true
+ // rails with softened edges; the two short ones are the long one turned
+ for(const[w,d,x,z,turn]of[[768,34,0,-207,0],[768,34,0,207,0],[380,34,-367,0,1],[380,34,367,0,1]]){
+  const m=new THREE.Mesh(new RoundedBoxGeometry(w,18,d,3,5),woodMat);m.position.set(x,9,z);if(turn)m.rotation.y=Math.PI/2;m.castShadow=true;m.receiveShadow=true;scene.add(m)
  }
+ // A cushion is a wedge: tall at the rail, sloping down to a nose at the playing
+ // surface. Its ends are cut back toward the nose so the pocket has jaws.
+ // Built with its back at depth 0 and its nose at depth 28; the caller turns it into place.
+ function cushionGeo(len,jaw){
+  const sh=new THREE.Shape();sh.moveTo(0,0);sh.lineTo(0,16);sh.lineTo(23,11.5);sh.lineTo(28,8);sh.lineTo(28,0);sh.closePath()
+  const g=new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false});g.translate(0,0,-len/2)
+  const p=g.attributes.position
+  for(let i=0;i<p.count;i++){const d=p.getX(i)/28,z=p.getZ(i);p.setZ(i,z-Math.sign(z)*d*jaw)}
+  g.computeVertexNormals();return g
+ }
+ const M0=POCKETS[0][0],MID=POCKETS[1][0],END=POCKETS[2][0],REACH=19
+ const along=(a,b)=>[(a+b)/2,b-a]
+ // [start, end] of the nose on each side, in table coordinates, with the jaw taper on top
+ const JAW=12
+ for(const[a,b,side]of[[M0+REACH,MID-REACH,'top'],[MID+REACH,END-REACH,'top'],[M0+REACH,MID-REACH,'bottom'],[MID+REACH,END-REACH,'bottom'],[M0+REACH,H-M0-REACH,'left'],[M0+REACH,H-M0-REACH,'right']]){
+  const [c,len]=along(a,b),m=new THREE.Mesh(cushionGeo(len+2*JAW,JAW),cushionMat);m.castShadow=true;m.receiveShadow=true
+  if(side==='top'){m.rotation.y=-Math.PI/2;m.position.set(tx(c),0,-H/2)}
+  else if(side==='bottom'){m.rotation.y=Math.PI/2;m.position.set(tx(c),0,H/2)}
+  else if(side==='left'){m.position.set(-W/2,0,tz(c))}
+  else{m.rotation.y=Math.PI;m.position.set(W/2,0,tz(c))}
+  scene.add(m)
+ }
+ // sights: the mother-of-pearl diamonds that let a player measure a bank
+ const pearl=new THREE.MeshStandardMaterial({color:'#efe6cf',roughness:.22,metalness:.3})
+ const diamondGeo=new THREE.CylinderGeometry(3.4,3.4,.8,4);diamondGeo.scale(.72,1,1.25)
+ const diamond=(x,z,turn)=>{const m=new THREE.Mesh(diamondGeo,pearl);m.position.set(x,18.2,z);if(turn)m.rotation.y=Math.PI/2;scene.add(m)}
+ for(const k of[1,2,3])for(const zz of[-207,207]){
+  const a=M0+(MID-M0)*k/4
+  diamond(tx(a),zz,false);diamond(tx(W-a),zz,false)
+ }
+ for(const k of[1,2,3])for(const xx of[-367,367])diamond(xx,tz(M0+(H-2*M0)*k/4),true)
+ // the marks on the cloth: head string, and the head, centre and foot spots
+ const marks=document.createElement('canvas');marks.width=W*2;marks.height=H*2
+ {const mg=marks.getContext('2d');mg.scale(2,2);mg.strokeStyle='rgba(255,255,255,.16)';mg.fillStyle='rgba(255,255,255,.26)';mg.lineWidth=1
+  mg.beginPath();mg.moveTo(175,M0+4);mg.lineTo(175,H-M0-4);mg.stroke()
+  for(const x of[175,350,420]){mg.beginPath();mg.arc(x,190,2.4,0,7);mg.fill()}}
+ const markTex=new THREE.CanvasTexture(marks);markTex.colorSpace=THREE.SRGBColorSpace
+ const markPlane=new THREE.Mesh(new THREE.PlaneGeometry(W,H),new THREE.MeshBasicMaterial({map:markTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}))
+ markPlane.rotation.x=-Math.PI/2;markPlane.position.y=.08;markPlane.renderOrder=1;scene.add(markPlane)
  const pocketMat=std('#05100b',.9)
  const pocketGeo=new THREE.CylinderGeometry(PR-1.5,PR-3,7,28)
  POCKETS.forEach(([x,y])=>{const m=new THREE.Mesh(pocketGeo,pocketMat);m.position.set(tx(x),-1,tz(y));scene.add(m)})
+ const leather=new THREE.MeshStandardMaterial({color:'#3a2214',roughness:.62})
+ const rimGeo=new THREE.TorusGeometry(PR-.5,2.1,10,32)
+ POCKETS.forEach(([x,y])=>{const r=new THREE.Mesh(rimGeo,leather);r.rotation.x=Math.PI/2;r.position.set(tx(x),7,tz(y));r.castShadow=true;scene.add(r)})
  const ring=new THREE.Mesh(new THREE.TorusGeometry(PR+3,1.7,8,36),new THREE.MeshBasicMaterial({color:'#ffd75d'}))
  ring.rotation.x=-Math.PI/2;ring.position.y=1.6;ring.visible=false;scene.add(ring)
 
@@ -186,12 +246,33 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  ghost.renderOrder=4;ghost.visible=false;scene.add(ghost)
 
  const cue=new THREE.Group()
- {const shaft=new THREE.Mesh(new THREE.CylinderGeometry(2.6,4.4,200,18),std(cueStyle.shaft,.5))
-  const butt=new THREE.Mesh(new THREE.CylinderGeometry(4.4,5.6,140,18),std(cueStyle.butt,.35))
-  const tip=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.6,5,16),std(cueStyle.tip,.7))
-  shaft.rotation.z=butt.rotation.z=tip.rotation.z=Math.PI/2
-  tip.position.x=2.5;shaft.position.x=-100;butt.position.x=-270
-  ;[shaft,butt,tip].forEach(m=>{m.castShadow=true;cue.add(m)})
+ {
+  // Built from the tip back (-x). The ferrule, maple shaft, steel joint, inlaid
+  // forearm, linen wrap, sleeve and bumper are all separate parts, as on a real cue.
+  const grainCanvas=(w,h,base,dark,light)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,w,h)
+   for(let i=0;i<110;i++){g.strokeStyle=Math.random()<.6?dark:light;g.globalAlpha=.05+Math.random()*.14;g.lineWidth=.8+Math.random()*1.8;const x=Math.random()*w;g.beginPath();g.moveTo(x,0);g.lineTo(x+(Math.random()-.5)*6,h);g.stroke()}g.globalAlpha=1;return c}
+  const maple=tex(grainCanvas(128,256,cueStyle.shaft,'#a58b58','#fff4d2'))
+  const inlayCanvas=()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle=cueStyle.butt;g.fillRect(0,0,256,256)
+   // veneer points, narrow ends toward the tip (the bottom of the canvas)
+   for(let k=0;k<4;k++){const x=k*64+32;g.fillStyle=cueStyle.shaft;g.beginPath();g.moveTo(x-20,20);g.lineTo(x+20,20);g.lineTo(x,150);g.closePath();g.fill()
+    g.fillStyle='rgba(0,0,0,.5)';g.beginPath();g.moveTo(x-9,20);g.lineTo(x+9,20);g.lineTo(x,88);g.closePath();g.fill()}
+   g.fillStyle='#d9b35d';g.fillRect(0,4,256,5);g.fillRect(0,236,256,5);return c}
+  const linenCanvas=()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.fillStyle='#181513';g.fillRect(0,0,64,64);g.strokeStyle='#37312c';g.lineWidth=1.4
+   for(let i=0;i<64;i+=4){g.beginPath();g.moveTo(i,0);g.lineTo(i,64);g.stroke();g.beginPath();g.moveTo(0,i);g.lineTo(64,i);g.stroke()}return c}
+  const seg=(x0,len,rTip,rButt,mat)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(rButt,rTip,len,28,1),mat);m.rotation.z=Math.PI/2;m.position.x=x0-len/2;m.castShadow=true;cue.add(m);return m}
+  const steel=new THREE.MeshStandardMaterial({color:'#cfd3d8',roughness:.3,metalness:.85}),gold=new THREE.MeshStandardMaterial({color:'#d9b35d',roughness:.3,metalness:.85})
+  seg(3,3,2.5,2.5,std(cueStyle.tip,.85))
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(2.5,18,8,0,Math.PI*2,0,Math.PI/2),std(cueStyle.tip,.85));dome.rotation.z=-Math.PI/2;dome.position.x=3;cue.add(dome)
+  seg(0,14,2.55,2.72,std('#efe8d6',.3))
+  seg(-14,176,2.72,4.15,new THREE.MeshStandardMaterial({map:maple,roughness:.38}))
+  seg(-190,6,4.3,4.3,steel)
+  seg(-196,70,4.4,5.2,new THREE.MeshStandardMaterial({map:tex(inlayCanvas()),roughness:.28}))
+  seg(-264,2,5.4,5.4,gold)
+  const linen=tex(linenCanvas(),6,3)
+  seg(-266,60,5.25,5.3,new THREE.MeshStandardMaterial({map:linen,roughness:.9}))
+  seg(-326,2,5.5,5.5,gold)
+  seg(-328,28,5.45,5.75,new THREE.MeshStandardMaterial({color:cueStyle.butt,roughness:.25}))
+  seg(-356,10,5.75,5.6,std('#0e0e0e',.85))
  }
  cue.visible=false;scene.add(cue)
 
