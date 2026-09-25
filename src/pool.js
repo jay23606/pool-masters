@@ -49,6 +49,9 @@ export class PoolGame{
  receiveState(m){
   const freshRound=m.round>this.round
   applySnapshot(this,m)
+  // The result is not part of applySnapshot, so a guest never had one: the status
+  // line reads it, and told a guest who had won that the opponent had.
+  this.result=m.result||''
   // A snapshot never carries velocity, only position -- so every one of
   // these is the anchor a locally predicted trajectory is rebuilt from,
   // bounding how far the cosmetic copy can ever drift from the truth to
