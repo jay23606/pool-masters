@@ -1,3 +1,4 @@
+import {blocks} from './obstacles.js'
 import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 
 // Eight-ball and nine-ball rules, as pure functions over a plain state object.
@@ -89,7 +90,7 @@ export const nearestPocket=p=>POCKETS.reduce((best,x,i)=>{
 // `limitX`, when given, keeps the cue ball behind that line (the head string, for kitchen ball in hand).
 export const validCueSpot=(balls,p,limitX=null)=>
  (limitX==null||p.x<=limitX)&&p.x>=MINX&&p.x<=MAXX&&p.y>=MINY&&p.y<=MAXY&&
- !balls.some(b=>b.k!=='cue'&&b.on&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
+ !blocks(p.x,p.y)&&!balls.some(b=>b.k!=='cue'&&b.on&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
 
 // What a finished shot means, decided without changing anything. The caller
 // applies the verdict and owns the side effects -- the flash, the sync, the

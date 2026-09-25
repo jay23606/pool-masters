@@ -1,4 +1,5 @@
 import {R,MINX,MAXX,MINY,MAXY} from './table.js'
+import {obstacleStep} from './obstacles.js'
 
 // The table is 700x380 units with a 9-unit ball radius, which puts one unit at
 // roughly 4.06 mm — so the speed scale the game already used is physical: a
@@ -121,11 +122,13 @@ function cushion(b,nx,ny){
  b.vy=ny*vnOut+ty*vt
 }
 
-// Returns true if the ball touched a cushion this step.
+// Returns true if the ball touched a cushion this step. Obstacles (bumpers, walls, portals) are handled here too,
+// since every loop that steps a ball already calls this once per step; a bounce off one counts as a cushion.
 export function railBounce(b){
  let hit=false
  if(b.x<MINX){b.x=MINX;cushion(b,1,0);hit=true}else if(b.x>MAXX){b.x=MAXX;cushion(b,-1,0);hit=true}
  if(b.y<MINY){b.y=MINY;cushion(b,0,1);hit=true}else if(b.y>MAXY){b.y=MAXY;cushion(b,0,-1);hit=true}
+ if(obstacleStep(b))hit=true
  return hit
 }
 

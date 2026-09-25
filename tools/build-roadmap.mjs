@@ -73,6 +73,7 @@ const shippedNew=[
  ['Aim snapping and a follow-the-shot camera','Aim snaps to the middle of a pocket (or a one-cushion bank) when you are close, can be turned off, and the 3D camera can follow the ball with an adjustable eye height.'],
  ['Rogue Pool','A solo roguelike run: clear each table within its shots, take one of three random upgrades (wider pockets, extra shots, lives, jump charges, a scratch shield, a second wind), and lose a life when you run out. The same seed is the same run.'],
  ['Chaos Pool','A scored game to 15 with a random twist dealt before every shot: a bonus pocket worth three, a bomb ball that blasts its neighbours, or a gravity well that bends the balls. The host deals it, so both players see the same one.'],
+ ['Obstacle tables','A table option in the lobby for practice and two players on one device: Bumpers, Walls, Portals or the Gauntlet. Balls bounce off bumpers and walls and come out of the paired portal going the same way; a jump shot hops a bumper or wall. The AI, the solver and the physics all see them. Not yet: online tables, and placing your own in the puzzle maker.'],
  ['Puzzle maker','Arrange a table, pick the ball to pot, and the computer searches the real physics for a shot. Only proven-solvable tables can be shared, and a puzzle link re-proves itself when it is opened.']
 ]
 const items=[
@@ -82,9 +83,9 @@ const items=[
  {rank:2,title:'Killer and more than two players',tag:['med','Next'],
   body:'Cue Club 2 seats up to four and lists killer; Real Pool 3D has teams of up to six. Hot-seat for three or four players, killer/cut-throat, and two-versus-two are cheap to add to the shared-device mode. More than two online players changes the host-authoritative model and is a large piece of work.',
   who:'Cue Club 2, Real Pool 3D'},
- {rank:3,title:'Obstacle tables',tag:['med','Next'],
-  body:'Bumpers, walls and portals on the cloth. Nobody in the commercial set lists it, and the physics already handles cushions and airborne balls; the work is the editor and the AI learning to plan around them. It would slot straight into the puzzle maker.',
-  who:'Nobody listed'},
+ {rank:3,title:'Curated trick shots: clear the whole table',tag:['med','Next'],
+  body:'A hand-made library of trick shots that pot every ball in one run, each with a Show me button that plays the proven solution. Virtual Pool 4 has a trick-shot library; ours would be built from the puzzle solver, so every shot is proven, and the puzzle maker would let anyone add one.',
+  who:'Virtual Pool 4'},
  {rank:4,title:'Ghost race',tag:['med','Next'],
   body:'Play against a friend\u2019s recorded run of a drill, daily shot or Rogue table, shown as a ghost cue ball. Replays already record positions, so this needs no server: the run travels in a link.',
   who:'Nobody listed'},

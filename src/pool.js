@@ -1,3 +1,4 @@
+import {setObstacles,presetItems} from './obstacles.js'
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
 import {normalizeHouse,nextBreaker,placementLimit} from './house.js'
@@ -107,7 +108,9 @@ export class PoolGame{
   if(!this.chal||this.chal.over||this.over)return
   if(this.phase==='aim'&&timedOut(this.chal,performance.now()))this.endChallenge()
  }
- resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};this.fx=null;if(this.mode==='chaos')this.fx=drawTwist(this.balls);if(this.rogueSeed!=null){this.run=newRogueRun(this.rogueSeed);this.chal={id:'rogue',over:false};this.rogueWait=false;this.breakShot=false;this.balls=this.rogueRack()};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState(this.mode));
+  // obstacle tables are for practice, hot-seat and puzzles; the scored challenge games and Rogue Pool keep a clear cloth
+  setObstacles(presetItems(this.drill?this.drill.obs:(this.rogueSeed!=null||this.challenge||this.mode==='chaos')?null:this.obstacles));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};this.fx=null;if(this.mode==='chaos')this.fx=drawTwist(this.balls);if(this.rogueSeed!=null){this.run=newRogueRun(this.rogueSeed);this.chal={id:'rogue',over:false};this.rogueWait=false;this.breakShot=false;this.balls=this.rogueRack()};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -585,5 +588,5 @@ export class PoolGame{
   catch(e){if(!this.loggedDrawError){this.loggedDrawError=true;console.error('a frame failed to draw',e)}}
  }
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}
- destroy(){clearTimeout(this.retryTimer);cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.unbindInput?.()}
+ destroy(){setObstacles([]);clearTimeout(this.retryTimer);cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.unbindInput?.()}
 }

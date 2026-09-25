@@ -1,6 +1,7 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
 import {rayToRail,bankPath} from './pool.js'
 import {tableFractions} from './screen-point.js'
+import {getObstacles,WALL_R} from './obstacles.js'
 import {CUE_STYLES,RAIL_STYLES} from './cosmetics.js'
 import {shotPose,stepBlend,smooth,FOV as SHOT_FOV,MIN_SPEED} from './shot-cam.js'
 
@@ -240,6 +241,18 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  bonusDisc.visible=bonusRing.visible=false;bonusRing.rotation.x=-Math.PI/2;scene.add(bonusDisc,bonusRing)
  const wellDisc=new THREE.Mesh(new THREE.CircleGeometry(1,40),new THREE.MeshBasicMaterial({color:'#9a5bff',transparent:true,opacity:.28,depthWrite:false}));wellDisc.rotation.x=-Math.PI/2;wellDisc.visible=false;scene.add(wellDisc)
  const bombRing=new THREE.Mesh(new THREE.TorusGeometry(R+3,1.4,8,28),new THREE.MeshBasicMaterial({color:'#ff503c'}));bombRing.rotation.x=-Math.PI/2;bombRing.visible=false;scene.add(bombRing)
+ // Obstacle tables: rebuilt whenever the game's set of obstacles changes
+ const obsGroup=new THREE.Group();scene.add(obsGroup);let obsShown=null
+ const PORTAL_COLORS=['#4aa8ff','#ff9a3c','#c46bff']
+ const buildObstacles=list=>{
+  for(const m of [...obsGroup.children]){obsGroup.remove(m);m.geometry?.dispose();m.material?.dispose?.()}
+  let pi=0
+  for(const o of list){
+   if(o.t==='bumper'){const m=new THREE.Mesh(new THREE.CylinderGeometry(o.r,o.r,16,28),new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.7,roughness:.3}));m.position.set(tx(o.x),8,tz(o.y));obsGroup.add(m)}
+   else if(o.t==='wall'){const len=Math.hypot(o.x2-o.x1,o.y2-o.y1)+WALL_R*2,m=new THREE.Mesh(new THREE.BoxGeometry(len,12,WALL_R*2),new THREE.MeshStandardMaterial({color:'#d8c58c',roughness:.5}));m.position.set(tx((o.x1+o.x2)/2),6,tz((o.y1+o.y2)/2));m.rotation.y=-Math.atan2(o.y2-o.y1,o.x2-o.x1);obsGroup.add(m)}
+   else if(o.t==='portal'){const c=PORTAL_COLORS[Math.floor(pi++/2)%PORTAL_COLORS.length],ringM=new THREE.Mesh(new THREE.TorusGeometry(o.r,2,8,40),new THREE.MeshBasicMaterial({color:c})),disc=new THREE.Mesh(new THREE.CircleGeometry(o.r,40),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.3,depthWrite:false}));for(const m of [ringM,disc]){m.rotation.x=-Math.PI/2;m.position.set(tx(o.x),1.4,tz(o.y));obsGroup.add(m)}}
+  }
+ }
  // a softer white ring for the pocket the aim has snapped to
  const snapRing=new THREE.Mesh(new THREE.TorusGeometry(PR+1,1.1,8,36),new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.7}))
  snapRing.rotation.x=-Math.PI/2;snapRing.position.y=1.7;snapRing.visible=false;scene.add(snapRing)
@@ -392,6 +405,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
    }
    const pk=game.pocketScale?game.pocketScale():1
    for(const m of pocketMeshes)m.scale.set(pk,1,pk)
+   const obs=getObstacles();if(obs!==obsShown){obsShown=obs;buildObstacles(obs)}
    const fx=game.fx
    bonusDisc.visible=bonusRing.visible=Boolean(fx&&fx.type==='bonus')
    if(bonusRing.visible){bonusDisc.position.set(tx(fx.x),1.2,tz(fx.y));bonusRing.position.set(tx(fx.x),2.2,tz(fx.y))}

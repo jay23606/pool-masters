@@ -209,6 +209,15 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Obstacle tables
+
+The lobby has a **Table** picker beside the game picker: *Clear table* (the default), *Bumpers*, *Walls*, *Portals* or *Gauntlet*. It applies to **Practice vs AI** and **Two players, one device**.
+Bumpers and walls bounce a ball back (keeping 85% of the speed into them, and all of the sideways speed); a ball that rolls into a portal comes out of its partner going the same way, and cannot go straight back in.
+A jump shot hops a bumper or wall but not a portal. Cue-ball placement is refused on an obstacle. Rogue Pool, the challenge games and Chaos Pool keep a clear cloth.
+
+Obstacles are handled inside `railBounce`, which every loop that steps a ball already calls, so the game, the AI's rollouts, the puzzle solver and guest prediction all see the same ones (`src/obstacles.js`).
+Every layout leaves the head spot and the rack clear. The aim guide line is drawn straight and does not bend around them. The tests cover the bounces, portals, tunnelling at full power (a 3,200 units/s break cannot pass a wall), placement, the rollout, and four whole AI games.
+
 ## Puzzle maker
 
 **Puzzle maker** on the lobby is an editor for pool puzzles. Tap the table to add a ball (up to eight), drag balls and the cue ball to move them, tap a ball to make it the one to pot,
@@ -517,6 +526,7 @@ DOM, no renderer.
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/obstacles.js` | Obstacle tables: bumpers, walls, portals and their presets |
 | `src/puzzle.js`, `src/puzzle-editor.js` | Puzzle maker: layout rules, solver, shareable links, the editor dialog |
 | `src/chaos.js` | Chaos Pool: the twists (bonus pocket, bomb ball, gravity well) |
 | `src/rogue.js` | Rogue Pool: the run, the upgrades, the shot accounting, the record |
