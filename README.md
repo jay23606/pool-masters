@@ -227,10 +227,8 @@ group and foul every shot after.
 ## Controls
 
 - **Power** and **Shoot** do the obvious thing.
-- **Shoot without the button:** press **Space** or **Enter** while aiming, or, on a touch screen, **pull back** —
-  press on the cue ball, drag away from it like drawing a bow, and release. The shot goes
-  the opposite way to the pull and its power is the length of the pull (`src/pullback.js`);
-  letting go close to the ball cancels and puts the power back.
+- **Shoot without the button:** press **Space** or **Enter** while aiming.
+  (Pulling the cue back to shoot was tried and dropped: hard to do on a phone, easy to fire by accident.)
 - The **cue-ball dial** beside the power slider sets the tip contact point —
   drag it for draw, follow and English, double-click to centre it.
 - Drag on the table to aim; how far the cue turns per pixel is the aim
