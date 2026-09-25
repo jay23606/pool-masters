@@ -224,7 +224,7 @@ group and foul every shot after.
 ## Controls
 
 - **Power** and **Shoot** do the obvious thing.
-- **Shoot without the button:** press **Space** or **Enter** while aiming, or **pull back** —
+- **Shoot without the button:** press **Space** or **Enter** while aiming, or, on a touch screen, **pull back** —
   press on the cue ball, drag away from it like drawing a bow, and release. The shot goes
   the opposite way to the pull and its power is the length of the pull (`src/pullback.js`);
   letting go close to the ball cancels and puts the power back.
