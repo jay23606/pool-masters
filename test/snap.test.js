@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict'
 import {snapAim,firstBall,REACH,MAX_TURN} from '../src/snap.js'
 import {bindGameInput} from '../src/game-input.js'
-import {R,PR,POCKETS} from '../src/table.js'
+import {R,PR,POCKETS,MAXX,MINX,MINY,MAXY} from '../src/table.js'
+import {bankPath} from '../src/pool.js'
 
 const ball=(n,x,y,on=true)=>({n,x,y,on,k:n===0?'cue':'solid',vx:0,vy:0})
 const deg=r=>r*180/Math.PI
@@ -27,11 +28,11 @@ test('an aim that would send the ball near a pocket is moved to send it through 
 
 test('an aim far from any pocket is left alone',()=>{
  const balls=table(200,200),a=Math.atan2(200-300,200-350)
- assert.deepEqual(snapAim(balls,a),{angle:a,pocket:null})
+ assert.deepEqual(snapAim(balls,a),{angle:a,pocket:null,bank:null})
 })
 
 test('a shot that would hit nothing is left alone',()=>{
- assert.deepEqual(snapAim(table(),0),{angle:0,pocket:null})
+ assert.deepEqual(snapAim(table(),0),{angle:0,pocket:null,bank:null})
 })
 
 test('it never turns the aim further than the limit, and never onto another ball',()=>{
@@ -63,10 +64,10 @@ test('with a ball in the way, the snap is for the ball that would really be hit,
 test('a pocket behind the ball, or one it is already sitting in, is not snapped to',()=>{
  // the object ball is between the cue ball and a pocket only if the pocket is ahead: aim away from every pocket
  const balls=[ball(0,350,100),ball(1,350,230)]     // struck downward: the nearest pocket ahead is bottom-middle
- const s=snapAim(balls,Math.PI/2+.2*Math.PI/180)
+ const s=snapAim(balls,Math.PI/2+.2*Math.PI/180,{banks:false})
  assert.ok(s.pocket===null||s.pocket===4,'only the pocket ahead can be chosen')
  const onPocket=[ball(0,350,300),ball(1,POCKETS[1][0],POCKETS[1][1]+PR*.9)]
- assert.equal(snapAim(onPocket,Math.atan2(onPocket[1].y-300,0)).pocket,null)
+ assert.notEqual(snapAim(onPocket,Math.atan2(onPocket[1].y-300,0)).pocket,1,'not the pocket it is already in')
 })
 
 test('a smaller reach snaps less often',()=>{
@@ -122,4 +123,59 @@ test('an aim set by something else (a hint) is where the hand starts from',()=>{
  game.pointerAngle=0;move(towards(cue,0))
  assert.ok(Math.abs(game.angle-1.2)<.05,`stayed near the outside setting, got ${game.angle}`)
  off()
+})
+
+// ---- the extended angle: banks ----
+// the ball at (500,200) sent at the right-hand cushion, so that it rebounds into the bottom-middle pocket
+function bankTable(pocket=4,axis='x',rail=MAXX,ball=[500,200]){
+ const [px,py]=POCKETS[pocket],mx=axis==='x'?2*rail-px:px,my=axis==='y'?2*rail-py:py
+ const d=Math.hypot(mx-ball[0],my-ball[1]),ux=(mx-ball[0])/d,uy=(my-ball[1])/d
+ const cue=[ball[0]-ux*(2*R+120),ball[1]-uy*(2*R+120)]
+ return {balls:[ball0(cue),ball1(ball)],aim:Math.atan2(uy,ux),ux,uy}
+}
+const ball0=c=>ball(0,c[0],c[1]),ball1=c=>ball(1,c[0],c[1])
+
+test('a one-cushion bank to a pocket is snapped too, and marked as a bank',()=>{
+ const {balls,aim}=bankTable()
+ const s=snapAim(balls,aim+.15*Math.PI/180)
+ assert.equal(s.pocket,4);assert.notEqual(s.bank,null,'a bank, not a direct line')
+ assert.ok(Math.abs(deg(s.angle-aim))<.001,'it snaps to the exact banking angle')
+ // and with banks off there is nothing to snap to: no pocket is on the direct line
+ assert.equal(snapAim(balls,aim+.15*Math.PI/180,{banks:false}).pocket,null)
+})
+
+test('the drawn extended line and the snapped bank agree: the rebound passes through the pocket',()=>{
+ const {balls,aim}=bankTable()
+ const s=snapAim(balls,aim+.1*Math.PI/180),h=firstBall(balls,s.angle),b=h.ball
+ const cx=balls[0].x+Math.cos(s.angle)*h.t,cy=balls[0].y+Math.sin(s.angle)*h.t
+ const ux=(b.x-cx)/(2*R),uy=(b.y-cy)/(2*R)
+ const [p1,p2]=bankPath(b.x,b.y,ux,uy,2)          // exactly what the aim line draws past the cushion
+ const [px,py]=POCKETS[4]
+ // distance from the pocket's centre to the rebound line p1 -> p2
+ const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.hypot(dx,dy)
+ const miss=Math.abs((px-p1.x)*dy-(py-p1.y)*dx)/len
+ assert.ok(miss<1,`the rebound misses the pocket centre by ${miss.toFixed(2)}`)
+})
+
+test('a direct line beats a bank when both are about equally good',()=>{
+ // the 1 sits near the top-middle pocket with the cue ball straight below it: the direct line is right there
+ const balls=table(),a=Math.atan2(-150,0)+.3*Math.PI/180
+ const s=snapAim(balls,a);assert.equal(s.pocket,1);assert.equal(s.bank,null)
+})
+
+test('a bank is only offered where the bounce is on the table, and the snap stays a small nudge',()=>{
+ const {balls,aim}=bankTable()
+ for(let d=-8;d<=8;d+=.05){
+  const a=aim+d*Math.PI/180,s=snapAim(balls,a)
+  assert.ok(Math.abs(deg(s.angle-a))<=MAX_TURN+1e-9)
+  if(s.pocket!==null)assert.equal(firstBall(balls,s.angle)?.ball.n,1)
+ }
+ assert.ok(MINX<MAXX&&MINY<MAXY)
+})
+
+test('banks off in the options never returns a bank',()=>{
+ for(let x=120;x<600;x+=40)for(let y=90;y<330;y+=40){
+  const balls=[ball(0,350,340),ball(1,x,y)],a=Math.atan2(y-340,x-350)
+  for(let d=-2;d<=2;d+=.25)assert.equal(snapAim(balls,a+d*Math.PI/180,{banks:false}).bank,null)
+ }
 })

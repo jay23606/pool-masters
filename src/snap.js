@@ -1,4 +1,4 @@
-import {R,PR,POCKETS} from './table.js'
+import {R,PR,POCKETS,MINX,MAXX,MINY,MAXY} from './table.js'
 
 // Aim snapping. While a player aims, the line the object ball will take (the one drawn from the
 // ball being hit) is checked against every pocket; if it would pass within reach of a pocket's
@@ -9,6 +9,8 @@ import {R,PR,POCKETS} from './table.js'
 
 export const REACH=.85            // how far off the pocket's centre the line may pass, in pocket radii
 export const MAX_TURN=3           // the most the aim will move, in degrees
+export const BANK_REACH=.6        // and how far off centre a one-cushion bank may pass, in pocket radii (it is a longer shot)
+export const BANK_PENALTY=1.6     // a bank has to be this much closer than a direct line to win over it
 
 // The first ball a ray from the cue ball meets: {ball,t} with t the distance to the moment of contact.
 // The same test the aim line uses.
@@ -26,10 +28,14 @@ export function firstBall(balls,angle){
 
 const turnBetween=(a,b)=>{let d=(a-b)%(2*Math.PI);if(d>Math.PI)d-=2*Math.PI;if(d<-Math.PI)d+=2*Math.PI;return Math.abs(d)}
 
+// The four cushion lines the object ball's centre bounces off. A bank to a pocket is found by
+// mirroring the pocket across one: the ball then heads for the mirror image in a straight line.
+const RAILS=()=>[{axis:'x',v:MINX},{axis:'x',v:MAXX},{axis:'y',v:MINY},{axis:'y',v:MAXY}]
+
 // The aim to show for `angle`: either it, or the nearest aim that sends the ball it would hit
 // through the middle of a pocket. Returns {angle,pocket}, with pocket null when nothing snapped.
-export function snapAim(balls,angle,{reach=REACH*PR,maxTurn=MAX_TURN}={}){
- const none={angle,pocket:null}
+export function snapAim(balls,angle,{reach=REACH*PR,maxTurn=MAX_TURN,bankReach=BANK_REACH*PR,banks=true}={}){
+ const none={angle,pocket:null,bank:null}
  const c=balls[0]
  if(!c||!c.on)return none
  const hit=firstBall(balls,angle)
@@ -40,13 +46,25 @@ export function snapAim(balls,angle,{reach=REACH*PR,maxTurn=MAX_TURN}={}){
  const ux=(b.x-cx)/(2*R),uy=(b.y-cy)/(2*R)
  let best=null
  for(let i=0;i<POCKETS.length;i++){
-  const[px,py]=POCKETS[i]
-  const dx=px-b.x,dy=py-b.y,dist=Math.hypot(dx,dy)
-  if(dist<=PR)continue                                    // already on the pocket: nothing to aim at
+  const[qx,qy]=POCKETS[i]
+  if(Math.hypot(qx-b.x,qy-b.y)<=PR)continue                // already on the pocket: nothing to aim at
+  const targets=[{x:qx,y:qy,bank:null,reach,weight:1}]
+  if(banks)RAILS().forEach((L,ri)=>{
+   const mx=L.axis==='x'?2*L.v-qx:qx,my=L.axis==='y'?2*L.v-qy:qy
+   // the bounce has to happen on the table, between the ball and its mirror pocket
+   const u=L.axis==='x'?(L.v-b.x)/(mx-b.x):(L.v-b.y)/(my-b.y)
+   if(!(u>0&&u<1))return
+   const bx=b.x+(mx-b.x)*u,by=b.y+(my-b.y)*u
+   if(L.axis==='x'?(by<MINY||by>MAXY):(bx<MINX||bx>MAXX))return
+   targets.push({x:mx,y:my,bank:ri,reach:bankReach,weight:BANK_PENALTY})
+  })
+  for(const T of targets){
+  const dx=T.x-b.x,dy=T.y-b.y,dist=Math.hypot(dx,dy)
+  if(!dist)continue
   const along=dx*ux+dy*uy
-  if(along<=0)continue                                    // the pocket is behind the line
+  if(along<=0)continue                                    // the target is behind the line
   const lateral=Math.abs(dx*uy-dy*ux)
-  if(lateral>reach)continue
+  if(lateral>T.reach)continue
   // the cue ball position that sends the ball straight at the pocket's centre
   const gx=b.x-dx/dist*2*R,gy=b.y-dy/dist*2*R
   const aim=Math.atan2(gy-c.y,gx-c.x)
@@ -54,7 +72,9 @@ export function snapAim(balls,angle,{reach=REACH*PR,maxTurn=MAX_TURN}={}){
   if(turn>maxTurn)continue
   // it has to be a real shot: still that ball first, and nothing else in the way
   if(firstBall(balls,aim)?.ball!==b)continue
-  if(!best||lateral<best.lateral)best={aim,pocket:i,lateral}
+  const score=lateral*T.weight
+  if(!best||score<best.score)best={aim,pocket:i,bank:T.bank,score}
+  }
  }
- return best?{angle:best.aim,pocket:best.pocket}:none
+ return best?{angle:best.aim,pocket:best.pocket,bank:best.bank}:none
 }

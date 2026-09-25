@@ -1,5 +1,5 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
-import {rayToRail} from './pool.js'
+import {rayToRail,bankPath} from './pool.js'
 import {tableFractions} from './screen-point.js'
 
 // The original top-down renderer. Kept as the default and as a fallback for
@@ -34,7 +34,7 @@ export function createRenderer2D(canvas,options={}){
    const q=game.guide()
    g.lineWidth=1.2;g.setLineDash([7,6]);g.strokeStyle='#fff';g.beginPath();g.moveTo(q.c.x,q.c.y);g.lineTo(q.c.x+q.dx*q.t,q.c.y+q.dy*q.t);g.stroke()
    if(q.banks.length){g.strokeStyle='rgba(255,255,255,.48)';g.beginPath();g.moveTo(q.banks[0].x,q.banks[0].y);q.banks.slice(1).forEach(p=>g.lineTo(p.x,p.y));g.stroke()}
-   if(q.hit){const gx=q.c.x+q.dx*q.t,gy=q.c.y+q.dy*q.t,nx=(q.hit.x-gx)/(2*R),ny=(q.hit.y-gy)/(2*R),d=rayToRail(q.hit.x,q.hit.y,nx,ny);g.strokeStyle='#ffd96a';g.beginPath();g.moveTo(q.hit.x,q.hit.y);g.lineTo(q.hit.x+nx*d,q.hit.y+ny*d);g.stroke()}
+   if(q.hit){const gx=q.c.x+q.dx*q.t,gy=q.c.y+q.dy*q.t,nx=(q.hit.x-gx)/(2*R),ny=(q.hit.y-gy)/(2*R),d=rayToRail(q.hit.x,q.hit.y,nx,ny);g.strokeStyle='#ffd96a';g.beginPath();g.moveTo(q.hit.x,q.hit.y);g.lineTo(q.hit.x+nx*d,q.hit.y+ny*d);g.stroke();const past=bankPath(q.hit.x,q.hit.y,nx,ny,2);if(past.length>1){g.strokeStyle='rgba(255,217,106,.45)';g.beginPath();g.moveTo(past[0].x,past[0].y);g.lineTo(past[1].x,past[1].y);g.stroke()}}
    g.setLineDash([])
    const tip=R+6+(+game.power.value/100)*42,at=d=>[q.c.x-q.dx*(tip+d),q.c.y-q.dy*(tip+d)]
    g.lineCap='round'
