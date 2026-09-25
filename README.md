@@ -219,6 +219,10 @@ group and foul every shot after.
 ## Controls
 
 - **Power** and **Shoot** do the obvious thing.
+- **Shoot without the button:** press **Space** or **Enter** while aiming, or **pull back** —
+  press on the cue ball, drag away from it like drawing a bow, and release. The shot goes
+  the opposite way to the pull and its power is the length of the pull (`src/pullback.js`);
+  letting go close to the ball cancels and puts the power back.
 - The **cue-ball dial** beside the power slider sets the tip contact point —
   drag it for draw, follow and English, double-click to centre it.
 - Drag on the table to aim; how far the cue turns per pixel is the aim
@@ -227,7 +231,7 @@ group and foul every shot after.
   Neither the ball-in-hand placement nor the called pocket is final until the
   shot is actually taken.
 - The HUD names each player's group and, once assigned, how many of their
-  balls are left (`YOU: STRIPES · 4`) — including while aiming at the 8 before
+  balls are left (`YOU: STRIPES · 4 left`) — including while aiming at the 8 before
   it's legal, which explains itself (`The 8 is not yours yet · 4 stripes still
   to pot`) rather than silently refusing the pocket call.
 
@@ -264,7 +268,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 259 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 263 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and

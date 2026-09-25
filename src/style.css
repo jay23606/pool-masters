@@ -49,3 +49,9 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
  .table-rot #callout{top:50%;translate:-50% -50%;rotate:-90deg}
  .table-rot #callout.show{translate:-50% -50%}
 }
+
+/* On a big window the table would grow taller than the screen and push the shot
+   controls out of sight: cap it so table, power and Shoot fit together. */
+@media (min-width:601px) and (min-height:621px){
+ .canvas-wrap{width:min(100%,max(340px,calc((100dvh - 340px)*1.842)))}
+}
