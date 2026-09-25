@@ -68,11 +68,16 @@ export class PoolGame{
   this.ready=true;this.sync()
   if(this.practice&&!this.hotSeat&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
  }
- requestRack(){if(!this.over)return;if(this.host)this.newRack();else this.send({t:'next-rack'})}
+ requestRack(){if(!this.over||this.spectator)return;if(this.host)this.newRack();else this.send({t:'next-rack'})}
  group(player=this.turn){return normalizeGroup(this.groups[player])}
  remaining(group){return countLeft(this.balls,group)}
  // The eight is only legal once your own group is gone. Nothing used to say so:
  // a tap meant to call a pocket was simply swallowed.
+ // Why the 8 cannot be played yet, in words that fit the table: an open table has no group to count.
+ eightBlockedMessage(){
+  const g=this.group(this.me),n=this.eightBlocked()
+  return g&&n?`The 8 is not yours yet · ${n} ${g==='solid'?'solids':'stripes'} still to pot`:'The 8 has to wait · pot a solid or a stripe first'
+ }
  eightBlocked(){const g=this.group(this.me);return g?this.remaining(g):null}
  aimingAtEight(){return this.eightGame()&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
  // The 8 only means something in eight-ball (and a game object with no mode is one).
@@ -85,7 +90,12 @@ export class PoolGame{
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
  canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill&&!this.chal)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
+ takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(this.eightBlockedMessage());return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill&&!this.chal)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);
+  // The pocket called for the 8 is read now, while the player is still aiming: startShot() begins the roll,
+  // and calling is only allowed while aiming. Read after it, a guest always sent no call at all, and the host
+  // judged every 8 a guest potted as a loss.
+  const called=this.canCallEight()?this.calledPocket:null
+  this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called});this.pendingPlace=null}
  startShot(){if(this.chal&&this.chal.startedAt==null)this.chal=startClock(this.chal,performance.now());this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
   if(!isGameMessage(m))return
@@ -100,6 +110,8 @@ export class PoolGame{
   // nearby pocket may already have dropped
   if(this.phase==='aim'&&this.balls&&this.gotState)this.beforeState={on:this.balls.map(b=>b.on),turn:this.turn,breakShot:this.breakShot}
   const freshRound=m.round>this.round
+  // what the player has chosen and not yet played: the pocket they called, and where they put the cue ball
+  const myCall=this.calledPocket,myPlace=this.pendingPlace,mine=!this.host&&this.turn===this.me
   const prior=this.phase==='aim'&&this.gotState&&!freshRound&&!this.rec?this.beforeState:null
   applySnapshot(this,m)
   this.gotState=true
@@ -120,8 +132,11 @@ export class PoolGame{
   this.predicted=this.balls.map(b=>({...b}));this.predictor?.reset(performance.now())
   this.noteRecording()
   if(freshRound){this.ready=true;this.finished=false;this.onRack?.()}
+  if(freshRound)this.stopReplay()          // the last rack's replay has no business holding up the next one
   if(this.ballInHand)this.placed=false
   if(!this.canCallEight())this.calledPocket=null
+  else if(mine&&this.turn===this.me&&this.calledPocket==null&&myCall!=null)this.calledPocket=myCall
+  if(mine&&!freshRound&&this.turn===this.me&&this.ballInHand&&myPlace){this.balls[0].x=myPlace[0];this.balls[0].y=myPlace[1];this.ballInHand=false;this.placed=true}
   if(m.result&&!this.finished){this.finished=true;this.onFinish({winner:m.result,round:m.round})}
  }
  restore(m){
@@ -336,8 +351,8 @@ export class PoolGame{
   const authoritative=this.balls
   if(replayed)this.balls=replayed
   else if(!this.host&&this.predicted&&this.phase==="roll")this.balls=this.predicted
-  this.renderer.draw(this,dt)
-  this.balls=authoritative
+  try{this.renderer.draw(this,dt)}
+  finally{this.balls=authoritative}          // whatever the renderer did, the real balls go back
   this.updateHud()
   const playing=this.replay&&!this.replay.finished
   if(this.replayOnly&&this.groupStatus)this.groupStatus.textContent=`${MODES[this.mode].label} · SHARED SHOT`
@@ -425,7 +440,7 @@ export class PoolGame{
   if(this.groupStatus){const left=p=>{const g=this.group(p);if(!g)return '';const n=this.remaining(g);return n?` · ${n} left`:' · the 8'};const text=!mine&&!their?`OPEN TABLE · ${this.remaining('solid')} SOLIDS · ${this.remaining('stripe')} STRIPES`:`${this.tag(this.me,'YOU')}: ${label(mine).toUpperCase()}${left(this.me)}  |  ${this.tag(other(this.me),'THEM')}: ${label(their).toUpperCase()}${left(other(this.me))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
-  if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.aimingAtEight()&&this.eightBlocked()?`The 8 is not yours yet · ${this.eightBlocked()} ${label(mine).toLowerCase()} still to pot`:this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`
+  if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.aimingAtEight()&&this.eightBlocked()?this.eightBlockedMessage():this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`
   if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)}
  // The simulation is no longer paced by the animation frame. Browsers stop or
  // heavily throttle requestAnimationFrame in a hidden tab, and since the host
@@ -454,6 +469,9 @@ export class PoolGame{
   return stepped
  }
  loop(t){
+  // The next frame is asked for first: a frame that throws (a renderer bug, an odd replay) then costs one
+  // frame, not the whole game. A loop that stops leaves a table that never moves or updates again.
+  this.raf=requestAnimationFrame(x=>this.loop(x))
   const now=performance.now()
   const frameDt=Math.min(.05,(now-(this.drawnAt??now))/1000)
   this.drawnAt=now
@@ -462,8 +480,8 @@ export class PoolGame{
   const replayed=this.replayBalls(now)
   // after a long catch-up the balls jump, and a jump reads as a collision
   if(stepped<.1)this.sfx?.update(replayed||this.balls)
-  this.draw(frameDt,replayed)
-  this.raf=requestAnimationFrame(x=>this.loop(x))
+  try{this.draw(frameDt,replayed)}
+  catch(e){if(!this.loggedDrawError){this.loggedDrawError=true;console.error('a frame failed to draw',e)}}
  }
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}
  destroy(){clearTimeout(this.retryTimer);cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.unbindInput?.()}
