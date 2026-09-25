@@ -192,6 +192,21 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Challenges
+
+**Challenges** on the lobby are three short scored games for one player, each with a best kept in the browser:
+
+- **Speed Pot:** pot as many as you can in 60 seconds. The clock starts with your first shot; a scratch puts the
+  cue ball back and balls that drop on it do not count; a cleared table refills.
+- **Perfect Potter:** pot a ball with every shot. The first shot that drops nothing, or scratches, ends the run.
+- **Clear the Table:** pot all seven as fast as you can; each scratch adds five seconds.
+
+The tables are random scatters (`scatter()`: apart, off the cushions, clear of the pockets and the cue ball, never the 8).
+`src/challenges.js` is the rules as pure functions over plain state; `PoolGame` plays them, with the same input, aim
+snapping and physics as any game. Three trophies (*Quick hands*, *Eight straight*, *Sprint*) read the bests. The tests cover
+the scatter's legality across sixty seeds, each game's scoring and ending, the clock, bests never getting worse, and whole games
+through the real game object (a run that ends on its first miss, a table that refills, a time-out that fires exactly once).
+
 ## Career
 
 **Career** on the lobby is a ladder of ten opponents, each a short match at a rising level of the AI, with a
@@ -267,7 +282,7 @@ shot.
 
 ## Trophies
 
-Thirty trophies in eight groups: racks won, nine-ball, skill (runs, break and
+Thirty-three trophies in eight groups: racks won, nine-ball, skill (runs, break and
 run, clean hands), opponents, practice drills and daily shots, the career ladder, sharing, and the league. Open the
 🏆 button in the header for the case, with a progress bar for each one; an unlock
 shows a toast. Stats are counted per device in the browser. They are derived from
@@ -417,13 +432,14 @@ DOM, no renderer.
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/replay.js` | recording, the link format and its validation, and playback |
-| `src/trophies.js` | the stats, the thirty trophies and how each is earned |
+| `src/trophies.js` | the stats, the thirty-three trophies and how each is earned |
 | `src/physics-info.js` | descriptions of the physics constants, for the read-only Physics panel |
 | `src/drills.js` | the drills, how each is judged, their hints, and progress |
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/challenges.js` | the challenge games: scatter, scoring, clock, bests |
 | `src/career.js` | the career ladder: opponents, who is open, recording a win |
 | `src/coach.js` | the shot coach: grades a shot, finds the coach's shot, builds the replays |
 | `src/snap.js` | aim snapping: nudging an aim so the object ball runs through a pocket's centre |

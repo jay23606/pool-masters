@@ -1,6 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,SCORE_TARGET} from './rules.js'
+import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,SCORE_TARGET,kind} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
@@ -8,6 +8,7 @@ import {bindGameInput} from './game-input.js'
 import {createPredictor,STEP,CATCHUP} from './predict.js'
 import {createRecorder,ballsAt,duration} from './replay.js'
 import {buildBalls,evaluate,resultOf,REASONS} from './drills.js'
+import {begin as beginChallenge,startClock,judge as judgeChallenge,timedOut,timeUp,scatter,byId as challengeById,timeLeft,clearTime,HEAD_SPOT} from './challenges.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current,sensitivity=.3)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*sensitivity
 export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls[0].x)
@@ -15,7 +16,40 @@ export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ // ---- challenge games (see challenges.js) ----
+ // the cue ball on the head spot and a fresh scatter of balls
+ challengeRack(keep){
+  const cue={id:0,x:HEAD_SPOT.x,y:HEAD_SPOT.y,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}
+  const balls=scatter(challengeById(this.challenge).balls,[keep||cue]).map(b=>({id:b.n,x:b.x,y:b.y,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(b.n),n:b.n}))
+  return [keep||cue,...balls]
+ }
+ // After a shot: score it, put the cue ball back after a scratch, refill a cleared table, and end the game when it is over.
+ resolveChallenge(){
+  const now=performance.now()
+  const left=this.balls.filter(b=>b.on&&b.k!=='cue').length
+  const v=judgeChallenge(this.chal,{potted:this.potted.map(b=>b.n),scratch:this.scratch,left},now)
+  this.chal=v.state
+  const cue=this.balls[0]
+  if(v.respotCue){cue.on=true;cue.x=HEAD_SPOT.x;cue.y=HEAD_SPOT.y;clearMotion(cue);this.flash('Scratch · cue ball back on the spot')}
+  else if(this.chal.id==='perfect'&&!v.over)this.flash(`Streak ${this.chal.score}`)
+  this.balls.forEach(clearMotion)
+  if(v.refill){this.balls=this.challengeRack(cue);this.flash('Table cleared · fresh balls')}
+  this.phase='aim';this.sync()
+  if(v.over)this.endChallenge()
+ }
+ // The game is over: keep the score, and tell the app.
+ endChallenge(){
+  if(this.over)return
+  this.chal=this.chal.over?this.chal:timeUp(this.chal)
+  this.over=true;this.result='a';this.finished=true;this.aiming=false
+  this.onFinish({winner:'a',round:this.round,challenge:this.chal})
+ }
+ // Called every frame: a timed game that runs out of time between shots ends there.
+ tickChallenge(){
+  if(!this.chal||this.chal.over||this.over)return
+  if(this.phase==='aim'&&timedOut(this.chal,performance.now()))this.endChallenge()
+ }
+ resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -43,8 +77,8 @@ export class PoolGame{
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
  canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
- startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
+ takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill&&!this.chal)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
+ startShot(){if(this.chal&&this.chal.startedAt==null)this.chal=startClock(this.chal,performance.now());this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
   if(!isGameMessage(m))return
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
@@ -141,7 +175,7 @@ export class PoolGame{
  // foul always gives the opponent ball in hand, and always passes the turn.
  noteShot(){
   const s=this.shotStart;this.shotStart=null
-  if(!s||this.drill||s.on.length!==this.balls.length)return
+  if(!s||this.drill||this.chal||s.on.length!==this.balls.length)return
   const potted=[]
   s.on.forEach((was,i)=>{const b=this.balls[i];if(was&&!b.on&&b.n!==0)potted.push(b.n)})
   this.onShot?.({by:s.turn,potted,foul:Boolean(this.ballInHand&&this.turn!==s.turn),
@@ -240,6 +274,7 @@ export class PoolGame{
  }
  resolve(){
   if(this.drill)return this.resolveDrill()
+  if(this.chal)return this.resolveChallenge()
   const shooter=this.turn
   const v=judgeShot(this)
   if(v.respotNine)this.respotNine()
@@ -324,6 +359,18 @@ export class PoolGame{
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · ${rule}`):this.practice?'AI is lining up…':'Opponent’s turn'
   if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
  }
+ updateChallengeHud(){
+  const c=this.chal,def=challengeById(c.id),now=performance.now()
+  this.tickChallenge()
+  const clock=def.seconds?(c.startedAt==null?`${def.seconds}s`:`${Math.ceil(timeLeft(c,now)/1000)}s left`):(c.startedAt==null?'0.0 s':`${((c.over?c.final:clearTime(c,now))/1000).toFixed(1)} s`)
+  const score=c.id==='speed'?`${c.score} potted`:c.id==='perfect'?`streak ${c.score}`:`${this.balls.filter(b=>b.on&&b.k!=='cue').length} left`
+  const text=`${def.name.toUpperCase()} · ${score} · ${clock}`
+  if(this.groupStatus&&this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}
+  this.shoot.disabled=!this.canAim()||!this.aiming
+  if(this.moveCue)this.moveCue.hidden=true
+  if(this.changePocket)this.changePocket.hidden=true
+  this.status.textContent=this.over?(c.id==='clear'?'Cleared':'Finished'):this.phase==='roll'?'':c.startedAt==null?'Your shot · the clock starts when you shoot':'Your shot'
+ }
  updateDrillHud(){
   if(this.groupStatus){const text=`DRILL · ${this.drillLabel||this.drill.name.toUpperCase()}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
   this.shoot.disabled=!this.canAim()||!this.aiming
@@ -334,6 +381,7 @@ export class PoolGame{
  }
  updateHud(){
   if(this.drill)return this.updateDrillHud()
+  if(this.chal)return this.updateChallengeHud()
   if(this.mode==='9ball')return this.updateNineHud()
   if(isScoreMode(this.mode))return this.updateScoreHud()
   // A called pocket remains part of a shot after aiming ends; only

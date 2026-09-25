@@ -135,3 +135,4 @@ dialog label:has(>input[type=checkbox]){display:flex;align-items:center;gap:10px
 .career-opp.beaten{background:#10241a}
 .career-opp:disabled{opacity:.45}
 #career-list{display:grid;gap:8px;max-height:56vh;overflow:auto;min-width:min(420px,84vw)}
+#challenge-list{display:grid;gap:8px;max-height:56vh;overflow:auto;min-width:min(440px,84vw)}

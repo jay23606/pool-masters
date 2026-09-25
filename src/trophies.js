@@ -104,6 +104,10 @@ export const TROPHIES=[
  A('career-5','Career','🎩','Regular at the club','Beat five opponents on the career ladder.',at(c=>beatenCount(c.career),5)),
  A('career-all','Career','👑','Champion of the circuit','Beat every opponent on the career ladder.',at(c=>beatenCount(c.career),LADDER.length)),
 
+ A('speed-10','Practice','⏱️','Quick hands','Pot 10 balls in a single Speed Pot.',at(c=>c.challenges?.speed?.best||0,10)),
+ A('perfect-8','Practice','🎯','Eight straight','Pot a ball with each of 8 shots in a row in Perfect Potter.',at(c=>c.challenges?.perfect?.best||0,8)),
+ A('clear-40','Practice','⚡','Sprint','Clear the table in under 40 seconds.',c=>{const b=c.challenges?.clear?.best;return {value:b!=null&&b<40000?1:0,target:1}}),
+
  A('share','Social','🎬','Highlight reel','Share a replay of one of your shots.',at(c=>c.stats.shared,1)),
 
  A('streak-3','League','📈','Hot streak','Win 3 ranked racks in a row.',at(c=>c.profile?.best_streak||0,3)),
