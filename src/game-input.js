@@ -1,11 +1,21 @@
 // DOM input adapter. Keeping this separate lets PoolGame remain concerned with
 // match state and exposes one small surface for future mobile controls.
+import {snapAim} from './snap.js'
+
 export function bindGameInput(game){
+ // If something else set the aim (a hint, the opening aim), the hand starts from there.
+ const turn=a=>{
+  const base=game.raw!=null&&game.angle===game.snappedTo?game.raw:game.angle
+  const raw=game.aimStep(base,game.pointerAngle,a)
+  const snap=game.prefs?.snap===false?null:snapAim(game.balls,raw)
+  game.raw=raw;game.angle=snap?snap.angle:raw
+  game.snappedTo=game.angle;game.snapPocket=snap?snap.pocket:null
+ }
  const h=game.handlers={
   power:()=>game.powerOut.textContent=game.power.value+'%',
   down:e=>{if(!game.canControl())return;const p=game.point(e);if(!p)return;const cue=game.balls[0];if(game.ballInHand){if(!game.validCueSpot(p))return;cue.x=p.x;cue.y=p.y;game.ballInHand=false;game.placed=true;game.pendingPlace=[p.x,p.y];game.flash('Ball in hand placed · tap again to aim');return}if(game.canCallEight()&&game.calledPocket==null){game.calledPocket=game.nearestPocket(p);game.flash('8-ball pocket marked · tap again to aim');return}
-  const a=Math.atan2(p.y-cue.y,p.x-cue.x);if(!game.aiming)game.angle=a;game.aiming=true;game.drag=true;game.pointerAngle=a;game.surface.setPointerCapture?.(e.pointerId)},
-  move:e=>{if(!game.drag)return;const p=game.point(e);if(!p)return;const cue=game.balls[0];if(Math.hypot(p.x-cue.x,p.y-cue.y)<5)return;const a=Math.atan2(p.y-cue.y,p.x-cue.x);game.angle=game.aimStep(game.angle,game.pointerAngle,a);game.pointerAngle=a},
+  const a=Math.atan2(p.y-cue.y,p.x-cue.x);if(!game.aiming)game.angle=a;game.raw=game.angle;game.aiming=true;game.drag=true;game.pointerAngle=a;game.surface.setPointerCapture?.(e.pointerId)},
+  move:e=>{if(!game.drag)return;const p=game.point(e);if(!p)return;const cue=game.balls[0];if(Math.hypot(p.x-cue.x,p.y-cue.y)<5)return;const a=Math.atan2(p.y-cue.y,p.x-cue.x);turn(a);game.pointerAngle=a},
   up:e=>{h.move(e);game.drag=false;game.surface.releasePointerCapture?.(e.pointerId)},
   key:e=>{if(e.defaultPrevented||e.repeat||e.metaKey||e.ctrlKey||e.altKey||(e.key!==' '&&e.key!=='Enter'))return;const t=e.target,tag=t?.tagName;if(t?.isContentEditable||tag==='TEXTAREA'||tag==='SELECT'||tag==='BUTTON'||tag==='A'||(tag==='INPUT'&&t.type!=='range')||document.querySelector('dialog[open]'))return;if(!game.canAim()||!game.aiming)return;e.preventDefault();game.takeShot()},
   shoot:()=>game.takeShot(),

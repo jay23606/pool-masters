@@ -35,6 +35,8 @@ export class PoolGame{
  aimingAtEight(){return this.eightGame()&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
  // The 8 only means something in eight-ball (and a game object with no mode is one).
  eightGame(){return this.mode!=='9ball'&&!isScoreMode(this.mode)}
+ // The pocket the aim has snapped to, while the player is aiming (null otherwise).
+ snapMark(){return this.aiming&&this.snapPocket!=null&&this.canAim()?this.snapPocket:null}
  // The pocket to ring on the table: the one called for the 8, or in one-pocket the shooter's own.
  markedPocket(){return this.mode==='onepocket'?ONE_POCKET[this.turn]:this.calledPocket}
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}

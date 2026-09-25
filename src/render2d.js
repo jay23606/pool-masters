@@ -28,7 +28,7 @@ export function createRenderer2D(canvas,options={}){
    g.clearRect(0,0,W,H);g.fillStyle='#5f351f';g.fillRect(0,0,W,H)
    const grad=g.createRadialGradient(350,170,10,350,190,400);grad.addColorStop(0,felt);grad.addColorStop(1,shade(felt,-.48));g.fillStyle=grad;g.fillRect(22,22,656,336)
    g.fillStyle='#07100c'
-   POCKETS.forEach(([x,y],i)=>{g.beginPath();g.arc(x,y,PR-2,0,7);g.fill();if((game.markedPocket?game.markedPocket():game.calledPocket)===i){g.strokeStyle='#ffd75d';g.lineWidth=3;g.beginPath();g.arc(x,y,PR+3,0,7);g.stroke()}})
+   POCKETS.forEach(([x,y],i)=>{g.beginPath();g.arc(x,y,PR-2,0,7);g.fill();if((game.markedPocket?game.markedPocket():game.calledPocket)===i){g.strokeStyle='#ffd75d';g.lineWidth=3;g.beginPath();g.arc(x,y,PR+3,0,7);g.stroke()}if(game.snapMark&&game.snapMark()===i){g.strokeStyle='#ffffffb0';g.lineWidth=2;g.beginPath();g.arc(x,y,PR+1,0,7);g.stroke()}})
    for(const b of game.balls)if(b.on)drawBall(b)
    if(!(game.aiming&&game.canAim()))return
    const q=game.guide()
