@@ -128,6 +128,31 @@ the opponent ball in hand. The AI plays both games.
 Nine-ball is deliberately unranked for now: the ranking tables have no notion of
 which game a result came from, and mixing the two into one Elo would be wrong.
 
+## Drills
+
+**Drills** on the lobby opens eleven one-shot exercises on fixed tables, in three
+levels: straight-in, a cut into a side pocket, across the table, a corner cut, a
+combination, a stop shot, the break, and at level three draw, follow, a bank and a
+kick shot. Each has a goal, a tip and a **Show me** that sets the aim, power and
+spin to a shot that works. A miss says why (it can tell a scratch, the wrong
+pocket, a bank that never touched a cushion, a kick that hit a ball first, or a
+cue ball that ended up in the wrong place) and resets the table by itself; a
+success leaves it for you to look at, replay, or move on from. Progress and best
+attempts are kept in the browser; a solve the hint aimed completes the drill but
+does not set a record.
+
+A practice mode with an impossible drill is worse than none, so every drill is
+proven solvable. `tools/solve-drills.mjs` searches angle, power and spin with the
+real physics and prefers the most robust solution, since a hint that only works
+to the last decimal place would not survive another browser's maths; the tests
+then run every stored hint through the real game, so a change to the physics or a
+layout that breaks a drill fails the build (run the tool again when that
+happens). The search also shaped the drills: corner pockets turned out to be
+small targets in this game, so the first corner and long-shot layouts had aiming
+windows of a third of a degree and were replaced, and the break's own tip had to
+be corrected once it showed that a full-power break with no spin scratches every
+time.
+
 ## Replays
 
 Every shot is recorded as it plays and stays available until the next one
@@ -226,7 +251,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 185 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 219 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and
@@ -242,6 +267,8 @@ DOM, no renderer.
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/replay.js` | recording, the link format and its validation, and playback |
+| `src/drills.js` | the drills, how each is judged, their hints, and progress |
+| `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/ai.js` | the practice opponent, over a ball array |
 | `src/physics.js` | the contact model |
 | `src/game-input.js` | pointer/drag input, separated from match control |

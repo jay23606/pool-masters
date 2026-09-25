@@ -7,6 +7,7 @@ import {isGameMessage} from './protocol.js'
 import {bindGameInput} from './game-input.js'
 import {createPredictor,STEP,CATCHUP} from './predict.js'
 import {createRecorder,ballsAt,duration} from './replay.js'
+import {buildBalls,evaluate,resultOf,REASONS} from './drills.js'
 export {shotSpeed}
 export const aimStep=(aim,previous,current,sensitivity=.3)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*sensitivity
 export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls[0].x)
@@ -14,7 +15,7 @@ export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
- resetRack(){Object.assign(this,freshRackState(this.mode));this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState(this.mode));if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -36,8 +37,8 @@ export class PoolGame{
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
  canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;if(this.mode!=='9ball'&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
- startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.phase='roll';this.noteRecording(true)}
+ takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.mode!=='9ball'&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
+ startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
   if(!isGameMessage(m))return
   if(m.t==='table'&&!this.host)return this.onTable?.(m)
@@ -118,9 +119,15 @@ export class PoolGame{
   for(const b of this.balls){
    if(!b.on)continue
    integrate(b,dt)
-   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
+   for(const[p,q]of POCKETS.entries())if(Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
    if(!b.on)continue
-   if(railBounce(b)&&this.firstHit)this.railHit=true
+   if(railBounce(b)){
+    // which balls touched a cushion, and whether the cue did so before it
+    // touched anything -- what a bank shot or a kick shot is judged on
+    ;(this.railBalls??=new Set()).add(b.n)
+    if(this.firstHit)this.railHit=true
+    else if(b.k==='cue')this.cueRailFirst=true
+   }
   }
   for(let i=0;i<this.balls.length;i++)for(let j=i+1;j<this.balls.length;j++){
    const a=this.balls[i],b=this.balls[j]
@@ -141,7 +148,40 @@ export class PoolGame{
  }
  foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(this.mode==='9ball'?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand')}
  finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(winner===this.me?'You win!':'You lose')}
+ // A drill is judged by its own rule, not by the rules of the game: nobody's turn
+ // changes, nothing is won, and a failed attempt puts the table back.
+ resolveDrill(){
+  const d=this.drill,cue=this.balls[0]
+  const v=evaluate(d,resultOf({scratch:this.scratch,firstHit:this.firstHit,cueRailFirst:this.cueRailFirst,
+   potted:this.potted.map(b=>b.n),pockets:this.pocketOf||{},railBalls:[...(this.railBalls||[])],
+   cue:{x:cue.x,y:cue.y,on:cue.on}}))
+  this.balls.forEach(clearMotion);this.phase='aim'
+  this.attempts=(this.attempts||0)+1;this.drillOutcome=v
+  this.sync()                       // ends the recording, so the attempt can be replayed
+  this.onDrill?.({...v,attempts:this.attempts,drill:d,hinted:this.hinted})
+  // a miss puts the table back by itself; a success leaves it to be looked at
+  if(!v.ok)this.retryTimer=setTimeout(()=>this.retryDrill(),1500)
+ }
+ retryDrill(){
+  clearTimeout(this.retryTimer)
+  if(!this.drill)return
+  this.balls=buildBalls(this.drill);this.phase='aim';this.drillOutcome=null;this.hinted=false
+  this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=true;this.setSpin(0,0)
+  this.stopReplay()
+  this.onDrill?.(null)
+ }
+ // Set the aim, power and spin to a shot known to solve the drill.
+ applyHint(){
+  const h=this.drill?.hint
+  if(!h||!this.canControl())return false
+  this.angle=h.angle;this.pointerAngle=h.angle;this.aiming=true
+  this.power.value=h.power;if(this.powerOut)this.powerOut.textContent=h.power+'%'
+  this.setSpin(h.spin[0],h.spin[1])
+  this.hinted=true          // this attempt was aimed by the game
+  return true
+ }
  resolve(){
+  if(this.drill)return this.resolveDrill()
   const shooter=this.turn
   const v=judgeShot(this)
   if(v.respotNine)this.respotNine()
@@ -200,7 +240,16 @@ export class PoolGame{
   if(this.changePocket)this.changePocket.hidden=true
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · hit the ${low} first`):this.practice?'AI is lining up…':'Opponent’s turn'
  }
+ updateDrillHud(){
+  if(this.groupStatus){const text=`DRILL · ${this.drillLabel||this.drill.name.toUpperCase()}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
+  this.shoot.disabled=!this.canAim()||!this.aiming
+  if(this.moveCue)this.moveCue.hidden=true
+  if(this.changePocket)this.changePocket.hidden=true
+  const o=this.drillOutcome
+  this.status.textContent=o?(o.ok?this.hinted?'Drill complete, with a hint':`Drill complete${this.attempts>1?` in ${this.attempts} attempts`:' first time'}`:REASONS[o.reason]):this.attempts?`Attempt ${this.attempts+1}`:'Your shot'
+ }
  updateHud(){
+  if(this.drill)return this.updateDrillHud()
   if(this.mode==='9ball')return this.updateNineHud()
   // A called pocket remains part of a shot after aiming ends; only
   // discard it while setting up an illegal call, never while balls are rolling.
@@ -249,5 +298,5 @@ export class PoolGame{
   this.raf=requestAnimationFrame(x=>this.loop(x))
  }
  flash(s){this.callout.textContent=s;this.callout.classList.add('show');clearTimeout(this.ft);this.ft=setTimeout(()=>this.callout.classList.remove('show'),1000)}
- destroy(){cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.unbindInput?.()}
+ destroy(){clearTimeout(this.retryTimer);cancelAnimationFrame(this.raf);clearInterval(this.background);clearTimeout(this.ft);this.unbindInput?.()}
 }

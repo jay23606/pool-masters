@@ -193,13 +193,17 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
    <span class="tag done">Shipped</span>
   </div>
 
-  <div class="rm">
-   <div class="rank">3</div>
+  <div class="rm shipped">
+   <div class="rank">✓</div>
    <div><h4>Trick-shot / practice drill library</h4>
-   <p>tailuge/billiards and Cue Club 2 both ship curated practice setups. We already
-   have ball-in-hand placement and a full physics sandbox in practice mode — this is
-   mostly content (a set of starting racks) plus a "load this setup" button.</p></div>
-   <span class="tag med">Medium impact</span>
+   <p><strong>Shipped.</strong> Eleven one-shot drills on fixed tables, from a straight-in pot to
+   draw, follow, stop, bank, combination and kick shots, with a level, a tip, a
+   <em>Show me</em> that dials in the aim, power and spin, and progress kept in the
+   browser. A solve the hint aimed completes the drill but sets no record. Every drill is
+   proven solvable: a solver searched the real physics for each one, and the tests run its
+   hint through the game again, so a physics change that breaks a drill fails the build.
+   It also caught that the break tip was wrong (full power with no spin scratches every time).</p></div>
+   <span class="tag done">Shipped</span>
   </div>
 
   <div class="rm">
@@ -308,7 +312,7 @@ const rows = [
 ['9-ball', ['y','y','p','y','p','y'], 'Standard WPA rules incl. the cushion rule and 9 re-spot; unranked for now.'],
 ['Snooker / carom variants', ['n','y','n','n','n','y']],
 ['Other rule variants (killer, speed pool, etc.)', ['n','n','n','n','n','y']],
-['Trick-shot / practice drill library', ['n','y','p','p','n','y']],
+['Trick-shot / practice drill library', ['y','y','p','p','n','y'], 'Eleven drills incl. draw, follow, bank and kick shots; each proven solvable in the tests.'],
 ['Tournament / bracket mode', ['n','n','n','y','y','y']],
 ['Single-player campaign or career', ['n','n','n','n','n','y']],
 ['"Slam" / novelty physics mode', ['n','n','n','n','n','y']],
