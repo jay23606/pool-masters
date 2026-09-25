@@ -1,5 +1,6 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
 import {rayToRail} from './pool.js'
+import {tableFractions} from './screen-point.js'
 
 // The original top-down renderer. Kept as the default and as a fallback for
 // devices where WebGL is unavailable or too slow.
@@ -20,7 +21,7 @@ export function createRenderer2D(canvas,options={}){
  return {
   mode:'2d',
   el:canvas,
-  point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H}},
+  point(e){const {fx,fy}=tableFractions(canvas,e);return{x:fx*W,y:fy*H}},
   resize(){},
   destroy(){},
   draw(game){
