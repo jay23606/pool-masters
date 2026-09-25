@@ -8,7 +8,8 @@
 // data, so nothing about the day's table depends on the player's browser.
 import fs from 'node:fs'
 import {attempt} from '../src/drills.js'
-import {POCKETS,W,H,R} from '../src/table.js'
+import {POCKETS,W,H,R,setTableSize} from '../src/table.js'
+setTableSize(7)   // the table the game really plays: its pockets are a hair smaller than the module default
 
 const COUNT=Number(process.argv[2])||180
 const MARGIN=48          // keep everything well off the cushions

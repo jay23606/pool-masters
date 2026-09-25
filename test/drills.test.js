@@ -1,6 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict'
-import {DRILLS,HINTS,buildBalls,evaluate,attempt,resultOf,REASONS} from '../src/drills.js'
-import {R,MINX,MAXX,MINY,MAXY} from '../src/table.js'
+import {DRILLS,HINTS,buildBalls,evaluate,attempt,resultOf,REASONS,DRILL_TABLE} from '../src/drills.js'
+import {R,MINX,MAXX,MINY,MAXY,setTableSize} from '../src/table.js'
+import {DAILY} from '../src/daily-data.js'
+
+// drills are played on the 7 ft table, set up the way the game sets it up
+setTableSize(DRILL_TABLE)
 
 const drill=id=>DRILLS.find(d=>d.id===id)
 
@@ -161,4 +165,16 @@ test('the drills form a sequence: each has a next, and the last has none',()=>{
  assert.equal(nextDrill(DRILLS[0].id).id,DRILLS[1].id)
  assert.equal(nextDrill(DRILLS[DRILLS.length-1].id),null)
  assert.equal(nextDrill('nonsense'),null)
+})
+
+test('the hints are proven on the drill table only: a bigger table has smaller balls, so the same shot can miss',()=>{
+ assert.equal(DRILL_TABLE,7)
+ const solved=()=>DRILLS.filter(x=>x.hint).filter(x=>attempt(x,x.hint).ok).length
+ const dailies=()=>DAILY.filter(e=>attempt({layout:{cue:e.cue,balls:e.balls},win:{pot:e.target}},e.hint).ok).length
+ const own=[solved(),dailies()]
+ assert.equal(own[0],DRILLS.filter(x=>x.hint).length,'every drill hint solves its drill on the drill table')
+ assert.equal(own[1],DAILY.length,'every daily hint solves its table on the drill table')
+ setTableSize(9)
+ try{assert.ok(solved()<own[0]||dailies()<own[1],'on a 9 ft table some of the same shots miss, which is why drills are played on the 7 ft one')}
+ finally{setTableSize(DRILL_TABLE)}
 })

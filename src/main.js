@@ -4,7 +4,7 @@ import { createFoyer } from '@jay23606/foyer'
 import { PoolGame } from './pool.js'
 import { createSfx } from './sfx.js'
 import { createMusic } from './music.js'
-import { setTableSize } from './table.js'
+import { setTableSize,tableSize,R as BALL_R } from './table.js'
 import { FELTS,loadTablePrefs } from './preferences.js'
 import { ofKind,isUnlocked,label as cosmeticLabel,usable,rewardsOf } from './cosmetics.js'
 import { createViewManager } from './view-manager.js'
@@ -14,7 +14,7 @@ import { winnerForResult } from './ranking.js'
 import { AI_LEVELS } from './ai.js'
 import { MODES,modeOf } from './rules.js'
 import { pack,unpack } from './replay.js'
-import { DRILLS,emptyProgress,recordDrill,doneCount,nextDrill } from './drills.js'
+import { DRILLS,DRILL_TABLE,emptyProgress,recordDrill,doneCount,nextDrill } from './drills.js'
 import { analyse,replayOf } from './coach.js'
 import { dayNumber,dailyDrill,isDaily,dailyNumberOf,shareText } from './daily.js'
 import { CONSTANTS,GROUPS as PHYS_GROUPS,valueOf,format as fmt,shotTable,tables as tableInfo,simulation } from './physics-info.js'
@@ -272,6 +272,8 @@ async function startDrill(id){
  const d=isDaily(id)?dailyDrill(dailyNumberOf(id)):DRILLS.find(x=>x.id===id);if(!d)return
  if($('#drills-dialog').open)$('#drills-dialog').close()
  state.game?.destroy();state.game=null
+ // the shots are proven on one table: play them there, and put the player's own back afterwards
+ if(tablePrefs.size!==DRILL_TABLE){await viewManager.previewTable(DRILL_TABLE);state.previewedTable=true;toast(`Drills use the ${DRILL_TABLE} ft table`)}
  state.mode='drill';state.room=null;state.opponent=null;state.drillId=id
  showGame()
  $('#game').classList.add('focus','solo');$('.call-actions').hidden=true;$('#room-sidebar').hidden=true
@@ -331,7 +333,7 @@ if(import.meta.env.PROD&&'serviceWorker'in navigator)
 
 // For driving the running app from a browser test. Vite replaces this with
 // false in a production build, so none of it ships.
-if(import.meta.env.DEV)window.__pm={state,viewManager,openReplay,track,checkTrophies,openTrophies}
+if(import.meta.env.DEV)window.__pm={state,viewManager,openReplay,track,checkTrophies,openTrophies,table:()=>({size:tableSize,radius:BALL_R})}
 
 boot().catch(e=>{console.error(e);toast('Could not connect. Reload to try again.')})
 
