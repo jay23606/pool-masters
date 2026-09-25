@@ -258,6 +258,22 @@ shows a toast. Stats are counted per device in the browser. They are derived fro
 finished shots, worked out from the table before and after, so a host and a guest
 count the same things (a test plays whole racks and checks they do).
 
+### Cosmetics, earned
+
+Trophies unlock things to look at: four cues (Gold leaf, Crimson, Carbon, Galaxy), four felts
+(Royal purple, Sunset, Ice, Black) and three rail woods (Maple, Cherry, Ebony) on top of everything that
+was already free. The game has no ads and no purchases, so this is what a trophy is for. In TABLE, an
+unearned choice is shown locked with the trophy that unlocks it ("🔒 Gold leaf — earn “Regular”");
+the trophy case says what each trophy gives, and unlocking one says so in its toast. Nothing that a
+player could choose before was put behind a trophy, and a stored choice that is not earned falls back
+to the default.
+
+`src/cosmetics.js` is the catalogue, the palettes the renderers draw from, and the unlock rules, as pure
+data and functions. The tests pin that every unlock names a real trophy, every choice has a palette and
+every palette entry is a choice, the old choices stay free, and that a choice unlocks by its own trophy
+and nothing else. The cushions take their colour from the felt, so a purple table has purple cushions.
+Everything is kept per device, like the trophies.
+
 ## Replays
 
 Every shot is recorded as it plays and stays available until the next one
@@ -382,6 +398,7 @@ DOM, no renderer.
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
+| `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
 | `src/coach.js` | the shot coach: grades a shot, finds the coach's shot, builds the replays |
 | `src/shot-cam.js` | the follow-the-shot camera's poses and blend |
 | `src/screen-point.js` | maps a pointer back to the table through the phone's quarter turn |

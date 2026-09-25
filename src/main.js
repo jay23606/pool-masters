@@ -6,6 +6,7 @@ import { createSfx } from './sfx.js'
 import { createMusic } from './music.js'
 import { setTableSize } from './table.js'
 import { FELTS,loadTablePrefs } from './preferences.js'
+import { ofKind,isUnlocked,label as cosmeticLabel,usable,rewardsOf } from './cosmetics.js'
 import { createViewManager } from './view-manager.js'
 import { parseGameMessage } from './protocol.js'
 import { snapshotOf } from './game-state.js'
@@ -53,7 +54,9 @@ document.querySelector('#app').innerHTML=`
 $('.view-buttons').insertAdjacentHTML('beforeend','<button id="replay-menu" class="view-toggle" title="Replay the last shot" hidden aria-label=\"Replay the last shot\">⟲</button>')
 $('.view-buttons').insertAdjacentHTML('afterbegin','<button id="table-settings" class="view-toggle" title="Table size and felt">TABLE</button>')
 document.body.insertAdjacentHTML('beforeend','<dialog id="table-dialog"><form method="dialog"><h2>Set up the table</h2><p>Table size changes the ball-to-table proportion. Changing it starts a fresh rack.</p><label>Table size <select id="table-size"><option value="7">7 ft · bar</option><option value="8">8 ft · home</option><option value="9">9 ft · league</option></select></label><label>Felt <select id="felt"><option value="green">Classic green</option><option value="blue">Tournament blue</option><option value="burgundy">Burgundy</option><option value="charcoal">Charcoal</option></select></label><div><button value="cancel" class="ghost">Cancel</button><button id="save-table" value="default" class="primary">Apply</button></div></form></dialog>')
-$('#table-dialog form').insertAdjacentHTML('beforeend','<label>Cue finish <select id="cue-finish"><option value="classic">Classic maple</option><option value="ebony">Ebony</option><option value="midnight">Midnight blue</option></select></label><label>Room lighting <select id="lighting"><option value="hall">Pool hall</option><option value="warm">Warm lounge</option><option value="cool">Cool arena</option></select></label><label>Aim sensitivity <input id="aim-sensitivity" type="range" min="10" max="100" value="30"> <output id="aim-sensitivity-out"></output></label><label><input id="shot-cam" type="checkbox"> Follow the shot (3D views): swing the camera behind the cue while balls roll</label><label><input id="haptics" type="checkbox"> Haptic feedback</label><button type="button" id="open-physics" class="ghost">How the physics works…</button>')
+$('#table-dialog form').insertAdjacentHTML('beforeend','<label>Rails <select id="rails"></select></label><label>Cue finish <select id="cue-finish"><option value="classic">Classic maple</option><option value="ebony">Ebony</option><option value="midnight">Midnight blue</option></select></label><label>Room lighting <select id="lighting"><option value="hall">Pool hall</option><option value="warm">Warm lounge</option><option value="cool">Cool arena</option></select></label><label>Aim sensitivity <input id="aim-sensitivity" type="range" min="10" max="100" value="30"> <output id="aim-sensitivity-out"></output></label><label><input id="shot-cam" type="checkbox"> Follow the shot (3D views): swing the camera behind the cue while balls roll</label><label><input id="haptics" type="checkbox"> Haptic feedback</label><button type="button" id="open-physics" class="ghost">How the physics works…</button>')
+// the settings above were added after the buttons; the buttons belong last
+$('#table-dialog form').append($('#table-dialog form>div'))
 
 function toast(text){const e=$('#toast');e.textContent=text;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2200)}
 const viewManager=createViewManager({$,tablePrefs,toast,
@@ -121,9 +124,15 @@ function bind(){
  $('#drill-list').onclick=e=>{const b=e.target.closest('[data-drill]');if(b)startDrill(b.dataset.drill)}
  $('#replay-home').onclick=()=>leaveRoom()
  $('#focus-table').onclick=()=>{const focused=$('#game').classList.toggle('focus');$('#focus-table').textContent=focused?'Show chat':'Focus table';view.renderer?.resize()}
- $('#table-settings').onclick=()=>{$('#table-size').value=tablePrefs.size;$('#felt').value=Object.entries(FELTS).find(([,v])=>v===tablePrefs.felt)?.[0]||'green';$('#cue-finish').value=tablePrefs.cue;$('#lighting').value=tablePrefs.lighting;$('#aim-sensitivity').value=Math.round(tablePrefs.aimSensitivity*100);$('#aim-sensitivity-out').textContent=`${$('#aim-sensitivity').value}%`;$('#haptics').checked=sfx.haptics;$('#shot-cam').checked=tablePrefs.shotCam!==false;$('#table-dialog').showModal()}
+ // Felt, cue and rails choices come from the catalogue: what a trophy has not yet unlocked is shown, locked, with the trophy that unlocks it.
+ const paintCosmetics=()=>{
+  const earned=loadUnlocked()
+  const fill=(sel,kind,keyOf)=>{$(sel).innerHTML=ofKind(kind).map(c=>`<option value="${c.key}"${isUnlocked(c,earned)?'':' disabled'}>${esc(cosmeticLabel(c,earned))}</option>`).join('')}
+  fill('#felt','felt');fill('#cue-finish','cue');fill('#rails','rails')
+ }
+ $('#table-settings').onclick=()=>{paintCosmetics();$('#rails').value=usable('rails',tablePrefs.rails,loadUnlocked());$('#table-size').value=tablePrefs.size;$('#felt').value=Object.entries(FELTS).find(([,v])=>v===tablePrefs.felt)?.[0]||'green';$('#cue-finish').value=tablePrefs.cue;$('#lighting').value=tablePrefs.lighting;$('#aim-sensitivity').value=Math.round(tablePrefs.aimSensitivity*100);$('#aim-sensitivity-out').textContent=`${$('#aim-sensitivity').value}%`;$('#haptics').checked=sfx.haptics;$('#shot-cam').checked=tablePrefs.shotCam!==false;$('#table-dialog').showModal()}
  $('#aim-sensitivity').oninput=e=>$('#aim-sensitivity-out').textContent=`${e.target.value}%`
- $('#save-table').onclick=async e=>{e.preventDefault();tablePrefs.cue=$('#cue-finish').value;tablePrefs.lighting=$('#lighting').value;tablePrefs.aimSensitivity=Number($('#aim-sensitivity').value)/100;tablePrefs.shotCam=$('#shot-cam').checked;const resized=Number($('#table-size').value)!==tablePrefs.size;state.game&&(state.game.aimSensitivity=tablePrefs.aimSensitivity);sfx.setHaptics($('#haptics').checked);localStorage.setItem('pool-masters:haptics',sfx.haptics?'1':'0');await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value],{fresh:resized});$('#table-dialog').close()}
+ $('#save-table').onclick=async e=>{e.preventDefault();tablePrefs.cue=usable('cue',$('#cue-finish').value,loadUnlocked());tablePrefs.rails=usable('rails',$('#rails').value,loadUnlocked());tablePrefs.lighting=$('#lighting').value;tablePrefs.aimSensitivity=Number($('#aim-sensitivity').value)/100;tablePrefs.shotCam=$('#shot-cam').checked;const resized=Number($('#table-size').value)!==tablePrefs.size;state.game&&(state.game.aimSensitivity=tablePrefs.aimSensitivity);sfx.setHaptics($('#haptics').checked);localStorage.setItem('pool-masters:haptics',sfx.haptics?'1':'0');await applyTablePrefs(Number($('#table-size').value),FELTS[$('#felt').value],{fresh:resized});$('#table-dialog').close()}
  const paintSfx=()=>{$('#mute-sfx').textContent=sfx.enabled?'♪':'✕';$('#mute-sfx').classList.toggle('on',sfx.enabled)}
  $('#mute-sfx').onclick=()=>{sfx.setEnabled(!sfx.enabled);localStorage.setItem('pool-masters:muted',sfx.enabled?'0':'1');paintSfx()}
  paintSfx()
@@ -233,7 +242,7 @@ function checkTrophies(){
  if(!fresh.length)return
  localStorage.setItem('pool-masters:trophies',JSON.stringify(unlock(unlocked,fresh)))
  // a toast holds one message, so stagger a couple and summarise a crowd
- if(fresh.length<=2)fresh.forEach((t,i)=>setTimeout(()=>toast(`${t.icon} ${t.name} · ${t.desc}`),1800+i*2600))
+ if(fresh.length<=2)fresh.forEach((t,i)=>setTimeout(()=>toast(`${t.icon} ${t.name} · ${rewardsOf(t.id).length?`unlocked ${rewardsOf(t.id).map(r=>r.name).join(', ')}`:t.desc}`),1800+i*2600))
  else setTimeout(()=>toast(`🏆 ${fresh.length} trophies earned`),1800)
  paintTrophies()
 }
@@ -242,8 +251,8 @@ function openTrophies(){
  const unlocked=loadUnlocked(),c={stats:loadStats(),drills:drillProgress(),profile:state.profile}
  $('#trophies-summary').textContent=`${TROPHIES.filter(t=>unlocked[t.id]).length} of ${TROPHIES.length} earned. Kept on this device.`
  $('#trophy-list').innerHTML=GROUPS.map(g=>`<h3>${g}</h3>`+TROPHIES.filter(t=>t.group===g).map(t=>{
-  const u=unlocked[t.id],p=progressOf(t,c)
-  return `<div class="trophy${u?' earned':''}"><span class="icon">${t.icon}</span><span class="what"><b>${esc(t.name)}</b><small>${esc(t.desc)}</small>${u?'':`<i class="bar"><b style="width:${Math.round(p.value/p.target*100)}%"></b></i>`}</span><span class="when">${u?new Date(u.at).toLocaleDateString():`${p.value} / ${p.target}`}</span></div>`
+  const u=unlocked[t.id],p=progressOf(t,c),gives=rewardsOf(t.id).map(r=>r.name).join(', ')
+  return `<div class="trophy${u?' earned':''}"><span class="icon">${t.icon}</span><span class="what"><b>${esc(t.name)}</b><small>${esc(t.desc)}</small>${gives?`<small class="reward">🎁 ${u?'Unlocked':'Unlocks'}: ${esc(gives)}</small>`:''}${u?'':`<i class="bar"><b style="width:${Math.round(p.value/p.target*100)}%"></b></i>`}</span><span class="when">${u?new Date(u.at).toLocaleDateString():`${p.value} / ${p.target}`}</span></div>`
  }).join('')).join('')
  $('#trophies-dialog').showModal()
 }
