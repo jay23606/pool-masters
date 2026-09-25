@@ -47,7 +47,7 @@ attempt. `src/ai.js`'s `AI_LEVELS` holds the three tunings.
 
 ## Calls, sound, and appearance
 
-Rooms support WebRTC voice and video calls. Use **Focus table** to hide the
+Rooms support WebRTC voice and video calls. The microphone and camera are icons that show their real state: green and plain when live, red and struck through when off (a call starts with the microphone muted). Use **Focus table** to hide the
 room sidebar and give the table more space.
 
 Pool Masters Radio streams real, actually-licensed tracks (CC BY / BY-SA,
