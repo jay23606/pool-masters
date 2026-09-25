@@ -32,6 +32,7 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
    side runs down the screen and it fills the width. Pointer positions are mapped
    back through --rot in screen-point.js. */
 .table-rot{display:contents}
+.table-side{display:contents}
 @media (orientation:portrait) and (max-width:600px){
  body:has(#game.active) header{display:none}
  #game .game-top{padding:6px 8px;min-height:0}
@@ -61,6 +62,20 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
  #game .game-top{padding:5px 16px}
  #game .game-top button{padding:.35rem .7rem}
  #game .play-layout{max-width:1800px}
+ /* controls to the side of the table, names and groups on one line above it */
+ #game .table-card{display:grid;grid-template-columns:minmax(0,1fr) 210px;grid-template-rows:auto minmax(0,1fr);column-gap:14px;align-items:stretch}
+ #game #versus{grid-area:1/1/2/3}
+ #game .table-bar{display:contents}
+ #game #groups{grid-area:1/1/2/3;align-self:center;justify-self:center;flex:none;pointer-events:none;min-height:0;z-index:1}
+ #game .table-bar .view-buttons{grid-area:2/2;align-self:start;justify-self:end;margin:0;flex-wrap:wrap;justify-content:flex-end}
+ #game .music-credit{display:none}
+ #game .table-rot{grid-area:2/1}
+ #game .table-side{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;grid-area:2/2;min-width:0}
+ #game .table-side .shot-controls{margin:0;grid-template-columns:auto 1fr;grid-template-areas:"spin shoot" "power power";gap:8px}
+ #game .table-side #spin{grid-area:spin}
+ #game .table-side #shoot,#game .table-side #next-rack{grid-area:shoot;min-height:64px}
+ #game .table-side .shot-controls label{grid-area:power;grid-template-columns:auto 1fr 38px}
+ #game .table-side #game-status,#game .table-side #practice-record{text-align:center}
  #game #versus{margin-bottom:0}
  #game #versus small{display:none}
  #game .table-bar{margin:0 0 4px}
