@@ -209,6 +209,15 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Lobby and the tutorial
+
+The lobby is grouped instead of a row of buttons: a primary row (**Find a game**, **Practice vs AI**, **Two players, one device**), the game settings (game, AI level, table, **House rules**), then
+**Sharpen your game** (*How to play*, *Daily shot*, *Drills and trick shots*, *Challenges*, *Puzzle maker*) and **Solo runs** (*Career*, *Rogue Pool*).
+
+A player who has never opened the tutorial sees a *New here?* banner once. **How to play** is five short steps, each an ordinary drill dressed with the words for one control: aim and shoot, power, cutting a ball,
+spin, and bank shots. Finishing (or *Not now*) is remembered in the browser and the banner does not return; *How to play* stays available. The steps are the drills' own, so progress is too, and Show me works on each.
+`src/tutorial.js` is the steps as data; the tests solve every step, check the lobby keeps one id per control and that each one still has a handler.
+
 ## Trick shots
 
 **Drills** now also lists twenty curated **trick shots**: small tables that one shot clears completely (eight with two balls, eight with three, four with four), easiest first. The win rule is `clear`:
