@@ -246,14 +246,16 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
    <span class="tag low">Lower priority</span>
   </div>
 
-  <div class="rm">
-   <div class="rank">8</div>
+  <div class="rm shipped">
+   <div class="rank">✓</div>
    <div><h4>Physics-constant inspector</h4>
-   <p>tailuge/billiards exposes its physics constants for tweaking; Pooltool goes
-   further with a full analytical model swap. A read-only debug panel showing our own
-   constants (already named and commented in <code>physics.js</code>) would be a fun,
-   low-cost nod to the same idea without touching the simulation itself.</p></div>
-   <span class="tag low">Lower priority</span>
+   <p><strong>Shipped, read-only.</strong> TABLE → <em>How the physics works</em> lists every constant the
+   simulation runs on (friction, restitution, spin decay, rest threshold, the fixed step), what each does,
+   the power-to-speed curve in game units and m/s, and ball and pocket size per table. Values are read live
+   from <code>physics.js</code>, and a test fails if a constant is added there without being described,
+   so the panel cannot drift. It is deliberately not tweakable: the same numbers drive every game, so
+   every player sees the same shot.</p></div>
+   <span class="tag done">Shipped</span>
   </div>
 
  </div>
@@ -326,7 +328,7 @@ const rows = [
 ['Speed-dependent cushion restitution + spin transfer', ['y','y','y','p','p','p']],
 ['Frame-rate-independent shot outcome (tested)', ['s','p','y','n','n','n'], 'Verified by test: identical result at 240Hz, a jittery rate, and 1 update/sec.'],
 ['Event-based / analytical physics engine', ['n','n','y','n','n','n'], 'We use fixed-substep integration; Pooltool solves motion analytically between events.'],
-['Physics constants exposed for inspection/tweaking', ['n','y','y','n','n','n']],
+['Physics constants exposed for inspection/tweaking', ['p','y','y','n','n','n']],
 ['Real-world scaled units (documented)', ['y','p','y','n','n','n']],
 
 ['cat','Multiplayer & networking'],
