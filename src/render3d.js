@@ -1,5 +1,5 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
-import {rayToRail} from './pool.js'
+import {rayToRail,bankPath} from './pool.js'
 import {tableFractions} from './screen-point.js'
 import {CUE_STYLES,RAIL_STYLES} from './cosmetics.js'
 import {shotPose,stepBlend,smooth,FOV as SHOT_FOV,MIN_SPEED} from './shot-cam.js'
@@ -275,7 +275,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  // ---- aim overlays ----
  const lineMat=(color,opacity)=>new THREE.LineBasicMaterial({color,transparent:true,opacity,depthTest:false})
  const makeLine=(mat,pts)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts*3),3));const l=new THREE.Line(g,mat);l.frustumCulled=false;l.renderOrder=5;scene.add(l);return l}
- const aimLine=makeLine(lineMat('#ffffff',.9),2),cutLine=makeLine(lineMat('#ffd96a',.9),2),bankLine=makeLine(lineMat('#ffffff',.4),3)
+ const aimLine=makeLine(lineMat('#ffffff',.9),2),cutLine=makeLine(lineMat('#ffd96a',.9),2),bankLine=makeLine(lineMat('#ffffff',.4),3),objBank=makeLine(lineMat('#ffd96a',.42),2)
  function setLine(line,pts){const a=line.geometry.attributes.position;pts.forEach((p,i)=>a.setXYZ(i,tx(p.x),1.4,tz(p.y)));a.needsUpdate=true;line.geometry.setDrawRange(0,pts.length);line.visible=pts.length>1}
  const ghost=new THREE.Mesh(ballGeo,new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.22,depthWrite:false}))
  ghost.renderOrder=4;ghost.visible=false;scene.add(ghost)
@@ -417,7 +417,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
 
    const aiming=game.aiming&&game.canAim()
    cue.visible=ghost.visible=aiming
-   if(!aiming){aimLine.visible=cutLine.visible=bankLine.visible=false}
+   if(!aiming){aimLine.visible=cutLine.visible=bankLine.visible=objBank.visible=false}
    else{
     const q=game.guide(),c=balls[0]?.shown||q.c
     const end={x:c.x+q.dx*q.t,y:c.y+q.dy*q.t}
@@ -425,8 +425,11 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     if(q.hit){
      const nx=(q.hit.x-end.x)/(2*R),ny=(q.hit.y-end.y)/(2*R),d=rayToRail(q.hit.x,q.hit.y,nx,ny)
      setLine(cutLine,[q.hit,{x:q.hit.x+nx*d,y:q.hit.y+ny*d}])
+     // and on past the cushion it meets: the extended angle
+     const past=bankPath(q.hit.x,q.hit.y,nx,ny,2)
+     setLine(objBank,past.length>1?[past[0],past[1]]:[])
      ghost.position.set(tx(end.x),R,tz(end.y));ghost.visible=true
-    }else{cutLine.visible=false;ghost.visible=false}
+    }else{cutLine.visible=false;objBank.visible=false;ghost.visible=false}
     setLine(bankLine,q.banks.length?[end,...q.banks]:[])
     const pull=R+10+(+game.power.value/100)*46
     cue.position.set(tx(c.x)-q.dx*pull,R+7,tz(c.y)-q.dy*pull)
