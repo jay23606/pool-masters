@@ -1,0 +1,95 @@
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>A second game mode — 9-ball</h4>
+   <p><strong>Shipped.</strong> Ten-ball diamond rack, lowest-ball-first, the cushion rule,
+   9-on-a-legal-shot wins (combinations included), 9 re-spotted on a foul, ball in hand
+   after any foul. It reused the whole physics/rendering/networking stack — this was a new
+   <code>rules.js</code> variant and a smaller rack, exactly as scoped. Available in
+   practice, private tables and quick play; unranked until the ranking tables know
+   which game a result came from.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Replay links</h4>
+   <p><strong>Shipped.</strong> Every shot is recorded as it plays — by the host from its
+   simulation, by guests and spectators from the snapshots they receive — and
+   <em>Copy replay link</em> packs it into a URL. A full 16-ball break is about 1,000
+   characters. Anyone can open the link and watch it (at full or quarter speed), with
+   sound. It records positions rather than re-simulating inputs, on purpose: two
+   JavaScript engines needn't agree to the last bit on sin, cos or pow, and billiards
+   amplifies a last-bit difference into a different shot.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Trick-shot / practice drill library</h4>
+   <p><strong>Shipped.</strong> Eleven one-shot drills on fixed tables, from a straight-in pot to
+   draw, follow, stop, bank, combination and kick shots, with a level, a tip, a
+   <em>Show me</em> that dials in the aim, power and spin, and progress kept in the
+   browser. A solve the hint aimed completes the drill but sets no record. Every drill is
+   proven solvable: a solver searched the real physics for each one, and the tests run its
+   hint through the game again, so a physics change that breaks a drill fails the build.
+   It also caught that the break tip was wrong (full power with no spin scratches every time).</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Achievements / trophies</h4>
+   <p><strong>Shipped.</strong> Twenty-seven trophies in seven groups (racks, nine-ball, skill,
+   opponents, practice, social, league), each with a progress bar toward its target, a toast
+   when one unlocks and a trophy case in the header. Stats are derived from what happened on
+   the table, so host and guest agree, and kept per device. Building it also found and fixed
+   a real bug: a shot that ended before the host's first snapshot was invisible to a guest.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Physics-constant inspector</h4>
+   <p><strong>Shipped, read-only.</strong> TABLE → <em>How the physics works</em> lists every constant the
+   simulation runs on (friction, restitution, spin decay, rest threshold, the fixed step), what each does,
+   the power-to-speed curve in game units and m/s, and ball and pocket size per table. Values are read live
+   from <code>physics.js</code>, and a test fails if a constant is added there without being described,
+   so the panel cannot drift. It is deliberately not tweakable: the same numbers drive every game, so
+   every player sees the same shot.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Daily shot</h4>
+   <p><strong>Shipped.</strong> One fixed table a day, the same for everyone, that a search of the real physics has shown can be solved. Difficulty rises through the week, the result is a shareable line, and there is no account or server, so it works offline. Two trophies hang off it.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Shot coach</h4>
+   <p><strong>Shipped.</strong> After a shot, the 🎓 Coach grades it against the best the AI can find from the same table: what you potted or why it was a foul, how often a shot like yours works for a steady player, and the coach's own pick with its odds, both watchable as replays on the table as it stood. It is the AI's play-it-out check turned on a person, and its answer is reproducible for a given table.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Hot-seat: two players, one device</h4>
+   <p><strong>Shipped.</strong> Pass the phone: no room code, no account, no network, and it works offline. It is the practice game with a second person where the AI was, so it plays both 8-ball and 9-ball with ball in hand, races to three, and names the players throughout. Ranked results and stats are deliberately left out.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Bank pool and one-pocket</h4>
+   <p><strong>Shipped.</strong> Two more games on a full rack of fifteen, first to eight. In bank pool a ball only scores if it touched a cushion on its way in; in one-pocket each player owns a foot corner and a ball scores for whoever owns the pocket it dropped in. Both are one pure rules function, the AI plays both (it finds bank shots by mirroring the pockets and confirming each candidate with a real play-out), and the shot coach knows what counts.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Cosmetics earned, not bought</h4>
+   <p><strong>Shipped.</strong> Trophies unlock four cues, four felts and three rail woods; locked choices show the trophy that unlocks them, and the trophy case says what each one gives. Everything that was free stays free, and the game still has no ads or purchases.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>

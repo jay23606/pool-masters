@@ -479,11 +479,9 @@ node's `zlib`, so there is no image dependency.
 
 ## Roadmap
 
-Two pages, both built from public sources and linked from the lobby's *Roadmap* button:
-[`public/feature.html`](public/feature.html) compares the game with open-source and commercial pool games and
-tracks what has shipped, and [`public/commercial.html`](public/commercial.html) compares it with commercial games
-only, from their store listings, to find features worth building (a feature a listing does not mention is marked
-unknown, never "no"). The second is generated: `node tools/build-commercial.mjs`.
+One page, linked from the lobby's *Roadmap* button: [`public/feature.html`](public/feature.html). It compares the game with five commercial pool games
+from their store listings (a feature a listing does not mention is marked unknown, never "no"), lists what has shipped, ranks what to build next, and names what we are not copying.
+It is generated: edit the data in `tools/build-roadmap.mjs` (older shipped cards live in `tools/roadmap-shipped.html`) and run `node tools/build-roadmap.mjs`.
 
 ## Development
 
