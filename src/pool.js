@@ -2,6 +2,7 @@ import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
 import {normalizeHouse,nextBreaker,placementLimit} from './house.js'
 import {airborne} from './physics.js'
+import {newRun as newRogueRun,judge as judgeRogue,choose as chooseRogue,advance as advanceRogue,offer as offerRogue,POCKET_BOOST} from './rogue.js'
 import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,targetFor,isRotation,MONEY,trianglePositions,kind} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
@@ -18,6 +19,53 @@ export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.house=normalizeHouse(o.house);this.breaker='a';this.scoreTarget=this.mode==='straight'?this.house.straightTo:(this.scoreTarget||targetFor(this.mode));this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
+ // ---- Rogue Pool (see rogue.js) ----
+ // the cue ball on the head spot, and the balls of this table of the run
+ rogueRack(keep){
+  const cue=keep||{id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}
+  return [cue,...this.run.layout.map(b=>({id:b.n,x:b.x,y:b.y,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(b.n),n:b.n}))]
+ }
+ // Pockets grow with the Wide pockets upgrade.
+ pocketScale(){return this.run&&this.rogueSeed!=null?1+POCKET_BOOST*(this.run.upgrades.pockets||0):1}
+ resolveRogue(){
+  const left=this.balls.filter(b=>b.on&&b.k!=='cue').length,cue=this.balls[0]
+  const v=judgeRogue(this.run,{potted:this.potted.length,scratch:this.scratch,left,jumped:Boolean(this.usedJump)})
+  this.usedJump=false;this.run=v.run
+  if(v.respotCue){cue.on=true;cue.x=154;cue.y=190;this.flash('Scratch · cue ball back on the spot')}
+  this.balls.forEach(clearMotion)
+  this.phase='aim'
+  if(v.event==='cleared'){
+   // the table is clear: the player picks an upgrade before the next one, unless there is nothing left to offer
+   const choices=offerRogue(this.run)
+   if(!choices.length){this.run=advanceRogue(this.run);this.balls=this.rogueRack(this.balls[0]);this.aiming=true;this.flash(`Table ${this.run.level} · nothing left to upgrade`);this.sync();return}
+   this.rogueWait=true;this.aiming=false;this.sync()
+   this.onRogue?.({type:'cleared',run:this.run,offer:choices})
+   return
+  }
+  if(v.event==='life'){this.balls=this.rogueRack();this.flash('Out of shots · a life lost · the table again')}
+  if(v.event==='over'){
+   this.over=true;this.result='a';this.finished=true;this.aiming=false;this.sync()
+   this.onRogue?.({type:'over',run:this.run});return
+  }
+  this.sync()
+ }
+ // The player has chosen: take the upgrade and set out the next table.
+ pickUpgrade(id){
+  if(!this.rogueWait)return false
+  this.run=chooseRogue(this.run,id);this.rogueWait=false
+  this.balls=this.rogueRack(this.balls[0]);this.aiming=true;this.phase='aim';this.sync()
+  this.flash(`Table ${this.run.level}`)
+  return true
+ }
+ updateRogueHud(){
+  const r=this.run
+  const text=`ROGUE POOL · TABLE ${r.level} · ${r.shotsLeft} ${r.shotsLeft===1?'SHOT':'SHOTS'} · ${'♥'.repeat(Math.max(0,r.lives))}${r.jumps?` · ${r.jumps} JUMP${r.jumps===1?'':'S'}`:''}`
+  if(this.groupStatus&&this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}
+  this.shoot.disabled=!this.canAim()||!this.aiming
+  if(this.moveCue)this.moveCue.hidden=true
+  if(this.changePocket)this.changePocket.hidden=true
+  this.status.textContent=this.over?'Run over':this.rogueWait?'Choose an upgrade':this.phase==='roll'?'':'Your shot'
+ }
  // ---- challenge games (see challenges.js) ----
  // the cue ball on the head spot and a fresh scatter of balls
  challengeRack(keep){
@@ -51,7 +99,7 @@ export class PoolGame{
   if(!this.chal||this.chal.over||this.over)return
   if(this.phase==='aim'&&timedOut(this.chal,performance.now()))this.endChallenge()
  }
- resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};if(this.rogueSeed!=null){this.run=newRogueRun(this.rogueSeed);this.chal={id:'rogue',over:false};this.rogueWait=false;this.breakShot=false;this.balls=this.rogueRack()};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -64,7 +112,9 @@ export class PoolGame{
  newRack(){
   if(!this.over)return
   const last={breaker:this.breaker||'a',winner:this.result}
-  this.round++;this.resetRack()
+  this.round++
+  if(this.rogueSeed!=null)this.rogueSeed=(this.rogueSeed*48271+11)%1000003     // a new run is a new run
+  this.resetRack()
   this.breaker=nextBreaker(this.house,last);this.turn=this.breaker
   this.ready=true;this.sync()
   if(this.practice&&!this.hotSeat&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
@@ -94,10 +144,13 @@ export class PoolGame{
   b.classList.toggle('on',Boolean(this.jumpOn));b.setAttribute('aria-pressed',String(Boolean(this.jumpOn)))
  }
  // Jump shots are a house rule, off unless the table was set up for them; drills and challenges never allow one.
- jumpAllowed(){return Boolean(this.house&&this.house.jumps)&&!this.drill&&!this.chal}
+ jumpAllowed(){
+  if(this.rogueSeed!=null&&this.run)return this.run.jumps>0     // a run has its own jumps, bought as upgrades
+  return Boolean(this.house&&this.house.jumps)&&!this.drill&&!this.chal
+ }
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
- canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
+ canControl(){return !this.rogueWait&&!this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
  takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(this.eightBlockedMessage());return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill&&!this.chal&&!(this.jumpAllowed()&&this.jumpOn))this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);
   // The pocket called for the 8 is read now, while the player is still aiming: startShot() begins the roll,
@@ -105,7 +158,7 @@ export class PoolGame{
   // judged every 8 a guest potted as a loss.
   const called=this.canCallEight()?this.calledPocket:null
   const jump=this.jumpAllowed()&&Boolean(this.jumpOn)
-  this.jumpOn=false
+  this.jumpOn=false;this.usedJump=jump
   this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1],jump);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called,...(jump?{jump:true}:{})});this.pendingPlace=null}
  startShot(){if(this.chal&&this.chal.startedAt==null)this.chal=startClock(this.chal,performance.now());this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
@@ -244,7 +297,7 @@ export class PoolGame{
   for(const b of this.balls){
    if(!b.on)continue
    integrate(b,dt)
-   for(const[p,q]of POCKETS.entries())if(!airborne(b)&&Math.hypot(b.x-q[0],b.y-q[1])<PR){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
+   for(const[p,q]of POCKETS.entries())if(!airborne(b)&&Math.hypot(b.x-q[0],b.y-q[1])<PR*this.pocketScale()){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
    if(!b.on)continue
    if(railBounce(b)){
     // which balls touched a cushion, and whether the cue did so before it
@@ -321,6 +374,7 @@ export class PoolGame{
  }
  resolve(){
   if(this.drill)return this.resolveDrill()
+  if(this.rogueSeed!=null)return this.resolveRogue()
   if(this.chal)return this.resolveChallenge()
   const shooter=this.turn
   const v=judgeShot(this)
@@ -443,6 +497,7 @@ export class PoolGame{
  updateHud(){
   this.paintJump()
   if(this.drill)return this.updateDrillHud()
+  if(this.rogueSeed!=null)return this.updateRogueHud()
   if(this.chal)return this.updateChallengeHud()
   if(isRotation(this.mode))return this.updateNineHud()
   if(isScoreMode(this.mode))return this.updateScoreHud()

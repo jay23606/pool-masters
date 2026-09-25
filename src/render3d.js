@@ -228,10 +228,11 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  markPlane.rotation.x=-Math.PI/2;markPlane.position.y=.08;markPlane.renderOrder=1;scene.add(markPlane)
  const pocketMat=std('#05100b',.9)
  const pocketGeo=new THREE.CylinderGeometry(PR-1.5,PR-3,7,28)
- POCKETS.forEach(([x,y])=>{const m=new THREE.Mesh(pocketGeo,pocketMat);m.position.set(tx(x),-1,tz(y));scene.add(m)})
+ const pocketMeshes=[]
+ POCKETS.forEach(([x,y])=>{const m=new THREE.Mesh(pocketGeo,pocketMat);m.position.set(tx(x),-1,tz(y));scene.add(m);pocketMeshes.push(m)})
  const leather=new THREE.MeshStandardMaterial({color:'#3a2214',roughness:.62})
  const rimGeo=new THREE.TorusGeometry(PR-.5,2.1,10,32)
- POCKETS.forEach(([x,y])=>{const r=new THREE.Mesh(rimGeo,leather);r.rotation.x=Math.PI/2;r.position.set(tx(x),7,tz(y));r.castShadow=true;scene.add(r)})
+ POCKETS.forEach(([x,y])=>{const r=new THREE.Mesh(rimGeo,leather);pocketMeshes.push(r);r.rotation.x=Math.PI/2;r.position.set(tx(x),7,tz(y));r.castShadow=true;scene.add(r)})
  const ring=new THREE.Mesh(new THREE.TorusGeometry(PR+3,1.7,8,36),new THREE.MeshBasicMaterial({color:'#ffd75d'}))
  ring.rotation.x=-Math.PI/2;ring.position.y=1.6;ring.visible=false;scene.add(ring)
  // a softer white ring for the pocket the aim has snapped to
@@ -384,6 +385,8 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     const e=balls[i];if(!e)continue
     e.mesh.visible=false;if(e.stripe)e.stripe.visible=false;if(e.badge)e.badge.visible=false
    }
+   const pk=game.pocketScale?game.pocketScale():1
+   for(const m of pocketMeshes)m.scale.set(pk,1,pk)
    // ---- follow the shot ----
    const c0=game.balls[0],rolling=options.shotCam!==false&&game.phase==='roll'&&!game.replay&&c0?.on!==false
    if(rolling&&!shot.dir){
