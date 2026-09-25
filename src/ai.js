@@ -15,6 +15,11 @@ export const AI_LEVELS={
  beginner:{label:'Beginner',aimError:.13,powerError:12,safetyCut:.72},
  league:{label:'League',aimError:.03,powerError:4,safetyCut:.34},
  pro:{label:'Pro',aimError:.008,powerError:1,safetyCut:.16},
+ // the extra rungs the career ladder needs between and beyond the three a player can pick
+ novice:{label:'Novice',aimError:.2,powerError:16,safetyCut:.85},
+ club:{label:'Club',aimError:.07,powerError:8,safetyCut:.5},
+ ace:{label:'Ace',aimError:.015,powerError:2,safetyCut:.24},
+ legend:{label:'Legend',aimError:.004,powerError:.5,safetyCut:.12},
 }
 // The coach plays the best shot it can see, every time: no aim or power error, and the same
 // answer for the same table. It is not a level a player can pick.

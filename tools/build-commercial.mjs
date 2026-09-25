@@ -22,7 +22,7 @@ const rows=[
 ['Table sizes',['y','u','u','u','y','u'],'Ours: 7, 8 and 9 ft. Cue Club 2: 6 to 12 ft.'],
 
 ['cat','Progression'],
-['Career or campaign against set opponents',['n','n','y','y','y','u'],'Pure Pool: hundreds of events, handcrafted opponents. Virtual Pool 4: Pro Tour and Hustler careers. Cue Club 2: bars, trophies.'],
+['Career or campaign against set opponents',['y','n','y','y','y','u'],'Pure Pool: hundreds of events, handcrafted opponents. Virtual Pool 4: Pro Tour and Hustler careers. Cue Club 2: bars, trophies. Ours: a ten-opponent ladder.'],
 ['Tournaments and brackets',['n','y','u','y','y','y'],'Virtual Pool 4: single and double elimination, with handicap. Real Pool 3D: ten prized events a day.'],
 ['Ranked league with tiers',['y','y','p','u','u','u'],'Ours: Elo league (8-ball only). 8 Ball Pool: league levels that unlock venues.'],
 ['Daily challenge',['y','n','y','u','u','u'],'Pure Pool: Daily Clearance. Ours: the daily shot.'],
@@ -67,8 +67,8 @@ const items=[
  {rank:1,title:'Tournaments and brackets',tag:['high','High impact'],
   body:'Four of the five have tournaments, and it is the feature that gives a player a reason to come back tomorrow. Virtual Pool 4 offers single and double elimination, with handicaps; Real Pool 3D runs ten prized events a day. We have a race-to-3 match and nothing above it. The bracket logic is pure and easy; the cost is that a tournament needs a shared, durable state, which means new database tables.',
   who:'8 Ball Pool, Virtual Pool 4, Cue Club 2, Real Pool 3D'},
- {rank:2,title:'A career mode',tag:['high','High impact'],
-  body:'Pure Pool, Virtual Pool 4 and Cue Club 2 all wrap the game in a campaign: a ladder of opponents and venues that opens up as you win. We already have every part: three AI tunings, drills, a daily shot, trophies, and cosmetics to unlock. A career is those pieces given an order, with named opponents whose playing styles differ (a safety player, a banker, a power breaker), and it needs no server at all.',
+ {rank:2,title:'A career mode',tag:['done','Shipped'],shipped:true,
+  body:'Shipped. Pure Pool, Virtual Pool 4 and Cue Club 2 all wrap the game in a campaign, and now so do we: a ladder of ten opponents and venues across all four games that opens up as you win, on seven rungs of AI from novice to legend, with trophies and cosmetics as rewards. It needs no server. What it does not have yet: opponents whose playing styles differ (a safety player, a banker, a power breaker) beyond how well they play.',
   who:'Pure Pool Pro, Virtual Pool 4, Cue Club 2'},
  {rank:3,title:'Challenge games: speed pot, perfect potter',tag:['med','Medium impact'],
   body:'Pure Pool builds a whole menu of short scored challenges (Speed Pot, Checkpoint, Perfect Potter, Royal Rumble) and Cue Club 2 has speed pool. They are drills with a clock or a streak, and the drill engine already judges a shot and resets the table. Cheap, and they give a five-minute session something to aim at.',
@@ -156,8 +156,8 @@ ${cards.map(([n,t])=>`  <div class="card"><h3>${esc(n)}</h3><p>${esc(t)}</p></di
  <p class="section-sub">Ranked by how many of the five have it and how well it fits what
  the game already is. Each item names who has it.</p>
  <div class="roadmap">
-${items.map(i=>`  <div class="rm">
-   <div class="rank">${i.rank}</div>
+${items.map(i=>`  <div class="rm${i.shipped?' shipped':''}">
+   <div class="rank">${i.shipped?'✓':i.rank}</div>
    <div><h4>${esc(i.title)}</h4>
    <p>${esc(i.body)}</p>
    <p style="margin-top:6px;font-size:.76rem;color:var(--muted2)">Seen in: ${esc(i.who)}</p></div>
