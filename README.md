@@ -95,6 +95,9 @@ camera, because building the renderer bakes sixteen ball textures.
 
 ## Physics
 
+Every constant below is listed, with what it does, in TABLE → *How the physics works* (read-only;
+`src/physics-info.js` reads the values from `physics.js` live, and a test fails if one is added without a description).
+
 `src/physics.js` models the balls properly rather than damping velocity each
 frame. Each ball carries angular velocity as well as linear, and a struck ball
 skids before it grips and rolls — which is where stun, draw and follow come
@@ -290,6 +293,7 @@ DOM, no renderer.
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/replay.js` | recording, the link format and its validation, and playback |
 | `src/trophies.js` | the stats, the twenty-five trophies and how each is earned |
+| `src/physics-info.js` | descriptions of the physics constants, for the read-only Physics panel |
 | `src/drills.js` | the drills, how each is judged, their hints, and progress |
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/ai.js` | the practice opponent, over a ball array |

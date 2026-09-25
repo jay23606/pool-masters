@@ -83,3 +83,16 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
  .table-rot .canvas-wrap{width:min(100cqw,calc(100cqh*1.842))}
  #game .shot-controls{margin-top:6px}
 }
+
+#physics-body{display:block;max-height:58vh;overflow:auto;min-width:min(560px,86vw);scrollbar-color:#2f5544 transparent;scrollbar-width:thin}
+#physics-body h3{margin:14px 0 6px;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:#42d983}
+#physics-body table{width:100%;border-collapse:collapse;font-size:.8rem}
+#physics-body th,#physics-body td{text-align:left;vertical-align:top;padding:6px 8px;border-top:1px solid var(--line)}
+#physics-body th{font-weight:700;white-space:nowrap}
+#physics-body td:last-child{color:#88a091}
+#physics-body .num{color:#ffe17c;font-variant-numeric:tabular-nums;white-space:nowrap}
+#physics-body small{color:#7f9688}
+#open-physics{justify-self:start}
+#physics-dialog{width:min(680px,94vw);max-width:none}
+#physics-dialog form{width:100%;max-width:none}
+#physics-body{min-width:0;overflow-x:hidden}
