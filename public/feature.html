@@ -278,11 +278,11 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
    <span class="tag done">Shipped</span>
   </div>
 
-  <div class="rm">
-   <div class="rank">10</div>
+  <div class="rm shipped">
+   <div class="rank">✓</div>
    <div><h4>Shot coach</h4>
-   <p>After a shot, show the shot the AI would have played from the same table, and how likely yours was to work. The AI already plays every candidate out on a copy of the table to screen out fouls; the same machinery can grade a human shot. Nobody else explains <em>why</em> a shot was good or bad.</p></div>
-   <span class="tag high">High impact</span>
+   <p><strong>Shipped.</strong> After a shot, the 🎓 Coach grades it against the best the AI can find from the same table: what you potted or why it was a foul, how often a shot like yours works for a steady player, and the coach's own pick with its odds, both watchable as replays on the table as it stood. It is the AI's play-it-out check turned on a person, and its answer is reproducible for a given table.</p></div>
+   <span class="tag done">Shipped</span>
   </div>
 
   <div class="rm">
@@ -421,6 +421,7 @@ const rows = [
 ['Recent match history', ['y','n','n','p','p','p']],
 ['Achievements / trophies', ['y','n','n','y','y','y']],
 ['Daily login rewards', ['n','n','n','y','n','n']],
+['Post-shot coaching (grades your shot, shows a better one)', ['y','n','n','n','n','n'], 'The coach plays your shot and its own out on copies of the table and gives odds for each.'],
 ['Daily shot (same solvable table for everyone)', ['y','n','n','n','n','n'], 'One proven-solvable table a day, difficulty rising through the week, with a shareable result. No account or server.'],
 ['Coin / currency economy', ['n','n','n','y','y','n']],
 

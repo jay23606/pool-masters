@@ -16,7 +16,10 @@ export const AI_LEVELS={
  league:{label:'League',aimError:.03,powerError:4,safetyCut:.34},
  pro:{label:'Pro',aimError:.008,powerError:1,safetyCut:.16},
 }
-export const difficultyFor=level=>AI_LEVELS[level]||AI_LEVELS.league
+// The coach plays the best shot it can see, every time: no aim or power error, and the same
+// answer for the same table. It is not a level a player can pick.
+const COACH={label:'Coach',aimError:0,powerError:0,safetyCut:.16}
+export const difficultyFor=level=>level==='coach'?COACH:AI_LEVELS[level]||AI_LEVELS.league
 
 // which balls this player is allowed to hit first. In nine-ball that is exactly
 // one ball -- the lowest on the table -- whoever is shooting.
@@ -117,7 +120,7 @@ export function simulateFirstHit(balls,angle,power){
 // real game does, and report what it did. The AI uses this to see its own
 // scratches and illegal contacts before it shoots -- without it, a ball sitting
 // beside a pocket had the cue ball follow it in on every attempt, forever.
-export function rollout(balls,angle,power,maxSeconds=8,spin=[0,0]){
+export function rollout(balls,angle,power,maxSeconds=8,spin=[0,0],onFrame=null){
  const bs=balls.map(b=>({...b}))
  const s=shotSpeed(power)
  strike(bs[0],Math.cos(angle)*s,Math.sin(angle)*s,spin[0],spin[1])
@@ -143,6 +146,7 @@ export function rollout(balls,angle,power,maxSeconds=8,spin=[0,0]){
     if(ballCollide(a,b)&&!firstHit){if(a.k==='cue')firstHit=b;else if(b.k==='cue')firstHit=a}
    }
   }
+  onFrame?.(bs,t)
   if(bs.every(b=>!b.on||atRest(b)))break
  }
  return {scratch,firstHit:firstHit&&{n:firstHit.n,k:firstHit.k},railHit,potted,pockets,railBalls:[...railBalls],cueRailFirst,
@@ -195,16 +199,22 @@ export function bestCueSpot(balls,group,mode='8ball'){
 // are screened: a shot that simply misses its pot is still a legitimate shot,
 // so the difficulty levels keep their aim errors.
 export function fouls(balls,plan,group,mode){
- const r=rollout(balls,plan.angle,plan.power)
- if(r.scratch||!r.firstHit)return true
+ return Boolean(foulReason(balls,rollout(balls,plan.angle,plan.power),group,mode))
+}
+
+// Why a played-out shot (rollout()'s result, from these balls) is a foul, or null if it is
+// legal: 'scratch', 'no-contact', 'wrong-first', 'no-rail' or 'early-8'.
+export function foulReason(balls,r,group,mode){
+ if(r.scratch)return 'scratch'
+ if(!r.firstHit)return 'no-contact'
  if(mode==='9ball'){
-  if(r.firstHit.n!==lowestBall(balls))return true
-  return !r.potted.length&&!r.railHit           // the cushion rule
+  if(r.firstHit.n!==lowestBall(balls))return 'wrong-first'
+  return !r.potted.length&&!r.railHit?'no-rail':null     // the cushion rule
  }
  const legal=legalTargets(balls,group,mode)
- if(!legal.some(t=>t.n===r.firstHit.n))return true
+ if(!legal.some(t=>t.n===r.firstHit.n))return 'wrong-first'
  // pocketing the 8 before it is yours loses the game outright
- return r.potted.includes(8)&&!legal.some(t=>t.k==='eight')
+ return r.potted.includes(8)&&!legal.some(t=>t.k==='eight')?'early-8':null
 }
 
 // The whole turn in one call: where to put the cue ball if it is in hand, which

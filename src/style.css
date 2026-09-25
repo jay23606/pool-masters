@@ -118,3 +118,9 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
 /* drills and shared shots title themselves; the group line has nothing to say there */
 #game.solo #groups{display:none}
 #game.solo #versus small{display:block}
+
+#coach-body{display:block;min-width:min(340px,80vw)}
+#coach-body p{margin:0 0 8px;line-height:1.4}
+#coach-body .coach-foul b{color:#ff9d9d}
+#coach-body .coach-miss b{color:#ffd76c}
+#coach-body .coach-good b,#coach-body .coach-great b{color:#8ff0bb}
