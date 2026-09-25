@@ -1,6 +1,7 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
 import {rayToRail} from './pool.js'
 import {tableFractions} from './screen-point.js'
+import {shotPose,stepBlend,smooth,FOV as SHOT_FOV,MIN_SPEED} from './shot-cam.js'
 
 // WebGL renderer. Purely a view over the existing 2D simulation: it reads the
 // same {x,y,vx,vy,on,k,n} balls the 2D renderer does and never writes to them,
@@ -219,7 +220,8 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  // A 9 shares yellow with the 1, and a 14 shares green with the 6. Keep the
  // stripe sphere white so category identity never depends on a tiny number or
  // a texture orientation.
- const mat=new THREE.MeshStandardMaterial({map:b.k==='stripe'?null:ballTexture(THREE,b.k,b.n),color:b.k==='stripe'?'#f7f4e9':'#ffffff',roughness:.13,metalness:0,envMapIntensity:1.4})
+ const skin=ballTexture(THREE,b.k,b.n)
+ const mat=new THREE.MeshStandardMaterial({map:b.k==='stripe'?blank:skin,color:b.k==='stripe'?'#f7f4e9':'#ffffff',roughness:.13,metalness:0,envMapIntensity:1.4})
  const mesh=new THREE.Mesh(ballGeo,mat);mesh.castShadow=true;mesh.position.set(tx(b.x),R,tz(b.y))
   // A fixed coloured ring on the white stripe base reads from both the top
   // and angled views, without the distracting continuous spin animation.
@@ -234,7 +236,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   }
   mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
   scene.add(mesh)
-  return balls[i]={mesh,mat,stripe,badge,n:b.n,k:b.k,shown:{x:b.x,y:b.y},sink:0}
+  return balls[i]={mesh,mat,skin,stripe,badge,n:b.n,k:b.k,shown:{x:b.x,y:b.y},sink:0}
  }
 
  // ---- aim overlays ----
@@ -277,6 +279,10 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  cue.visible=false;scene.add(cue)
 
  // ---- framing ----
+ const base={pos:new THREE.Vector3(),up:new THREE.Vector3(0,0,-1),fov:26}
+ const shot={dir:null,start:null,blend:0,applied:false},blank=new THREE.CanvasTexture(Object.assign(document.createElement('canvas'),{width:1,height:1}))
+ {const c=blank.image.getContext('2d');c.fillStyle='#f7f4e9';c.fillRect(0,0,1,1);blank.needsUpdate=true;blank.colorSpace=THREE.SRGBColorSpace}
+ const eye=new THREE.Vector3(),look=new THREE.Vector3(),eye1=new THREE.Vector3(),look1=new THREE.Vector3(),up=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0)
  const CORNERS=[]
  for(const x of[-374,374])for(const z of[-213,213])for(const y of[0,18])CORNERS.push(new THREE.Vector3(x,y,z))
  function frame(){
@@ -290,6 +296,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
    if(Math.abs(worst-.985)<.01)break
    dist*=worst/.985
   }
+  base.pos.copy(camera.position);base.up.copy(cam.up);base.fov=cam.fov
   key.target.updateMatrixWorld()
  }
 
@@ -344,6 +351,30 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     const e=balls[i];if(!e)continue
     e.mesh.visible=false;if(e.stripe)e.stripe.visible=false;if(e.badge)e.badge.visible=false
    }
+   // ---- follow the shot ----
+   const c0=game.balls[0],rolling=options.shotCam!==false&&game.phase==='roll'&&!game.replay&&c0?.on!==false
+   if(rolling&&!shot.dir){
+    const v={x:c0.vx||0,y:c0.vy||0}
+    if(Math.hypot(v.x,v.y)>=MIN_SPEED){shot.dir=v;shot.start={x:c0.x,y:c0.y}}
+   }
+   if(!rolling&&shot.blend===0)shot.dir=null
+   shot.blend=stepBlend(shot.blend,rolling&&Boolean(shot.dir),dt)
+   const close=shot.blend>.35
+   for(const e of balls){
+    if(!e)continue
+    if(e.k==='stripe'&&e.mat.map!==(close?e.skin:blank)){e.mat.map=close?e.skin:blank}
+    if(close){if(e.badge)e.badge.visible=false;if(e.stripe)e.stripe.visible=false}
+   }
+   if(shot.blend>0&&shot.dir){
+    const pose=shotPose(shot.start,shot.dir),t=smooth(shot.blend)
+    if(pose){
+     eye.lerpVectors(base.pos,eye1.set(tx(pose.eye.x),pose.eye.y,tz(pose.eye.z)),t)
+     look.lerpVectors(TARGET,look1.set(tx(pose.look.x),pose.look.y,tz(pose.look.z)),t)
+     up.lerpVectors(base.up,UP,t).normalize()
+     camera.up.copy(up);camera.fov=base.fov+(SHOT_FOV-base.fov)*t
+     camera.position.copy(eye);camera.lookAt(look);camera.updateProjectionMatrix();shot.applied=true
+    }
+   }else if(shot.applied){frame();shot.applied=false}
    ring.visible=game.calledPocket!=null
    if(ring.visible){const[px,py]=POCKETS[game.calledPocket];ring.position.x=tx(px);ring.position.z=tz(py)}
 

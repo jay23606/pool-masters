@@ -66,6 +66,11 @@ for the table itself, synced to whichever player changes them.
 
 ## Table views
 
+**Follow the shot.** In the 3D views, when a shot is taken the camera swings to where the cue was —
+behind the cue ball, looking down the line of the shot — and returns when the balls stop.
+Striped balls switch to their real stripes for it. Turn it off under TABLE → *Follow the shot*
+(`src/shot-cam.js`).
+
 Held upright on a phone, the table turns a quarter turn so its long side runs down the
 screen and fills the width; the site header and secondary buttons are hidden while you
 play. Landscape is unchanged. Pointer positions are mapped back in `src/screen-point.js`.
@@ -268,7 +273,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 263 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 268 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and

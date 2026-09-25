@@ -6,7 +6,7 @@ test('table preferences reject stale or invalid values',()=>{
  const p=loadTablePrefs({getItem:k=>({
   'pool-masters:table-size':'12','pool-masters:felt':'#bad',
   'pool-masters:cue':'gold','pool-masters:lighting':'laser'}[k]??null)})
- assert.deepEqual(p,{size:7,felt:FELTS.green,cue:'classic',lighting:'hall',aimSensitivity:.3})
+ assert.deepEqual(p,{size:7,felt:FELTS.green,cue:'classic',lighting:'hall',aimSensitivity:.3,shotCam:true})
 })
 test('an out-of-range aim sensitivity falls back to the default rather than clamping silently',()=>{
  for(const bad of ['0','.05','1.4','not-a-number',null])
@@ -16,4 +16,13 @@ test('an out-of-range aim sensitivity falls back to the default rather than clam
 test('table preferences are normalized before persisting',()=>{
  const store=memory(),p=saveTablePrefs({size:9,felt:FELTS.blue,cue:'ebony',lighting:'warm'},store)
  assert.equal(p.size,9);assert.equal(store.getItem('pool-masters:cue'),'ebony')
+})
+
+test('the follow-the-shot camera is on unless the player turned it off, and only "0" turns it off',()=>{
+ assert.equal(loadTablePrefs({getItem:()=>null}).shotCam,true)
+ assert.equal(loadTablePrefs({getItem:k=>k==='pool-masters:shot-cam'?'0':null}).shotCam,false)
+ for(const junk of ['1','','off','false','x'])assert.equal(loadTablePrefs({getItem:k=>k==='pool-masters:shot-cam'?junk:null}).shotCam,true)
+ const store={};const st={getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v}}
+ assert.equal(saveTablePrefs({...loadTablePrefs({getItem:()=>null}),shotCam:false},st).shotCam,false)
+ assert.equal(store['pool-masters:shot-cam'],'0')
 })
