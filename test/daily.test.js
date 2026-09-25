@@ -1,8 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict'
 import {DAILY} from '../src/daily-data.js'
 import {dayNumber,dailyDrill,entryFor,levelOf,shareText,isDaily,dailyNumberOf,dailySolved,EPOCH} from '../src/daily.js'
-import {attempt,buildBalls} from '../src/drills.js'
-import {W,H,R} from '../src/table.js'
+import {attempt,buildBalls,DRILL_TABLE} from '../src/drills.js'
+import {W,H,R,setTableSize} from '../src/table.js'
+
+// the table the game plays drills on, as the game sets it up (not the module's initial constants)
+setTableSize(DRILL_TABLE)
 
 test('day numbers count from 1 January 2026 by the local calendar',()=>{
  assert.equal(dayNumber(new Date(2026,0,1,0,5)),1)

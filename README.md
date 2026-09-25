@@ -205,6 +205,8 @@ success leaves it for you to look at, replay, or move on from. Progress and best
 attempts are kept in the browser; a solve the hint aimed completes the drill but
 does not set a record.
 
+Drills and daily shots are always played on the 7 ft table, whatever your own table setting is (a toast says so, and your table comes back when you leave): a bigger table has smaller balls and pockets, so the same layout needs a different shot. Measured, the stored hints solve 11 of 11 drills and all of the dailies on 7 ft, but only 8 of 11 drills and about 40% of the dailies on 8 ft, and 6 of 11 and about a quarter on 9 ft.
+
 A practice mode with an impossible drill is worse than none, so every drill is
 proven solvable. `tools/solve-drills.mjs` searches angle, power and spin with the
 real physics and prefers the most robust solution, since a hint that only works

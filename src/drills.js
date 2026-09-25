@@ -23,6 +23,11 @@ import {rollout} from './ai.js'
 //   anyPot   any ball at all must drop
 // and a scratch always fails.
 
+// Every drill, and every daily shot, is worked out and proven on the 7 ft table. A bigger table has
+// smaller balls and pockets, so the same layout needs a different shot: the game plays drills on this
+// table whatever the player's own setting is.
+export const DRILL_TABLE=7
+
 const ball=(n,x,y)=>({id:n,n,x,y,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:n===0?'cue':kind(n)})
 
 export const DRILLS=[
