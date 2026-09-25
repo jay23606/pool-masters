@@ -209,6 +209,15 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Trick shots
+
+**Drills** now also lists twenty curated **trick shots**: small tables that one shot clears completely (eight with two balls, eight with three, four with four), easiest first. The win rule is `clear`:
+every ball has to drop from the single shot, and a scratch fails. **Show me** sets up and plays the proven shot, so you can watch how the balls run, then try it yourself.
+
+They were found by searching the real physics (`tools/gen-tricks.mjs`: layouts drawn from a seed, every angle, several powers and a little side spin; `tools/extend-tricks.mjs` grows a clearable three-ball
+table into a four-ball one) and picked and named by `tools/build-tricks.mjs`, which re-proves each with the hint as stored and writes `src/tricks-data.js`. The tests replay every shot through the physics, check
+that nothing else drops and that a shot 8 degrees off does not clear (so they are tricks, not gimmes), and play each one through the real game with Show me.
+
 ## Obstacle tables
 
 The lobby has a **Table** picker beside the game picker: *Clear table* (the default), *Bumpers*, *Walls*, *Portals* or *Gauntlet*. It applies to **Practice vs AI** and **Two players, one device**.
@@ -526,6 +535,7 @@ DOM, no renderer.
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/tricks.js`, `src/tricks-data.js` | Trick shots: the curated, proven one-shot table clears (data is generated) |
 | `src/obstacles.js` | Obstacle tables: bumpers, walls, portals and their presets |
 | `src/puzzle.js`, `src/puzzle-editor.js` | Puzzle maker: layout rules, solver, shareable links, the editor dialog |
 | `src/chaos.js` | Chaos Pool: the twists (bonus pocket, bomb ball, gravity well) |

@@ -158,3 +158,4 @@ dialog label:has(>input[type=checkbox]){display:flex;align-items:center;gap:10px
 #puzzle-canvas{width:100%;aspect-ratio:700/380;border-radius:12px;touch-action:none;cursor:crosshair;display:block}
 #puzzle-status{min-height:1.3em;color:#bfe6cf}
 #puzzle-dialog .puzzle-tools{flex-wrap:wrap;justify-content:flex-start}
+.drill-head{margin:14px 0 4px;font-size:.9rem}.drill-head small{color:#82978a;font-weight:400;margin-left:6px}

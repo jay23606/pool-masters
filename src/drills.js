@@ -21,6 +21,7 @@ import {rollout} from './ai.js'
 //   kick     the cue ball must touch a cushion before it touches a ball
 //   zone     {x,y,r} the cue ball must finish inside this circle
 //   anyPot   any ball at all must drop
+//   clear    every ball in the layout must drop, all from the one shot (the trick shots)
 // and a scratch always fails.
 
 // Every drill, and every daily shot, is worked out and proven on the 7 ft table. A bigger table has
@@ -98,6 +99,7 @@ export const REASONS={
  'no-bank':'It dropped without touching a cushion; this one is a bank.',
  'no-kick':'The cue ball has to touch a cushion before it touches a ball.',
  'wrong-first':'The cue ball hit the wrong ball first.',
+ left:'Not every ball dropped: this one has to clear the table in a single shot.',
  position:'Potted it, but the cue ball finished in the wrong place.',
 }
 
@@ -118,6 +120,7 @@ export function evaluate(drill,r){
   if(w.bank&&!r.railBalls.includes(w.pot))return {ok:false,reason:'no-bank'}
  }
  if(w.anyPot&&!r.potted.length)return {ok:false,reason:'missed'}
+ if(w.clear){const left=drill.layout.balls.filter(b=>!r.potted.includes(b[0])).length;if(left)return {ok:false,reason:'left',left}}
  if(w.zone&&(!r.cue.on||Math.hypot(r.cue.x-w.zone.x,r.cue.y-w.zone.y)>w.zone.r))return {ok:false,reason:'position'}
  return {ok:true}
 }

@@ -16,6 +16,7 @@ import { MODES,modeOf } from './rules.js'
 import { pack,unpack } from './replay.js'
 import { normalizeHouse,isDefault as houseIsDefault,describe as describeHouse,RACES,BALL_IN_HAND,BREAKERS,STRAIGHT_TARGETS,words as houseWords } from './house.js'
 import { PRESETS as OBSTACLE_PRESETS,isPreset as isObstaclePreset } from './obstacles.js'
+import { TRICK_DRILLS,trickById,isTrick,nextTrick,tricksDone } from './tricks.js'
 import { createPuzzleEditor } from './puzzle-editor.js'
 import { decode as decodePuzzle,puzzleDrill } from './puzzle.js'
 import { DRILLS,DRILL_TABLE,emptyProgress,recordDrill,doneCount,nextDrill } from './drills.js'
@@ -133,7 +134,7 @@ function bind(){
  $('#open-physics').onclick=()=>{$('#table-dialog').close();openPhysics()}
  $('#drill-hint').onclick=()=>{if(!state.game?.applyHint())toast('Wait for the balls to stop')}
  $('#drill-retry').onclick=()=>state.game?.retryDrill()
- $('#drill-next').onclick=()=>{const n=nextDrill(state.drillId);if(n)startDrill(n.id);else{toast('That was the last drill');leaveRoom().then(openDrills)}}
+ $('#drill-next').onclick=()=>{const n=isTrick(state.drillId)?nextTrick(state.drillId):nextDrill(state.drillId);if(n)startDrill(n.id);else{toast(isTrick(state.drillId)?'That was the last trick shot':'That was the last drill');leaveRoom().then(openDrills)}}
  $('#drill-list').onclick=e=>{const b=e.target.closest('[data-drill]');if(b)startDrill(b.dataset.drill)}
  $('#replay-home').onclick=()=>leaveRoom()
  $('#focus-table').onclick=()=>{const focused=$('#game').classList.toggle('focus');$('#focus-table').textContent=focused?'Show chat':'Focus table';view.renderer?.resize()}
@@ -276,11 +277,11 @@ function openTrophies(){
 function drillProgress(){try{return JSON.parse(localStorage.getItem('pool-masters:drills'))||emptyProgress()}catch{return emptyProgress()}}
 function openDrills(){
  const p=drillProgress()
- $('#drills-summary').textContent=`One shot at a time, on a fixed table. ${doneCount(p)} of ${DRILLS.length} done.`
+ $('#drills-summary').textContent=`One shot at a time, on a fixed table. ${doneCount(p)} of ${DRILLS.length} done${TRICK_DRILLS.length?`, and ${tricksDone(p)} of ${TRICK_DRILLS.length} trick shots.`:'.'}`
  $('#drill-list').innerHTML=DRILLS.map(d=>{
   const r=p[d.id]
   return `<button type="button" class="drill" data-drill="${d.id}"><span class="dots" title="Level ${d.level}">${'●'.repeat(d.level)}${'○'.repeat(3-d.level)}</span><span class="what"><b>${esc(d.name)}</b><small>${esc(d.goal)}</small></span><span class="done">${r?.done?(r.best==null?'✓ with a hint':`✓ ${r.best===1?'first go':r.best+' tries'}`):''}</span></button>`
- }).join('')
+ }).join('')+(TRICK_DRILLS.length?`<h3 class="drill-head">Trick shots <small>clear the table with one shot; Show me plays the proven one</small></h3>`+TRICK_DRILLS.map(d=>{const r=p[d.id];return `<button type="button" class="drill" data-drill="${d.id}"><span class="dots" title="Level ${d.level}">${'●'.repeat(d.level)}${'○'.repeat(3-d.level)}</span><span class="what"><b>${esc(d.name)}</b><small>${esc(d.goal)}</small></span><span class="done">${r?.done?(r.best==null?'✓ with a hint':`✓ ${r.best===1?'first go':r.best+' tries'}`):''}</span></button>`}).join(''):'')
  $('#drills-dialog').showModal()
 }
 // The puzzle maker plays on the drill table, so it borrows it while it is open and gives the player's own back.
@@ -303,7 +304,7 @@ async function openPuzzle(link){
  return true
 }
 async function startDrill(id){
- const d=typeof id==='object'?id:isDaily(id)?dailyDrill(dailyNumberOf(id)):DRILLS.find(x=>x.id===id);if(!d)return
+ const d=typeof id==='object'?id:isDaily(id)?dailyDrill(dailyNumberOf(id)):isTrick(id)?trickById(id):DRILLS.find(x=>x.id===id);if(!d)return
  if($('#drills-dialog').open)$('#drills-dialog').close()
  state.game?.destroy();state.game=null
  // the shots are proven on one table: play them there, and put the player's own back afterwards
@@ -315,7 +316,7 @@ async function startDrill(id){
  $('#room-label').textContent=`Drill · ${d.name}`;$('#match-score').textContent=''
  $('#versus').innerHTML=`<span style="grid-column:1/-1;text-align:center"><b>${esc(d.name)} <small>${'●'.repeat(d.level)}${'○'.repeat(3-d.level)}</small></b><small>${esc(d.goal)}</small></span>`
  $('#drill-tip').textContent=d.tip
- state.game=new PoolGame({drill:d,drillLabel:d.puzzle?'PUZZLE':d.daily?`DAILY #${d.daily}`:`${DRILLS.indexOf(d)+1} OF ${DRILLS.length}`,mode:'8ball',renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),jumpBtn:$('#jump'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,onReplay:paintReplayBar,onDrill:onDrillResult,aimSensitivity:tablePrefs.aimSensitivity,prefs:tablePrefs,host:true,practice:false,spectator:false,send:()=>{}})
+ state.game=new PoolGame({drill:d,drillLabel:d.trick?`TRICK ${d.index+1} OF ${TRICK_DRILLS.length}`:d.puzzle?'PUZZLE':d.daily?`DAILY #${d.daily}`:`${DRILLS.indexOf(d)+1} OF ${DRILLS.length}`,mode:'8ball',renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),jumpBtn:$('#jump'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,onReplay:paintReplayBar,onDrill:onDrillResult,aimSensitivity:tablePrefs.aimSensitivity,prefs:tablePrefs,host:true,practice:false,spectator:false,send:()=>{}})
  state.game.setReady(true)
  $('#drill-bar').hidden=false;$('#drill-next').hidden=true;$('#drill-share').hidden=true
 }
@@ -323,7 +324,7 @@ function onDrillResult(e){
  if(!e){$('#drill-next').hidden=true;$('#drill-share').hidden=true;return}
  if(e.drill.puzzle){if(e.ok){toast('Puzzle solved!');sfx.result(true)}return}
  localStorage.setItem('pool-masters:drills',JSON.stringify(recordDrill(drillProgress(),e.drill.id,{ok:e.ok,attempts:e.attempts,hinted:e.hinted})))
- if(e.ok){toast('Drill complete!');sfx.result(true);$('#drill-next').hidden=!nextDrill(e.drill.id);$('#drill-share').hidden=!isDaily(e.drill.id);paintDaily();setTimeout(checkTrophies,1800)}
+ if(e.ok){toast(e.drill.trick?'Table cleared!':'Drill complete!');sfx.result(true);$('#drill-next').hidden=!(e.drill.trick?nextTrick(e.drill.id):nextDrill(e.drill.id));$('#drill-share').hidden=!isDaily(e.drill.id);paintDaily();setTimeout(checkTrophies,1800)}
 }
 
 // The bar shows once a shot has been recorded, and goes again when the next begins.
