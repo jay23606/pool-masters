@@ -62,6 +62,9 @@ export function choose(run,id){
  return startTable(next,run.level+1,tableRand({...next,level:run.level+1}))
 }
 
+// The next table with nothing taken: for a run that has every upgrade it can have, and so has nothing left to be offered.
+export function advance(run){return startTable(run,run.level+1,tableRand({...run,level:run.level+1}))}
+
 // Playing one table again after it was lost: the same size, fresh balls.
 const retryTable=(run)=>startTable(run,run.level,tableRand(run,run.lives))
 

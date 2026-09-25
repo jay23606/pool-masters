@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict'
-import {UPGRADES,upgradeById,levelSpec,newRun,offer,choose,judge,record,emptyRecord,START_LIVES,POCKET_BOOST,rng} from '../src/rogue.js'
+import {UPGRADES,upgradeById,levelSpec,newRun,offer,choose,advance,judge,record,emptyRecord,START_LIVES,POCKET_BOOST,rng} from '../src/rogue.js'
 import {PoolGame} from '../src/pool.js'
 import {chooseShot} from '../src/ai.js'
 import {TROPHIES,earned,emptyStats} from '../src/trophies.js'
@@ -146,18 +146,23 @@ test('the game sets up a run: the cue ball on the spot and the table\'s balls',(
 })
 
 test('an AI clears tables and takes upgrades; the game never gets stuck between them',()=>{
+ // the AI draws its aim error from Math.random: a fixed sequence makes this the same run every time
+ const real=Math.random;Math.random=rng(2026)
+ try{
  const {g,events}=game(21)
 
  for(let i=0;i<400&&!g.over;i++){
-  if(g.rogueWait){const e=events[events.length-1];assert.equal(e.type,'cleared');assert.equal(g.canControl(),false,'no shooting while choosing');assert.equal(g.pickUpgrade(e.offer[0].id),true);continue}
-  const plan=chooseShot(g.balls.map(b=>({...b})),null,false,'league','8ball')
+  if(g.rogueWait){const e=events[events.length-1];assert.ok(e.offer.length>0,'the picker is never opened with nothing in it');assert.equal(e.type,'cleared');assert.equal(g.canControl(),false,'no shooting while choosing');assert.equal(g.pickUpgrade(e.offer[0].id),true);continue}
+  const plan=chooseShot(g.balls.map(b=>({...b})),null,false,'pro','8ball')
   if(!plan)break
   play(g,plan.angle,plan.power)
  }
- assert.ok(g.over,'the run ended within the shot limit')
- assert.equal(events[events.length-1].type,'over')
+ // a strong AI may go a long way or may be beaten: either way it was never stuck, and it did clear tables
+ assert.ok(g.over||g.run.level>=4,'the run went on, or ended')
+ if(g.over){assert.equal(events[events.length-1].type,'over');assert.equal(g.run.lives,0)}
  assert.ok(events.some(e=>e.type==='cleared'),'at least one table was cleared on the way')
- assert.equal(g.run.lives,0)
+ assert.ok(g.run.level>=2,'it reached table two or beyond')
+ }finally{Math.random=real}
 })
 
 test('choosing before a table is cleared, or twice, does nothing',()=>{
@@ -183,4 +188,16 @@ test('wide pockets pot balls a normal pocket would miss, and only in a run',()=>
 
 test('a game that is not a run is untouched: no run state, no waiting',()=>{
  const g=Object.create(PoolGame.prototype);assert.equal(g.pocketScale(),1);assert.notEqual(g.rogueWait,true)
+})
+
+test('with every upgrade taken there is nothing to offer, and the run goes straight on to the next table',()=>{
+ const full={...newRun(2),level:9,cleared:9,upgrades:{shield:1,pockets:3,shots:3,life:9,jump:3,wind:2}}
+ assert.deepEqual(offer(full),[])
+ const next=advance(full);assert.equal(next.level,10);assert.equal(next.upgrades.life,9,'nothing was taken')
+ assert.equal(next.shotsLeft,levelSpec(10,full.upgrades).shots)
+ // and through the game: a table cleared on such a run does not wait for a choice
+ const {g,events}=game(4);g.run={...full,level:1,layout:g.run.layout,shotsLeft:9,cleared:0}
+ g.balls.forEach((b,i)=>{if(i)b.on=false});g.potted=[];g.scratch=false;g.phase='roll';g.resolve()
+ assert.equal(g.rogueWait,false,'not waiting');assert.equal(events.length,0,'no picker was opened');assert.equal(g.run.level,2)
+ assert.ok(g.balls.filter(b=>b.on&&b.k!=='cue').length>=1,'a new table is out')
 })

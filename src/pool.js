@@ -2,7 +2,7 @@ import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
 import {normalizeHouse,nextBreaker,placementLimit} from './house.js'
 import {airborne} from './physics.js'
-import {newRun as newRogueRun,judge as judgeRogue,choose as chooseRogue,offer as offerRogue,POCKET_BOOST} from './rogue.js'
+import {newRun as newRogueRun,judge as judgeRogue,choose as chooseRogue,advance as advanceRogue,offer as offerRogue,POCKET_BOOST} from './rogue.js'
 import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,targetFor,isRotation,MONEY,trianglePositions,kind} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
@@ -35,9 +35,11 @@ export class PoolGame{
   this.balls.forEach(clearMotion)
   this.phase='aim'
   if(v.event==='cleared'){
-   // the table is clear: the player picks an upgrade before the next one
+   // the table is clear: the player picks an upgrade before the next one, unless there is nothing left to offer
+   const choices=offerRogue(this.run)
+   if(!choices.length){this.run=advanceRogue(this.run);this.balls=this.rogueRack(this.balls[0]);this.aiming=true;this.flash(`Table ${this.run.level} · nothing left to upgrade`);this.sync();return}
    this.rogueWait=true;this.aiming=false;this.sync()
-   this.onRogue?.({type:'cleared',run:this.run,offer:offerRogue(this.run)})
+   this.onRogue?.({type:'cleared',run:this.run,offer:choices})
    return
   }
   if(v.event==='life'){this.balls=this.rogueRack();this.flash('Out of shots · a life lost · the table again')}
