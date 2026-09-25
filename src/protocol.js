@@ -10,13 +10,13 @@ export function isGameMessage(m){
  if(!m||typeof m!=='object'||typeof m.t!=='string')return false
  if(m.t==='next-rack')return true
  if(m.t==='table')return finite(m.size)&&typeof m.felt==='string'
- if(m.t==='shot')return finite(m.vx)&&finite(m.vy)&&(!m.spin||Array.isArray(m.spin)&&m.spin.every(finite))
+ if(m.t==='shot')return finite(m.vx)&&finite(m.vy)&&(!m.spin||Array.isArray(m.spin)&&m.spin.every(finite))&&(m.jump===undefined||typeof m.jump==='boolean')
  if(m.t!=='state'||!Array.isArray(m.b)||!player.has(m.turn)||!phase.has(m.phase)||!Number.isInteger(m.round))return false
  // A ball tuple is either the plain v1 shape (position only) or the v2 shape
  // with five more finite fields appended (velocity and spin) -- accepting
  // both means a tab still running the old build a moment after a deploy
  // degrades to no local prediction rather than dropping every state message.
- const validBall=b=>Array.isArray(b)&&(b.length===5||b.length===10)&&finite(b[0])&&finite(b[1])&&typeof b[2]==='boolean'&&groups.has(b[3])&&Number.isInteger(b[4])&&b[4]>=0&&b[4]<=15&&b[3]===expectedGroup(b[4])&&(b.length===5||b.slice(5).every(finite))
+ const validBall=b=>Array.isArray(b)&&(b.length===5||b.length===10||b.length===12)&&finite(b[0])&&finite(b[1])&&typeof b[2]==='boolean'&&groups.has(b[3])&&Number.isInteger(b[4])&&b[4]>=0&&b[4]<=15&&b[3]===expectedGroup(b[4])&&(b.length===5||b.slice(5).every(finite))
  // A snapshot without a mode is from before nine-ball existed: an 8-ball rack.
  const mode=m.mode===undefined?'8ball':m.mode,size=RACK_SIZE[mode]
  if(!size)return false

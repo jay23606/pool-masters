@@ -9,7 +9,7 @@ import {STEP} from './predict.js'
 
 export const MM_PER_UNIT=4.06   // see the note at the top of physics.js
 
-export const GROUPS=['Balls and cloth','Cushions','Shot','Simulation']
+export const GROUPS=['Balls and cloth','Cushions','Shot','Jump shots','Simulation']
 
 export const CONSTANTS=[
  {key:'G',group:'Balls and cloth',name:'Gravity',unit:'units/s²',note:'Sets how hard the cloth grips a ball; friction is proportional to it.'},
@@ -20,6 +20,9 @@ export const CONSTANTS=[
  {key:'MU_BALL',group:'Balls and cloth',name:'Ball-on-ball friction',unit:'',note:'Friction between two balls in contact; it is what causes throw on a cut shot.'},
  {key:'E_BALL',group:'Balls and cloth',name:'Ball restitution',unit:'',note:'How much speed two balls keep when they collide (1 would be perfectly elastic).'},
  {key:'MU_CUSHION',group:'Cushions',name:'Cushion friction',unit:'',note:'Friction against a cushion, which is how sidespin changes the angle a ball leaves at.'},
+ {key:'JUMP_MIN',group:'Jump shots',name:'Least jump',unit:'units/s',note:'The slowest a jumping cue ball leaves the cloth, however soft the shot.'},
+ {key:'JUMP_MAX',group:'Jump shots',name:'Greatest jump',unit:'units/s',note:'The fastest it can leave the cloth, however hard the shot: about two ball diameters of height at most.'},
+ {key:'JUMP_PER_SPEED',group:'Jump shots',name:'Jump per speed',unit:'',note:'How much of the speed of the shot becomes upward speed, between those limits: a harder shot goes higher and further.'},
  {key:'REST_SPEED',group:'Simulation',name:'Rest threshold',unit:'units/s',note:'A ball slower than this, in both motion and slip, counts as stopped.'},
 ]
 

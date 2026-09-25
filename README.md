@@ -218,12 +218,25 @@ shoots for a human (mutation-checked).
   stays where it stopped, and goes back on the head spot, clear of any ball sitting there, if it was potted.
 - **Who breaks:** the host always (standard), taking turns, the winner, or the loser. When the AI is due to break, it does.
 - **Straight pool is played to** 15, 30 (standard), 50 or 100 points.
+- **Jump shots:** a checkbox, off by default. When it is on, a **Jump** button appears beside Shoot; switch it on and the next
+  shot (only that one) pops the cue ball off the cloth so it can hop over balls in its way.
 
 A rule that is not standard is named in the game's header. An online table carries its rules in its room settings, so both players
 play the same game; a table with house rules is never ranked, and *Find a game* skips tables that have them. Career opponents keep
 the standard rules. The rules are validated wherever they come from (`src/house.js`): a stored value, or another player's room
 settings, that is not one of the offered choices is replaced by the standard one. The AI places the cue ball behind the head string
 when the kitchen rule says so.
+
+### Jump shots
+
+The simulation gives a ball a height. A jump shot lifts the cue ball half a ball off the cloth and gives it an upward speed that grows
+with the shot (`jumpSpeed()`, between two limits, so a harder shot goes higher and further). While it is in the air it feels only
+gravity on its height: it keeps its sideways speed and spin, collides with no ball and drops into no pocket, then lands and rolls as
+any ball does. A ball that is in the air is never "at rest". Height crosses the network as two more numbers on a ball's tuple, sent only
+while it is up, so old messages still validate; a guest asks for a jump with a flag on its shot message, and the host plays it only if the
+house rules allow it (a hostile or stale client cannot jump on a table that forbids it). Drills, challenges and the coach never jump. In the flat view the ball is drawn larger
+while it is up, and smaller as it comes down, with its shadow left on the cloth; in the 3D views it rises. Replays record positions only, so they do not show the hop.
+The tests hop a ball the cue ball is touching, and check the same shot without a jump hits it (mutation-checked).
 
 ## Challenges
 

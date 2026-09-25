@@ -7,21 +7,22 @@ import {bestCueSpot,chooseShot} from '../src/ai.js'
 import {R,MINX} from '../src/table.js'
 
 test('the defaults are the standard rules, and anything else is not',()=>{
- assert.deepEqual(DEFAULT_HOUSE,{race:3,ballInHand:'anywhere',breaker:'host',straightTo:30})
+ assert.deepEqual(DEFAULT_HOUSE,{race:3,ballInHand:'anywhere',breaker:'host',straightTo:30,jumps:false})
  assert.equal(isDefault(DEFAULT_HOUSE),true);assert.equal(isDefault(undefined),true);assert.equal(isDefault({}),true)
  for(const k of Object.keys(DEFAULT_HOUSE)){
-  const other={...DEFAULT_HOUSE,[k]:k==='race'?5:k==='ballInHand'?'kitchen':k==='breaker'?'alternate':50}
+  const other={...DEFAULT_HOUSE,[k]:k==='race'?5:k==='ballInHand'?'kitchen':k==='breaker'?'alternate':k==='jumps'?true:50}
   assert.equal(isDefault(other),false,k)
  }
  assert.equal(describe(DEFAULT_HOUSE),'')
- assert.match(describe({race:5,ballInHand:'kitchen',breaker:'winner',straightTo:100}),/race to 5 · ball in hand behind the head string · the winner breaks · straight pool to 100/)
+ assert.match(describe({race:5,ballInHand:'kitchen',breaker:'winner',straightTo:100,jumps:true}),/race to 5 · ball in hand behind the head string · the winner breaks · straight pool to 100 · jump shots allowed/)
 })
 
 test('rules from storage or from another player are validated, and junk falls back to the default',()=>{
  for(const junk of [null,undefined,42,'x',[],{race:99,ballInHand:'lava',breaker:'never',straightTo:7},{race:'3'},{race:3.5}]){
   const n=normalizeHouse(junk);assert.deepEqual(n,DEFAULT_HOUSE,JSON.stringify(junk))
  }
- assert.deepEqual(normalizeHouse({race:5,ballInHand:'none',breaker:'loser',straightTo:15,extra:'x'}),{race:5,ballInHand:'none',breaker:'loser',straightTo:15})
+ assert.deepEqual(normalizeHouse({race:5,ballInHand:'none',breaker:'loser',straightTo:15,jumps:true,extra:'x'}),{race:5,ballInHand:'none',breaker:'loser',straightTo:15,jumps:true})
+ for(const junk of ['true',1,'yes',null,{}])assert.equal(normalizeHouse({jumps:junk}).jumps,false,`jumps: ${JSON.stringify(junk)}`)
  // every offered choice is one that validates
  for(const r of RACES)assert.equal(normalizeHouse({race:r}).race,r)
  for(const b of BALL_IN_HAND)assert.equal(normalizeHouse({ballInHand:b}).ballInHand,b)
