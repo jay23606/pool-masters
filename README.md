@@ -51,13 +51,17 @@ Rooms support WebRTC voice and video calls. Use **Focus table** to hide the
 room sidebar and give the table more space.
 
 Pool Masters Radio streams real, actually-licensed tracks (CC BY / BY-SA,
-fetched from Jamendo via the Openverse API) rather than a fixed playlist, with
-a large procedurally-generated station catalogue (`src/music.js`'s 48
-`MUSIC_PRESETS`) as the fallback when a fetch fails or a track won't play. Both
-sources duck automatically around a rack result, which plays its own small
-Web Audio sting plus, on a win or loss, a short CC0 crowd clip (Freesound,
-preloaded lazily). Music has its own volume control, separate from the table's
-sound toggle.
+fetched from Jamendo via the Openverse API) rather than a fixed playlist. It is on
+by default at 20% volume (turn it off or change the volume and that choice is kept),
+picks from 36 genres and a random page of each, so the mix is thousands of tracks,
+and never repeats a song until 80 others have played. A failed request is retried on
+other genres; a browser that blocks autoplay gets the song on your first tap. Only if
+no real track can be had does it fall back to the procedurally-generated station
+catalogue (`src/music.js`'s 48 `MUSIC_PRESETS`, the pool-themed loops), and it tries
+the radio again every 40 seconds from there. Both sources duck automatically around a
+rack result, which plays its own small Web Audio sting plus, on a win or loss, a short
+CC0 crowd clip (Freesound, preloaded lazily). Music has its own volume control,
+separate from the table's sound toggle.
 
 Table settings include felt color, table size, cue finish, room lighting, cue
 aim sensitivity (how far the cue rotates per pixel of drag), and mobile
@@ -71,9 +75,20 @@ behind the cue ball, looking down the line of the shot — and returns when the 
 Striped balls switch to their real stripes for it. Turn it off under TABLE → *Follow the shot*
 (`src/shot-cam.js`).
 
-Held upright on a phone, the table turns a quarter turn so its long side runs down the
-screen and fills the width; the site header and secondary buttons are hidden while you
-play. Landscape is unchanged. Pointer positions are mapped back in `src/screen-point.js`.
+**The table is the point of the screen.** The site header is hidden while you play. On a
+desktop or tablet the game fills the window and the table is fitted into whatever height is
+left (container query units, so no row's height has to be guessed), with spin, power and Shoot
+in a column beside it and the names and group line on one row above. Held upright on a phone
+the table turns a quarter turn so its long side runs down the screen; the card is one screen
+tall, the table is fitted into what the rows around it leave, and status, record and the
+replay button share space. Landscape phones have their own layout. Pointer positions are
+mapped back through the rotation in `src/screen-point.js`.
+
+**The 3D table** has woven felt with the head string and spots, varnished wood-grain rails
+with mother-of-pearl diamonds and brass inlay, engraved brass plates on rounded corner caps,
+wedge-profile cushions with cut-back jaws at every pocket, and leather pocket rims. The cue is
+built from a leather tip, ferrule, maple shaft, steel joint, inlaid forearm, linen wrap,
+sleeve and bumper. All of it is view-only: the physics never sees it.
 
 The table draws through a swappable renderer, and the button in the corner of
 the table cycles three of them:
@@ -165,10 +180,25 @@ windows of a third of a degree and were replaced, and the break's own tip had to
 be corrected once it showed that a full-power break with no spin scratches every
 time.
 
+### Daily shot
+
+**Daily shot** on the lobby is one fixed table a day, the same for everyone, with no account
+and no server (so it works offline). It plays like any drill: a hint if you want one, a retry
+after a miss, and a **Share result** button that copies `Pool Masters Daily #268 ★★★` plus how
+it went, ready to paste to a friend. The lobby button shows ✓ once today's is solved.
+
+The tables are not made up on the day. `tools/gen-daily.mjs` draws layouts from a seeded
+generator and keeps only those where a real search of the physics finds a shot with at least a
+degree of aim to spare; the 180 it kept are stored as data in `src/daily-data.js`, so nothing
+about the day's table depends on the player's browser. The date picks the table (day 1 is
+1 January 2026, by the local calendar) and the weekday picks the difficulty — easy Monday and
+Tuesday, hard Friday and Saturday — with a table not repeated until every other of its grade has
+had its turn. The tests re-run every stored shot through the physics.
+
 ## Trophies
 
-Twenty-five trophies in seven groups: racks won, nine-ball, skill (runs, break and
-run, clean hands), opponents, practice drills, sharing, and the league. Open the
+Twenty-seven trophies in seven groups: racks won, nine-ball, skill (runs, break and
+run, clean hands), opponents, practice drills and daily shots, sharing, and the league. Open the
 🏆 button in the header for the case, with a progress bar for each one; an unlock
 shows a toast. Stats are counted per device in the browser. They are derived from
 finished shots, worked out from the table before and after, so a host and a guest
@@ -177,8 +207,9 @@ count the same things (a test plays whole racks and checks they do).
 ## Replays
 
 Every shot is recorded as it plays and stays available until the next one
-finishes: **↺ Replay** and **Slow motion** play it back on your own table, and
-**Copy replay link** puts it in a URL that opens a table which does nothing but
+finishes. A ⟲ button appears beside the view buttons; it opens a small menu with
+**Replay** and **Slow motion**, which play it back on your own table, and
+**Copy replay link**, which puts it in a URL that opens a table which does nothing but
 play that shot, with a *Play a game* button for whoever lands on it. A full
 16-ball break is about a thousand characters.
 
@@ -237,9 +268,10 @@ group and foul every shot after.
   Neither the ball-in-hand placement nor the called pocket is final until the
   shot is actually taken.
 - The HUD names each player's group and, once assigned, how many of their
-  balls are left (`YOU: STRIPES · 4 left`) — including while aiming at the 8 before
+  balls are left (`YOU: STRIPES · 6 left | THEM: SOLIDS · 4 left`) — including while aiming at the 8 before
   it's legal, which explains itself (`The 8 is not yours yet · 4 stripes still
   to pot`) rather than silently refusing the pocket call.
+- Drills and the daily shot title themselves, so the group line is hidden there.
 
 ## Progressive web app
 
@@ -274,7 +306,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 268 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 280 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and
@@ -290,10 +322,14 @@ DOM, no renderer.
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/replay.js` | recording, the link format and its validation, and playback |
-| `src/trophies.js` | the stats, the twenty-five trophies and how each is earned |
+| `src/trophies.js` | the stats, the twenty-seven trophies and how each is earned |
 | `src/physics-info.js` | descriptions of the physics constants, for the read-only Physics panel |
 | `src/drills.js` | the drills, how each is judged, their hints, and progress |
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
+| `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
+| `tools/gen-daily.mjs` | generates and proves the daily tables |
+| `src/shot-cam.js` | the follow-the-shot camera's poses and blend |
+| `src/screen-point.js` | maps a pointer back to the table through the phone's quarter turn |
 | `src/ai.js` | the practice opponent, over a ball array |
 | `src/physics.js` | the contact model |
 | `src/game-input.js` | pointer/drag input, separated from match control |

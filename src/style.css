@@ -114,3 +114,7 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
 #replay-bar.pop{display:none}
 #replay-bar.pop.open:not([hidden]){display:flex;width:max-content;min-width:170px;position:fixed;z-index:30;flex-direction:column;gap:2px;padding:6px;background:#0d1d16;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px #000a}
 #replay-bar.pop button{text-align:left;justify-content:flex-start}
+
+/* drills and shared shots title themselves; the group line has nothing to say there */
+#game.solo #groups{display:none}
+#game.solo #versus small{display:block}
