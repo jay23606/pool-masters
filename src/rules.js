@@ -6,13 +6,19 @@ import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 
 export const MODES={
  '8ball':{label:'8-ball',balls:16},'9ball':{label:'9-ball',balls:10},
- 'bank':{label:'Bank pool',balls:16},'onepocket':{label:'One-pocket',balls:16}
+ 'bank':{label:'Bank pool',balls:16},'onepocket':{label:'One-pocket',balls:16},
+ '10ball':{label:'10-ball',balls:11},'straight':{label:'Straight pool',balls:16}
 }
 export const modeOf=m=>MODES[m]?m:'8ball'
 // Bank pool and one-pocket are scored games: fifteen balls, any of them may be hit first, and the
 // first to eight wins. What they share is judged by judgeScoreGame().
-export const isScoreMode=m=>m==='bank'||m==='onepocket'
+export const isScoreMode=m=>m==='bank'||m==='onepocket'||m==='straight'
 export const SCORE_TARGET=8
+// what wins each scored game: eight for the two short ones, thirty for straight pool
+export const targetFor=m=>m==='straight'?30:SCORE_TARGET
+// Nine-ball and ten-ball share their rules: hit the lowest ball first, and the money ball wins.
+export const isRotation=m=>m==='9ball'||m==='10ball'
+export const MONEY={'9ball':9,'10ball':10}
 // One-pocket: each player owns one of the two foot corners (the end the rack sits at). Player A
 // has the bottom-right pocket and player B the top-right; a ball dropped in either is that
 // player's, whoever shot it.
@@ -27,7 +33,8 @@ export const normalizeGroup=g=>g==='solids'?'solid':g==='stripes'?'stripe':g
 
 const shuffle=a=>a.sort(()=>Math.random()-.5)
 export function rack(mode='8ball'){
- return modeOf(mode)==='9ball'?nineRack():eightRack()
+ const m=modeOf(mode)
+ return m==='9ball'?nineRack():m==='10ball'?tenRack():eightRack()
 }
 
 // Diamond of ten: the 1 on the foot spot at the apex, the 9 in the middle, the
@@ -41,6 +48,22 @@ function nineRack(){
   const n=nums[i]
   return {id:n,x:420+col*(R*Math.sqrt(3)),y:190+row*(2*R),vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(n),n}
  })]
+}
+
+// Triangle of ten: the 1 at the apex on the foot spot, the 10 in the middle, the other eight anywhere.
+function tenRack(){
+ const cue={id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}
+ const slots=trianglePositions(4)
+ const others=shuffle([2,3,4,5,6,7,8,9])
+ const nums=[1,...others.slice(0,3),10,...others.slice(3)]     // slot 4 is the middle of the third row
+ return [cue,...slots.map(([x,y],i)=>({id:nums[i],x,y,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(nums[i]),n:nums[i]}))]
+}
+
+// The places of a triangle rack with the given number of rows, apex first, on the foot spot.
+export function trianglePositions(rows){
+ const out=[]
+ for(let row=0;row<rows;row++)for(let i=0;i<=row;i++)out.push([420+row*(R*Math.sqrt(3)),190+(i-row/2)*(2*R)])
+ return out
 }
 
 function eightRack(){
@@ -74,6 +97,7 @@ export const validCueSpot=(balls,p)=>
 // table when the shot was taken.
 export function judgeShot(s){
  if(modeOf(s.mode)==='9ball')return judgeNineBall(s)
+ if(modeOf(s.mode)==='10ball')return judgeNineBall(s,MONEY['10ball'])
  if(isScoreMode(modeOf(s.mode)))return judgeScoreGame(s)
  const shooter=s.turn,group=normalizeGroup(s.groups[shooter]),open=!group
  const black=s.potted.some(b=>b.k==='eight')
@@ -127,8 +151,8 @@ export function lowestBall(balls){
 
 // Where a pocketed 9 goes back: the foot spot, or the next free spot behind it
 // if a ball is sitting there, so it can never reappear inside another ball.
-export function nineRespot(balls){
- const free=p=>!balls.some(b=>b.on&&b.n!==9&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
+export function nineRespot(balls,money=9){
+ const free=p=>!balls.some(b=>b.on&&b.n!==money&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
  for(let x=420;x<=MAXX;x+=R)if(free({x,y:190}))return {x,y:190}
  for(let x=420;x>=MINX;x-=R)if(free({x,y:190}))return {x,y:190}
  return {x:420,y:190}
@@ -137,14 +161,14 @@ export function nineRespot(balls){
 // Takes: turn, potted (object balls only), scratch, firstHit, lowest (the
 // lowest ball when the shot was taken), railHit (a ball reached a cushion
 // after the first contact).
-export function judgeNineBall(s){
- const shooter=s.turn,nine=s.potted.some(b=>b.n===9)
+export function judgeNineBall(s,money=9){
+ const shooter=s.turn,nine=s.potted.some(b=>b.n===money)
  const reason=s.scratch?'scratch'
   :!s.firstHit?'no-contact'
   :s.firstHit.n!==s.lowest?'wrong-first'
   :!s.potted.length&&!s.railHit?'no-rail'
   :null
- if(reason)return {winner:null,foul:true,reason,assign:null,nextTurn:other(shooter),respotNine:nine}
+ if(reason)return {winner:null,foul:true,reason,assign:null,nextTurn:other(shooter),respotNine:nine,respotBall:nine?money:null}
  if(nine)return {winner:shooter,foul:false,reason:null,assign:null,nextTurn:shooter,respotNine:false}
  return {winner:null,foul:false,reason:null,assign:null,nextTurn:s.potted.length?shooter:other(shooter),respotNine:false}
 }
@@ -173,13 +197,18 @@ export function judgeScoreGame(s){
   let to=null
   if(!reason){
    if(mode==='bank')to=rails.has(b.n)?shooter:null
+   else if(mode==='straight')to=shooter
    else{const i=pockets?.[b.n];to=i===ONE_POCKET.a?'a':i===ONE_POCKET.b?'b':null}
   }
   if(to){score[to]++;credited.push({n:b.n,to})}else wasted.push(b.n)
  }
  const left=s.balls.filter(b=>b.on&&b.k!=='cue').length
- let winner=score.a>=SCORE_TARGET?'a':score.b>=SCORE_TARGET?'b':null
- if(!winner&&left===0)winner=score.a>score.b?'a':score.b>score.a?'b':opponent
+ const target=targetFor(mode)
+ if(mode==='straight')score[shooter]-=reason?1:0                    // a foul costs a point
+ let winner=score.a>=target?'a':score.b>=target?'b':null
+ if(!winner&&left===0&&mode!=='straight')winner=score.a>score.b?'a':score.b>score.a?'b':opponent
  const kept=!reason&&credited.some(c=>c.to===shooter)
- return {winner,foul:Boolean(reason),reason,assign:null,nextTurn:reason||!kept?opponent:shooter,score,credited,wasted}
+ // straight pool is continuous: when one ball is left the fourteen are racked again around it
+ const rerack=mode==='straight'&&!winner&&left<=1
+ return {winner,foul:Boolean(reason),reason,assign:null,nextTurn:reason||!kept?opponent:shooter,score,credited,wasted,rerack}
 }

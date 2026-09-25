@@ -1,7 +1,7 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,strike,shotSpeed} from './physics.js'
 import {STEP} from './predict.js'
-import {remaining,validCueSpot,nearestPocket,normalizeGroup,lowestBall,isScoreMode,ONE_POCKET} from './rules.js'
+import {remaining,validCueSpot,nearestPocket,normalizeGroup,lowestBall,isScoreMode,isRotation,ONE_POCKET} from './rules.js'
 
 // The practice opponent, as pure functions over a ball array. It never touches
 // the game object, so it can be run, measured and tested on its own -- which is
@@ -30,7 +30,7 @@ export const difficultyFor=level=>level==='coach'?COACH:AI_LEVELS[level]||AI_LEV
 // one ball -- the lowest on the table -- whoever is shooting.
 export function legalTargets(balls,group,mode='8ball'){
  if(isScoreMode(mode))return balls.filter(b=>b.on&&b.k!=='cue')     // bank pool and one-pocket: any ball
- if(mode==='9ball'){const low=lowestBall(balls);return balls.filter(b=>b.on&&b.n===low)}
+ if(isRotation(mode)){const low=lowestBall(balls);return balls.filter(b=>b.on&&b.n===low)}
  return balls.filter(b=>b.on&&b.k!=='cue'&&
   (group?b.k===(remaining(balls,group)?group:'eight'):b.k!=='eight'))
 }
@@ -208,12 +208,12 @@ export function rollout(balls,angle,power,maxSeconds=8,spin=[0,0],onFrame=null){
 // angle that makes a legal contact.
 export function escapeShot(balls,want,mode='8ball'){
  const start=Math.random()*Math.PI*2
- const low=mode==='9ball'?lowestBall(balls):null
+ const low=isRotation(mode)?lowestBall(balls):null
  for(const power of [52,74])for(let i=0;i<40;i++){
   const angle=start+i*Math.PI*2/40
   const hit=simulateFirstHit(balls,angle,power)
   if(!hit)continue
-  if(mode==='9ball'?hit.n===low:(isScoreMode(mode)||(want?hit.k===want:hit.k!=='eight')))return{angle,power}
+  if(isRotation(mode)?hit.n===low:(isScoreMode(mode)||(want?hit.k===want:hit.k!=='eight')))return{angle,power}
  }
  return null
 }
@@ -256,7 +256,7 @@ export function fouls(balls,plan,group,mode){
 export function foulReason(balls,r,group,mode){
  if(r.scratch)return 'scratch'
  if(!r.firstHit)return 'no-contact'
- if(mode==='9ball'){
+ if(isRotation(mode)){
   if(r.firstHit.n!==lowestBall(balls))return 'wrong-first'
   return !r.potted.length&&!r.railHit?'no-rail':null     // the cushion rule
  }
@@ -295,7 +295,7 @@ export function chooseShot(balls,group,ballInHand,level='league',mode='8ball',ct
 function planOnce(balls,group,level,mode,place,ctx){
  const difficulty=difficultyFor(level)
  // nine-ball has no called pockets, so nothing here ever names one
- const calls=t=>mode!=='9ball'&&t.k==='eight'
+ const calls=t=>!isRotation(mode)&&t.k==='eight'
  const cue=balls[0]
  // bank pool wants a bank; one-pocket only your own pocket; the others, any pot
  const shot=mode==='bank'?bankShot(balls,level==='coach'?Infinity:350):bestShot(balls,group,mode,pocketsFor(mode,ctx))

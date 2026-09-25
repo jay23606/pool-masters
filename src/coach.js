@@ -29,7 +29,7 @@ export function play(before,shot,group,mode,player='a'){
  return {potted:r.potted,pockets:r.pockets,firstHit:r.firstHit?r.firstHit.n:null,scratch:r.scratch,
   foul:foulReason(before,r,normalizeGroup(group),mode),pot,pocket:pot!=null?r.pockets[pot]:null,mode,
   // the balls that scored: in the scored games a ball that dropped the wrong way is no use
-  counted:!isScoreMode(mode)?r.potted:r.potted.filter(n=>mode==='bank'?r.railBalls.includes(n):r.pockets[n]===ONE_POCKET[player])}
+  counted:!isScoreMode(mode)||mode==='straight'?r.potted:r.potted.filter(n=>mode==='bank'?r.railBalls.includes(n):r.pockets[n]===ONE_POCKET[player])}
 }
 
 // How often a shot like this one works for a steady player: aim and power wobbled a little
