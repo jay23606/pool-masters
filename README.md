@@ -209,6 +209,16 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Puzzle maker
+
+**Puzzle maker** on the lobby is an editor for pool puzzles. Tap the table to add a ball (up to eight), drag balls and the cue ball to move them, tap a ball to make it the one to pot,
+and press **Check it**: the computer searches the real physics for a shot that pots the ball, and reports how many degrees of aim still work. Only a table it has solved can be shared: **Copy link**
+makes a `?puzzle=` link. **Play it** tries the table yourself straight away.
+
+Opening a link plays the packed shot through the physics again and refuses the puzzle if it does not pot the ball, so a link can never hold an unsolvable table, however it was made or edited.
+The puzzle plays as a practice drill on the 7 ft table (the one the shots are proven on), with Show me and Retry. `src/puzzle.js` is the layout rules, the search and the link format as pure functions;
+`src/puzzle-editor.js` is the dialog. The tests cover the layout checks, the solver, link round trips, and a set of malformed and unsolvable links.
+
 ## Chaos Pool
 
 **Chaos Pool** is a scored game to 15 with a random twist dealt before every shot. The host deals it and it travels in the game state, so both players see the same one:
@@ -509,6 +519,7 @@ DOM, no renderer.
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/puzzle.js`, `src/puzzle-editor.js` | Puzzle maker: layout rules, solver, shareable links, the editor dialog |
 | `src/chaos.js` | Chaos Pool: the twists (bonus pocket, bomb ball, gravity well) |
 | `src/rogue.js` | Rogue Pool: the run, the upgrades, the shot accounting, the record |
 | `src/house.js` | house rules: the choices, validation, who breaks, where the cue ball may go |

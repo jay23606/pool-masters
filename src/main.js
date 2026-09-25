@@ -15,6 +15,8 @@ import { AI_LEVELS } from './ai.js'
 import { MODES,modeOf } from './rules.js'
 import { pack,unpack } from './replay.js'
 import { normalizeHouse,isDefault as houseIsDefault,describe as describeHouse,RACES,BALL_IN_HAND,BREAKERS,STRAIGHT_TARGETS,words as houseWords } from './house.js'
+import { createPuzzleEditor } from './puzzle-editor.js'
+import { decode as decodePuzzle,puzzleDrill } from './puzzle.js'
 import { DRILLS,DRILL_TABLE,emptyProgress,recordDrill,doneCount,nextDrill } from './drills.js'
 import { analyse,replayOf } from './coach.js'
 import { record as recordRogue,emptyRecord as emptyRogue } from './rogue.js'
@@ -52,7 +54,7 @@ setTableSize(tablePrefs.size)
 document.querySelector('#app').innerHTML=`
 <header><button class="brand" id="home">● Pool Masters</button><div class="identity"><a class="ghost" href="feature.html" target="_blank" rel="noopener" title="How this compares to other pool games, and what is next">Roadmap</a><button id="theme-toggle" class="theme-toggle" title="Switch color theme">☼</button><span id="mini-rating"></span><button id="trophies" class="ghost" title="Trophies">🏆</button><button id="player-stats" class="ghost">Stats</button><button id="edit-name" class="ghost"></button></div></header>
 <main>
- <section id="lobby" class="screen active"><div class="hero"><p class="eyebrow">THE TABLE IS OPEN</p><h1>Rack up.<br><em>Play anyone.</em></h1><p>Instant rooms, live chat, and calls. No account required.</p><div class="actions"><button id="quick" class="primary">Find a game</button><button id="practice">Practice vs AI</button><button id="career">Career</button><button id="house">House rules</button><button id="hotseat">Two players, one device</button><button id="daily">Daily shot</button><button id="challenges">Challenges</button><button id="rogue">Rogue Pool</button><button id="drills">Drills</button><select id="game-mode" aria-label="Game"><option value="8ball" selected>8-ball</option><option value="9ball">9-ball</option><option value="10ball">10-ball</option><option value="bank">Bank pool</option><option value="straight">Straight pool</option><option value="chaos">Chaos Pool</option><option value="onepocket">One-pocket</option></select><select id="ai-level" aria-label="AI difficulty"><option value="beginner">Beginner AI</option><option value="league" selected>League AI</option><option value="pro">Pro AI</option></select></div><div class="join"><input id="code" maxlength="5" placeholder="ROOM CODE"><button id="join">Join</button></div><div class="hero-art" aria-hidden="true"></div></div><div class="lobby-side"><div class="panel"><div class="panel-title"><h2>Open tables</h2><button id="refresh" class="icon">↻</button></div><div id="rooms" class="room-list"></div><button id="create" class="wide">+ Create a private table</button></div><div class="panel leaderboard"><h2>League leaders</h2><div id="leaders"></div></div></div></section>
+ <section id="lobby" class="screen active"><div class="hero"><p class="eyebrow">THE TABLE IS OPEN</p><h1>Rack up.<br><em>Play anyone.</em></h1><p>Instant rooms, live chat, and calls. No account required.</p><div class="actions"><button id="quick" class="primary">Find a game</button><button id="practice">Practice vs AI</button><button id="career">Career</button><button id="house">House rules</button><button id="hotseat">Two players, one device</button><button id="daily">Daily shot</button><button id="challenges">Challenges</button><button id="rogue">Rogue Pool</button><button id="drills">Drills</button><button id="puzzles">Puzzle maker</button><select id="game-mode" aria-label="Game"><option value="8ball" selected>8-ball</option><option value="9ball">9-ball</option><option value="10ball">10-ball</option><option value="bank">Bank pool</option><option value="straight">Straight pool</option><option value="chaos">Chaos Pool</option><option value="onepocket">One-pocket</option></select><select id="ai-level" aria-label="AI difficulty"><option value="beginner">Beginner AI</option><option value="league" selected>League AI</option><option value="pro">Pro AI</option></select></div><div class="join"><input id="code" maxlength="5" placeholder="ROOM CODE"><button id="join">Join</button></div><div class="hero-art" aria-hidden="true"></div></div><div class="lobby-side"><div class="panel"><div class="panel-title"><h2>Open tables</h2><button id="refresh" class="icon">↻</button></div><div id="rooms" class="room-list"></div><button id="create" class="wide">+ Create a private table</button></div><div class="panel leaderboard"><h2>League leaders</h2><div id="leaders"></div></div></div></section>
  <section id="game" class="screen"><div class="game-top"><div><button id="leave" class="ghost">← Leave room</button><span id="room-label"></span><span id="match-score" class="match-score"></span><button id="rename-room" class="ghost" hidden>Rename</button></div><div id="spectator-requests"></div><div class="call-actions"><button id="focus-table" class="ghost">Focus table</button><button id="copy" class="ghost">Copy invite</button><button id="call">Start call</button></div></div><div class="play-layout"><div class="table-card"><div id="versus"></div><div class="table-bar"><div id="groups"></div><a id="music-credit" class="music-credit" target="_blank" rel="noopener" hidden></a><div class="view-buttons"><button id="music-toggle" class="view-toggle sfx-toggle" title="Background music"></button><input id="music-volume" class="music-volume" type="range" min="10" max="100" value="100" aria-label="Music volume" title="Music volume" hidden><button id="music-shuffle" class="view-toggle" title="Shuffle music">↻</button><button id="mute-sfx" class="view-toggle sfx-toggle" title="Table sound"></button><button id="view-3d" class="view-toggle" title="Switch table view: top-down 3D, angled 3D, flat 2D">TOP</button></div></div><div class="table-rot"><div class="canvas-wrap"><canvas id="table" width="700" height="380"></canvas><canvas id="table3d" hidden></canvas><div id="callout"></div></div></div><div class="table-side"><div class="shot-controls"><div id="spin" class="spin" title="Cue tip contact point. Drag for draw, follow and English; double-click to centre."><i></i></div><label>Power <input id="power" type="range" min="1" max="100" value="45"><output>45%</output></label><button id="jump" class="jump-toggle" type="button" hidden aria-pressed="false" title="Jump shot: the cue ball hops over balls in its way. Harder shots go further.">Jump</button><button id="shoot" class="primary" disabled>Shoot</button><button id="next-rack" hidden>Next rack</button><button id="move-cue" class="redo" hidden>Move cue ball</button><button id="change-pocket" class="redo" hidden>Change 8-ball pocket</button></div><div id="game-status"></div><div id="drill-bar" hidden><div id="drill-tip"></div><div id="drill-buttons"><button id="drill-hint" class="ghost" title="Set the aim, power and spin to a shot that works">Show me</button><button id="drill-retry" class="ghost">↺ Retry</button><button id="drill-next" class="ghost" hidden>Next drill →</button><button id="drill-share" class="ghost" hidden>Share result</button></div></div><div id="replay-bar" hidden><button id="replay-shot" class="ghost" title="Watch the last shot again">↺ Replay</button><button id="replay-slow" class="ghost" title="Watch it at a quarter of the speed">Slow motion</button><button id="share-replay" class="ghost" title="Copy a link that plays this shot for anyone">Copy replay link</button><button id="coach-open" class="ghost" title="What would a coach say about your last shot?">🎓 Coach</button><button id="replay-home" class="ghost" hidden>Play a game</button></div><div id="practice-record" hidden></div></div></div><aside id="room-sidebar"><div id="video-panel"><video id="remote-video" autoplay playsinline></video><video id="local-video" autoplay playsinline muted></video><div class="media-controls"><button id="mute" class="call-icon off" type="button" aria-label="Microphone is off. Turn it on" title="Microphone is off"></button><button id="camera" class="call-icon off" type="button" aria-label="Camera is off. Turn it on" title="Camera is off"></button></div></div><div class="chat"><div id="messages"></div><form id="chat-form"><input id="message" maxlength="500" autocomplete="off" placeholder="Message the room"><button>Send</button></form></div></aside></div></section>
 </main><dialog id="name-dialog"><form method="dialog"><h2>Choose your name</h2><p>This device remembers you. You can change it anytime.</p><input id="name" maxlength="24" placeholder="Pool player" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-name" value="default" class="primary">Continue</button></div></form></dialog><dialog id="room-dialog"><form method="dialog"><h2>Name this table</h2><p>Players will see this name in the open-table list.</p><input id="room-name" maxlength="48" placeholder="Friday night pool" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-room-name" value="default" class="primary">Save</button></div></form></dialog><dialog id="stats-dialog"><form method="dialog"><h2>Your league record</h2><div id="stats-body"></div><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="result-dialog"><form method="dialog"><h2 id="result-title"></h2><p id="result-summary"></p><div><button id="share-result" type="button" class="ghost">Share result</button><button id="result-next" type="button" class="primary">Next rack</button><button value="default" class="ghost">Close</button></div></form></dialog><dialog id="trophies-dialog"><form method="dialog"><h2>Trophies</h2><p id="trophies-summary"></p><div id="trophy-list"></div><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="drills-dialog"><form method="dialog"><h2>Practice drills</h2><p id="drills-summary"></p><div id="drill-list"></div><div><button value="default" class="primary">Done</button></div></form></dialog><div id="toast"></div>`
 $('.view-buttons').insertAdjacentHTML('beforeend','<button id="replay-menu" class="view-toggle" title="Replay the last shot" hidden aria-label=\"Replay the last shot\">⟲</button>')
@@ -72,8 +74,8 @@ async function boot(){
  let name=localStorage.getItem('pool-masters:name')||''
  if(!name){name=`Player ${Math.floor(100+Math.random()*900)}`;localStorage.setItem('pool-masters:name',name)}
  await foyer.signIn(name); $('#edit-name').textContent=foyer.player.name; await ensureLeagueProfile(); bind(); await ensureRenderer(); await refresh();
- const params=new URLSearchParams(location.search),shared=params.get('replay'),code=params.get('room')
- if(shared)await openReplay(shared);else if(code)await joinRoom(code)
+ const params=new URLSearchParams(location.search),shared=params.get('replay'),code=params.get('room'),puzzle=params.get('puzzle')
+ if(shared)await openReplay(shared);else if(puzzle)await openPuzzle(puzzle);else if(code)await joinRoom(code)
 }
 async function ensureLeagueProfile(){
  await sb.rpc('pm_upsert_profile',{p_username:foyer.player.name})
@@ -116,7 +118,7 @@ function bind(){
  $('#replay-shot').onclick=()=>watch(1)
  $('#replay-slow').onclick=()=>watch(.25)
  $('#share-replay').onclick=shareReplay
- $('#drills').onclick=openDrills
+ $('#drills').onclick=openDrills;$('#puzzles').onclick=openPuzzleMaker
  $('#daily').onclick=()=>startDrill(`daily-${dayNumber()}`)
  $('#drill-share').onclick=shareDaily
  paintDaily()
@@ -278,25 +280,45 @@ function openDrills(){
  }).join('')
  $('#drills-dialog').showModal()
 }
+// The puzzle maker plays on the drill table, so it borrows it while it is open and gives the player's own back.
+let puzzleEditor=null
+async function openPuzzleMaker(){
+ if(tablePrefs.size!==DRILL_TABLE){await viewManager.previewTable(DRILL_TABLE);state.previewedTable=true}
+ puzzleEditor??=createPuzzleEditor({
+  onPlay:d=>{state.puzzlePlaying=true;startDrill(d)},
+  onLink:async code=>{const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('puzzle',code);try{await navigator.clipboard.writeText(url.href);return {copied:true,url:url.href}}catch{return {copied:false,url:url.href}}},
+  toast
+ })
+ puzzleEditor.open()
+ document.querySelector('#puzzle-dialog').addEventListener('close',async()=>{if(state.puzzlePlaying){state.puzzlePlaying=false;return}if(state.previewedTable&&!state.game){state.previewedTable=false;await viewManager.applyTablePrefs(tablePrefs.size,tablePrefs.felt,{fresh:false,remote:true})}},{once:true})
+}
+// A shared puzzle link: refused unless its own shot really pots the ball.
+async function openPuzzle(link){
+ const r=decodePuzzle(link)
+ if(!r){toast('That puzzle link is not valid');return false}
+ await startDrill(puzzleDrill(r.puzzle,r.hint))
+ return true
+}
 async function startDrill(id){
- const d=isDaily(id)?dailyDrill(dailyNumberOf(id)):DRILLS.find(x=>x.id===id);if(!d)return
+ const d=typeof id==='object'?id:isDaily(id)?dailyDrill(dailyNumberOf(id)):DRILLS.find(x=>x.id===id);if(!d)return
  if($('#drills-dialog').open)$('#drills-dialog').close()
  state.game?.destroy();state.game=null
  // the shots are proven on one table: play them there, and put the player's own back afterwards
  if(tablePrefs.size!==DRILL_TABLE){await viewManager.previewTable(DRILL_TABLE);state.previewedTable=true;toast(`Drills use the ${DRILL_TABLE} ft table`)}
- state.mode='drill';state.room=null;state.opponent=null;state.drillId=id
+ state.mode='drill';state.room=null;state.opponent=null;state.drillId=d.id
  showGame()
  $('#game').classList.add('focus','solo');$('.call-actions').hidden=true;$('#room-sidebar').hidden=true
  history.replaceState({},'',location.pathname)
  $('#room-label').textContent=`Drill · ${d.name}`;$('#match-score').textContent=''
  $('#versus').innerHTML=`<span style="grid-column:1/-1;text-align:center"><b>${esc(d.name)} <small>${'●'.repeat(d.level)}${'○'.repeat(3-d.level)}</small></b><small>${esc(d.goal)}</small></span>`
  $('#drill-tip').textContent=d.tip
- state.game=new PoolGame({drill:d,drillLabel:d.daily?`DAILY #${d.daily}`:`${DRILLS.indexOf(d)+1} OF ${DRILLS.length}`,mode:'8ball',renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),jumpBtn:$('#jump'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,onReplay:paintReplayBar,onDrill:onDrillResult,aimSensitivity:tablePrefs.aimSensitivity,prefs:tablePrefs,host:true,practice:false,spectator:false,send:()=>{}})
+ state.game=new PoolGame({drill:d,drillLabel:d.puzzle?'PUZZLE':d.daily?`DAILY #${d.daily}`:`${DRILLS.indexOf(d)+1} OF ${DRILLS.length}`,mode:'8ball',renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),jumpBtn:$('#jump'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,onReplay:paintReplayBar,onDrill:onDrillResult,aimSensitivity:tablePrefs.aimSensitivity,prefs:tablePrefs,host:true,practice:false,spectator:false,send:()=>{}})
  state.game.setReady(true)
  $('#drill-bar').hidden=false;$('#drill-next').hidden=true;$('#drill-share').hidden=true
 }
 function onDrillResult(e){
  if(!e){$('#drill-next').hidden=true;$('#drill-share').hidden=true;return}
+ if(e.drill.puzzle){if(e.ok){toast('Puzzle solved!');sfx.result(true)}return}
  localStorage.setItem('pool-masters:drills',JSON.stringify(recordDrill(drillProgress(),e.drill.id,{ok:e.ok,attempts:e.attempts,hinted:e.hinted})))
  if(e.ok){toast('Drill complete!');sfx.result(true);$('#drill-next').hidden=!nextDrill(e.drill.id);$('#drill-share').hidden=!isDaily(e.drill.id);paintDaily();setTimeout(checkTrophies,1800)}
 }
