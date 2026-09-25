@@ -153,3 +153,8 @@ dialog label:has(>input[type=checkbox]){display:flex;align-items:center;gap:10px
 #rogue-dialog{width:min(480px,94vw);max-width:none}
 #rogue-dialog form{width:100%;max-width:none}
 #rogue-offer{min-width:0;overflow-x:hidden}
+
+#puzzle-dialog form{width:min(760px,94vw);max-width:none}
+#puzzle-canvas{width:100%;aspect-ratio:700/380;border-radius:12px;touch-action:none;cursor:crosshair;display:block}
+#puzzle-status{min-height:1.3em;color:#bfe6cf}
+#puzzle-dialog .puzzle-tools{flex-wrap:wrap;justify-content:flex-start}
