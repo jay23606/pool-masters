@@ -195,6 +195,23 @@ about the day's table depends on the player's browser. The date picks the table 
 Tuesday, hard Friday and Saturday — with a table not repeated until every other of its grade has
 had its turn. The tests re-run every stored shot through the physics.
 
+## Shot coach
+
+After any shot of your own, the ⟲ menu has a **🎓 Coach** button. It grades that shot against the
+best the AI can find from the same table: what you potted (or the foul, with the reason), how often
+a shot like yours works for a steady player, and the shot the coach would have played, with how
+often *that* works. **Watch your shot** and **Watch the coach's shot** both play back as replays on
+the table as it stood before you shot.
+
+It is the AI's own machinery turned on a person. `rollout()` already plays a shot out on a copy of
+the table to screen for fouls; the coach plays yours out, plays out its own pick (the AI at a
+"coach" level with no aim or power error), and wobbles each shot's aim and power a little sixteen
+times to see how often it still drops something without fouling (`src/coach.js`). The same table
+always gets the same words: the coach draws from a fixed random sequence, so its answer is
+reproducible, and the tests pin the wording, the verdicts, and that it never touches the table it is
+given. Breaks are described but not compared, and it is worked out when you ask, not after every
+shot.
+
 ## Trophies
 
 Twenty-seven trophies in seven groups: racks won, nine-ball, skill (runs, break and
@@ -306,7 +323,7 @@ npm test
 Apply `supabase/schema.sql` to the same Supabase project after Foyer's schema. Anonymous authentication and Realtime must be enabled.
 
 Pushing to `main` deploys to GitHub Pages. That workflow runs `npm test` first,
-so the tests gate the deploy. 280 tests cover the physics (stun, draw, follow,
+so the tests gate the deploy. 292 tests cover the physics (stun, draw, follow,
 throw, cushion behaviour, and that a shot is bit-identical regardless of frame
 pacing — 240Hz, a jittery rate, even one update per second on a backgrounded
 tab), the rules (`judgeShot()`'s verdicts for fouls, group assignment, and
@@ -328,6 +345,7 @@ DOM, no renderer.
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
+| `src/coach.js` | the shot coach: grades a shot, finds the coach's shot, builds the replays |
 | `src/shot-cam.js` | the follow-the-shot camera's poses and blend |
 | `src/screen-point.js` | maps a pointer back to the table through the phone's quarter turn |
 | `src/ai.js` | the practice opponent, over a ball array |
