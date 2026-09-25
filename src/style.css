@@ -148,3 +148,8 @@ dialog label:has(>input[type=checkbox]){display:flex;align-items:center;gap:10px
 /* When the rack is over, Next rack takes the place of Shoot. Both used to sit in the same spot, with the disabled
    Shoot on top, so a real click never reached Next rack. */
 .shot-controls:has(#next-rack:not([hidden])) #shoot,.shot-controls:has(#next-rack:not([hidden])) #jump{display:none}
+
+#rogue-offer{display:grid;gap:8px;min-width:min(420px,84vw)}
+#rogue-dialog{width:min(480px,94vw);max-width:none}
+#rogue-dialog form{width:100%;max-width:none}
+#rogue-offer{min-width:0;overflow-x:hidden}

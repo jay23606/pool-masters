@@ -209,6 +209,19 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Rogue Pool
+
+**Rogue Pool** on the lobby is a solo roguelike run. Each table is a scatter of balls and a budget of shots to clear it, and the tables grow (three balls, then more, up to nine)
+while the slack shrinks. Clear a table and you take one of three random **upgrades** before the next: *Wide pockets* (15% wider, up to three times),
+*Extra shots*, *Extra life*, *Jump charges* (two jump shots a table, and the Jump button appears), *Scratch shield* (the first scratch
+on a table costs nothing extra), and *Second wind* (the first miss on a table is free). Run out of shots and you lose a life and get the same-sized table again with fresh balls;
+lose all three and the run is over. Your best run (tables cleared) is kept in the browser, and two trophies read it.
+
+`src/rogue.js` is the run as pure functions: every random choice (the balls, the offers) comes from one seeded generator, so the same seed is the same run and the tests can
+pin it. The game plays it through the same physics, aim snapping and input as any other; wider pockets are real (they pot at the wider radius) and drawn wider in both views.
+The tests cover the shot accounting, each upgrade, the offer, and a whole run played through the real game object by an AI, including that shooting is blocked while an upgrade
+is being chosen.
+
 ## House rules
 
 **House rules** on the lobby sets four things, kept in the browser and used for practice, two-player games and tables you host:
@@ -328,7 +341,7 @@ shot.
 
 ## Trophies
 
-Thirty-three trophies in eight groups: racks won, nine-ball, skill (runs, break and
+Thirty-five trophies in eight groups: racks won, nine-ball, skill (runs, break and
 run, clean hands), opponents, practice drills and daily shots, the career ladder, sharing, and the league. Open the
 🏆 button in the header for the case, with a progress bar for each one; an unlock
 shows a toast. Stats are counted per device in the browser. They are derived from
@@ -478,13 +491,14 @@ DOM, no renderer.
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/replay.js` | recording, the link format and its validation, and playback |
-| `src/trophies.js` | the stats, the thirty-three trophies and how each is earned |
+| `src/trophies.js` | the stats, the thirty-five trophies and how each is earned |
 | `src/physics-info.js` | descriptions of the physics constants, for the read-only Physics panel |
 | `src/drills.js` | the drills, how each is judged, their hints, and progress |
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/rogue.js` | Rogue Pool: the run, the upgrades, the shot accounting, the record |
 | `src/house.js` | house rules: the choices, validation, who breaks, where the cue ball may go |
 | `src/challenges.js` | the challenge games: scatter, scoring, clock, bests |
 | `src/career.js` | the career ladder: opponents, who is open, recording a win |
