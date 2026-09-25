@@ -2,7 +2,10 @@ const groups=new Set(['cue','solid','stripe','eight'])
 const phase=new Set(['aim','roll'])
 const player=new Set(['a','b'])
 const finite=n=>typeof n==='number'&&Number.isFinite(n)
-const RACK_SIZE={'8ball':16,'9ball':10,'10ball':11,bank:16,onepocket:16,straight:16}
+const RACK_SIZE={'8ball':16,'9ball':10,'10ball':11,bank:16,onepocket:16,straight:16,chaos:16}
+const TWIST_TYPES=new Set(['bonus','bomb','well'])
+// a twist is a small record of numbers; anything else is refused
+const validTwist=t=>t===undefined||t===null||(typeof t==='object'&&TWIST_TYPES.has(t.type)&&['x','y','n','r'].every(k=>t[k]===undefined||finite(t[k]))&&(t.spent===undefined||typeof t.spent==='boolean'))
 const TOP_BALL={'9ball':9,'10ball':10}
 const expectedGroup=n=>n===0?'cue':n===8?'eight':n<8?'solid':'stripe'
 
@@ -23,6 +26,7 @@ export function isGameMessage(m){
  if(m.b.length!==size||!m.b.every(validBall))return false
  if(new Set(m.b.map(b=>b[4])).size!==size)return false
  if(TOP_BALL[mode]&&!m.b.every(b=>b[4]<=TOP_BALL[mode]))return false   // nine-ball is balls 0-9, ten-ball 0-10
+ if(!validTwist(m.fx))return false
  // the score of a scored game: two small whole numbers, and absent before those games existed
  if(m.score!==undefined&&!(m.score&&typeof m.score==='object'&&['a','b'].every(p=>Number.isInteger(m.score[p])&&m.score[p]>=-99&&m.score[p]<=999)))return false
  return m.groups&&['a','b'].every(p=>m.groups[p]===null||m.groups[p]==='solid'||m.groups[p]==='stripe')

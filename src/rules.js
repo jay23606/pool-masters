@@ -7,15 +7,15 @@ import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 export const MODES={
  '8ball':{label:'8-ball',balls:16},'9ball':{label:'9-ball',balls:10},
  'bank':{label:'Bank pool',balls:16},'onepocket':{label:'One-pocket',balls:16},
- '10ball':{label:'10-ball',balls:11},'straight':{label:'Straight pool',balls:16}
+ '10ball':{label:'10-ball',balls:11},'straight':{label:'Straight pool',balls:16},'chaos':{label:'Chaos Pool',balls:16}
 }
 export const modeOf=m=>MODES[m]?m:'8ball'
 // Bank pool and one-pocket are scored games: fifteen balls, any of them may be hit first, and the
 // first to eight wins. What they share is judged by judgeScoreGame().
-export const isScoreMode=m=>m==='bank'||m==='onepocket'||m==='straight'
+export const isScoreMode=m=>m==='bank'||m==='onepocket'||m==='straight'||m==='chaos'
 export const SCORE_TARGET=8
 // what wins each scored game: eight for the two short ones, thirty for straight pool
-export const targetFor=m=>m==='straight'?30:SCORE_TARGET
+export const targetFor=m=>m==='straight'?30:m==='chaos'?15:SCORE_TARGET
 // Nine-ball and ten-ball share their rules: hit the lowest ball first, and the money ball wins.
 export const isRotation=m=>m==='9ball'||m==='10ball'
 export const MONEY={'9ball':9,'10ball':10}
@@ -23,6 +23,8 @@ export const MONEY={'9ball':9,'10ball':10}
 // has the bottom-right pocket and player B the top-right; a ball dropped in either is that
 // player's, whoever shot it.
 export const ONE_POCKET={a:5,b:2}
+// Chaos Pool's bonus pocket is numbered after the six real ones, and a ball in it is worth three (see chaos.js)
+export const BONUS_POCKET=6,BONUS_POINTS=3
 
 export const other=t=>t==='a'?'b':'a'
 export const kind=n=>n===8?'eight':n<8?'solid':'stripe'
@@ -198,18 +200,19 @@ export function judgeScoreGame(s){
   let to=null
   if(!reason){
    if(mode==='bank')to=rails.has(b.n)?shooter:null
-   else if(mode==='straight')to=shooter
+   else if(mode==='straight'||mode==='chaos')to=shooter
    else{const i=pockets?.[b.n];to=i===ONE_POCKET.a?'a':i===ONE_POCKET.b?'b':null}
   }
-  if(to){score[to]++;credited.push({n:b.n,to})}else wasted.push(b.n)
+  const points=mode==='chaos'&&pockets?.[b.n]===BONUS_POCKET?BONUS_POINTS:1
+  if(to){score[to]+=points;credited.push({n:b.n,to,points})}else wasted.push(b.n)
  }
  const left=s.balls.filter(b=>b.on&&b.k!=='cue').length
  const target=s.scoreTarget||targetFor(mode)     // a house rule may set it for straight pool
- if(mode==='straight')score[shooter]-=reason?1:0                    // a foul costs a point
+ if(mode==='straight'||mode==='chaos')score[shooter]-=reason?1:0     // a foul costs a point
  let winner=score.a>=target?'a':score.b>=target?'b':null
- if(!winner&&left===0&&mode!=='straight')winner=score.a>score.b?'a':score.b>score.a?'b':opponent
+ if(!winner&&left===0&&mode!=='straight'&&mode!=='chaos')winner=score.a>score.b?'a':score.b>score.a?'b':opponent
  const kept=!reason&&credited.some(c=>c.to===shooter)
  // straight pool is continuous: when one ball is left the fourteen are racked again around it
- const rerack=mode==='straight'&&!winner&&left<=1
+ const rerack=(mode==='straight'||mode==='chaos')&&!winner&&left<=1
  return {winner,foul:Boolean(reason),reason,assign:null,nextTurn:reason||!kept?opponent:shooter,score,credited,wasted,rerack}
 }

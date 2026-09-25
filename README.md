@@ -140,7 +140,7 @@ timer instead of freezing the game for both players.
 
 ## Game modes
 
-The lobby's game picker chooses **8-ball**, **9-ball**, **10-ball**, **Bank pool**, **Straight pool** or **One-pocket** for practice, for a new
+The lobby's game picker chooses **8-ball**, **9-ball**, **10-ball**, **Bank pool**, **Straight pool**, **One-pocket** or **Chaos Pool** for practice, for a new
 table, and for quick play (which only joins a table of the same game). A table
 carries its game in its room metadata and in every state snapshot, so a guest
 always ends up in the host's game, whatever it started as.
@@ -208,6 +208,17 @@ turn it is after each change, and the result and race-to-3 line name the players
 9-ball work, ball in hand goes to whoever is next, and the shot coach and replays work for either.
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
+
+## Chaos Pool
+
+**Chaos Pool** is a scored game to 15 with a random twist dealt before every shot. The host deals it and it travels in the game state, so both players see the same one:
+
+- **Bonus pocket** - an extra pocket opens on a long rail for one shot, and a ball that drops in it is worth 3.
+- **Bomb ball** - one ball is a bomb: the first time anything touches it, it blasts the balls around it outward.
+- **Gravity well** - a well pulls balls near it toward its centre and bends their paths.
+
+Every pot scores a point, a foul costs one, and the table is racked again when one ball is left. `src/chaos.js` holds the twists as pure functions; the tests cover the dealing,
+the blast, the well, the bonus scoring, the wire format, and a whole AI game to a winner.
 
 ## Rogue Pool
 
@@ -498,6 +509,7 @@ DOM, no renderer.
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/chaos.js` | Chaos Pool: the twists (bonus pocket, bomb ball, gravity well) |
 | `src/rogue.js` | Rogue Pool: the run, the upgrades, the shot accounting, the record |
 | `src/house.js` | house rules: the choices, validation, who breaks, where the cue ball may go |
 | `src/challenges.js` | the challenge games: scatter, scoring, clock, bests |

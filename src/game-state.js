@@ -21,7 +21,7 @@ export function snapshotOf(g){
    round1(b.vx),round1(b.vy),round1(b.wx),round1(b.wy),round1(b.wz),...(b.z>0?[round1(b.z),round1(b.vz||0)]:[])]),
   turn:g.turn,phase:g.phase,over:g.over,result:g.result||'',round:g.round,
   groups:g.groups,assignment:g.assignment,breakShot:g.breakShot,
-  ballInHand:g.ballInHand,calledPocket:g.calledPocket,score:g.score||{a:0,b:0}}
+  ballInHand:g.ballInHand,calledPocket:g.calledPocket,score:g.score||{a:0,b:0},fx:g.fx||null}
 }
 
 export function applySnapshot(g,s){
@@ -34,5 +34,6 @@ export function applySnapshot(g,s){
  g.turn=s.turn;g.phase=s.phase;g.over=s.over;g.round=s.round;g.groups=s.groups
  g.assignment=s.assignment||null;g.breakShot=s.breakShot;g.ballInHand=s.ballInHand
  g.calledPocket=s.calledPocket
+ g.fx=s.fx||null
  g.score=s.score||{a:0,b:0}   // absent before bank pool and one-pocket existed
 }

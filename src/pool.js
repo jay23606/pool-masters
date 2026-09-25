@@ -2,6 +2,7 @@ import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
 import {normalizeHouse,nextBreaker,placementLimit} from './house.js'
 import {airborne} from './physics.js'
+import {drawTwist,blast,wellPull,bonusPocket,twistName} from './chaos.js'
 import {newRun as newRogueRun,judge as judgeRogue,choose as chooseRogue,advance as advanceRogue,offer as offerRogue,POCKET_BOOST} from './rogue.js'
 import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,targetFor,isRotation,MONEY,trianglePositions,kind} from './rules.js'
 import {chooseShot} from './ai.js'
@@ -22,7 +23,9 @@ export class PoolGame{
  // ---- Rogue Pool (see rogue.js) ----
  // the cue ball on the head spot, and the balls of this table of the run
  rogueRack(keep){
-  const cue=keep||{id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}
+  // a new table always starts with the cue ball on the head spot, which the layout keeps clear
+  const cue=keep?{...keep,x:154,y:190,on:true}:{id:0,x:154,y:190,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:'cue',n:0}
+  clearMotion(cue)
   return [cue,...this.run.layout.map(b=>({id:b.n,x:b.x,y:b.y,vx:0,vy:0,wx:0,wy:0,wz:0,on:true,k:kind(b.n),n:b.n}))]
  }
  // Pockets grow with the Wide pockets upgrade.
@@ -31,7 +34,12 @@ export class PoolGame{
   const left=this.balls.filter(b=>b.on&&b.k!=='cue').length,cue=this.balls[0]
   const v=judgeRogue(this.run,{potted:this.potted.length,scratch:this.scratch,left,jumped:Boolean(this.usedJump)})
   this.usedJump=false;this.run=v.run
-  if(v.respotCue){cue.on=true;cue.x=154;cue.y=190;this.flash('Scratch · cue ball back on the spot')}
+  if(v.respotCue){
+   // the head spot, or the nearest place along the centre line where it does not sit on another ball
+   const others=this.balls.filter(b=>b!==cue&&b.on);let x=154
+   for(let i=0;i<60&&others.some(b=>Math.hypot(b.x-x,b.y-190)<2*R+1);i++)x+=R
+   cue.on=true;cue.x=x;cue.y=190;this.flash('Scratch · cue ball back on the spot')
+  }
   this.balls.forEach(clearMotion)
   this.phase='aim'
   if(v.event==='cleared'){
@@ -99,7 +107,7 @@ export class PoolGame{
   if(!this.chal||this.chal.over||this.over)return
   if(this.phase==='aim'&&timedOut(this.chal,performance.now()))this.endChallenge()
  }
- resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};if(this.rogueSeed!=null){this.run=newRogueRun(this.rogueSeed);this.chal={id:'rogue',over:false};this.rogueWait=false;this.breakShot=false;this.balls=this.rogueRack()};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
+ resetRack(){Object.assign(this,freshRackState(this.mode));this.lastCoach=null;if(this.drill){this.balls=buildBalls(this.drill);this.breakShot=false;this.attempts=0;this.drillOutcome=null;this.hinted=false;clearTimeout(this.retryTimer)};this.fx=null;if(this.mode==='chaos')this.fx=drawTwist(this.balls);if(this.rogueSeed!=null){this.run=newRogueRun(this.rogueSeed);this.chal={id:'rogue',over:false};this.rogueWait=false;this.breakShot=false;this.balls=this.rogueRack()};if(this.challenge){this.chal=beginChallenge(this.challenge);this.breakShot=false;this.balls=this.challengeRack()};this.rec=null;this.lastReplay=null;this.replay=null;this.onReplay?.(null);this.shots={a:0,b:0};this.angle=openingAim(this.balls);this.pointerAngle=this.angle;this.aiming=this.me==='a';this.setSpin(0,0)}
  bind(){this.unbindInput=bindGameInput(this)} point(e){return this.renderer.point(e)}
  setRenderer(r){this.renderer=r}
  // Tip contact point, in ball radii. Sideways is English, vertical is
@@ -293,11 +301,31 @@ export class PoolGame{
   }
   return ballsAt(p.rec,ms)
  }
+ // The six pockets, and Chaos Pool's bonus pocket while there is one (numbered after the six).
+ pocketList(){
+  // rebuilt when the twist changes, or when the table size does (the pockets are a size of their own)
+  if(!this._pockets||this.fx!==this._pocketFx||this._pocketPR!==PR){
+   this._pocketFx=this.fx;this._pocketPR=PR
+   const bp=bonusPocket(this.fx)
+   this._pockets=bp?[...POCKETS.map(q=>({x:q[0],y:q[1],r:PR})),{x:bp.x,y:bp.y,r:bp.r}]:POCKETS.map(q=>({x:q[0],y:q[1],r:PR}))
+  }
+  return this._pockets
+ }
+ // A bomb ball has been hit: everything near it is thrown outward, once.
+ explode(){
+  const fx=this.fx;if(!fx||fx.type!=='bomb'||fx.spent)return
+  const bomb=this.balls.find(b=>b.n===fx.n&&b.on);if(!bomb)return
+  blast(this.balls,bomb);this.fx={...fx,spent:true};this.flash('BOOM')
+ }
+ // The next shot's twist, in Chaos Pool.
+ newTwist(){if(this.mode==='chaos'){this.fx=drawTwist(this.balls);this.flash(`Twist: ${twistName(this.fx).toLowerCase()}`)}}
  sub(dt){
+  const well=this.fx&&this.fx.type==='well'?this.fx:null,pockets=this.pocketList(),scale=this.pocketScale()
   for(const b of this.balls){
    if(!b.on)continue
+   if(well&&!airborne(b))wellPull(b,well,dt)
    integrate(b,dt)
-   for(const[p,q]of POCKETS.entries())if(!airborne(b)&&Math.hypot(b.x-q[0],b.y-q[1])<PR*this.pocketScale()){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}
+   for(let p=0;p<pockets.length;p++){const q=pockets[p];if(!airborne(b)&&Math.hypot(b.x-q.x,b.y-q.y)<q.r*(p<6?scale:1)){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}}
    if(!b.on)continue
    if(railBounce(b)){
     // which balls touched a cushion, and whether the cue did so before it
@@ -310,7 +338,10 @@ export class PoolGame{
   for(let i=0;i<this.balls.length;i++)for(let j=i+1;j<this.balls.length;j++){
    const a=this.balls[i],b=this.balls[j]
    if(!a.on||!b.on)continue
-   if(ballCollide(a,b)&&!this.firstHit){if(a.k==='cue')this.firstHit=b;else if(b.k==='cue')this.firstHit=a}
+   if(ballCollide(a,b)){
+    if(!this.firstHit){if(a.k==='cue')this.firstHit=b;else if(b.k==='cue')this.firstHit=a}
+    if(this.fx&&this.fx.type==='bomb'&&!this.fx.spent&&(a.n===this.fx.n||b.n===this.fx.n))this.explode()
+   }
   }}
  pottedMessage(b){
   if(b.k==='cue')return 'Scratch!'
@@ -391,7 +422,9 @@ export class PoolGame{
   this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:Boolean(v.foul),reason:v.reason||null,winner:null})
   if(v.foul)this.foul(v.reason)
   else if(v.nextTurn!==shooter){this.turn=v.nextTurn;this.calledPocket=null}
-  this.breakShot=false;this.balls.forEach(clearMotion);this.phase='aim';this.sync()
+  this.breakShot=false;this.balls.forEach(clearMotion);this.phase='aim'
+  this.newTwist()
+  this.sync()
   if(this.practice&&!this.hotSeat&&!this.over&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
  }
  aiShot(){
@@ -456,6 +489,7 @@ export class PoolGame{
   if(v.foul)return
   if(v.credited.length){
    const mine=v.credited.filter(c=>c.to===shooter).length,theirs=v.credited.length-mine
+   if(v.credited.some(c=>c.points>1)){this.flash(`BONUS · +${v.credited.reduce((n,c)=>n+c.points,0)} · ${v.score[shooter]} of ${(this.scoreTarget||targetFor(this.mode))}`);return}
    this.flash(theirs&&!mine?`${who(shooter)} sank it in ${who(other(shooter))}’s pocket`:mine?`${who(shooter)} scored${mine>1?` ${mine}`:''} · ${v.score[shooter]} of ${(this.scoreTarget||targetFor(this.mode))}`:'')
   }else if(v.wasted.length)this.flash(this.mode==='bank'?`No bank · ball ${v.wasted[0]} does not count`:`Wrong pocket · ball ${v.wasted[0]} does not count`)
  }
@@ -464,13 +498,13 @@ export class PoolGame{
   const a=this.score?.a||0,b=this.score?.b||0
   const nm=p=>this.hotSeat?this.nameOf(p).toUpperCase():p===this.me?'YOU':this.practice?'AI':'THEM'
   const me=this.hotSeat?this.turn:this.me,opp=other(me)
-  const label=this.mode==='bank'?'BANK POOL':this.mode==='straight'?'STRAIGHT POOL':'ONE-POCKET'
+  const label=this.mode==='bank'?'BANK POOL':this.mode==='straight'?'STRAIGHT POOL':this.mode==='chaos'?`CHAOS POOL · ${twistName(this.fx)}`:'ONE-POCKET'
   if(this.groupStatus){const text=`${label} · ${nm(me)} ${me==='a'?a:b} – ${opp==='a'?a:b} ${nm(opp)} · FIRST TO ${(this.scoreTarget||targetFor(this.mode))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
   this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
   if(this.changePocket)this.changePocket.hidden=true
-  const rule=this.mode==='bank'?'bank it off a cushion':this.mode==='straight'?'pot any ball, a foul costs a point':'sink it in the ringed pocket'
+  const rule=this.mode==='bank'?'bank it off a cushion':this.mode==='straight'?'pot any ball, a foul costs a point':this.mode==='chaos'?'pot any ball, mind the twist':'sink it in the ringed pocket'
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · ${rule}`):this.practice?'AI is lining up…':'Opponent’s turn'
   if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
  }
