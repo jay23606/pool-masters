@@ -85,7 +85,22 @@ export class PoolGame{
   this.calledPocket=this.canCallEight()?(m.called??null):null
   this.startShot();strike(this.balls[0],m.vx,m.vy,m.spin?.[0]||0,m.spin?.[1]||0)
  }
- sync(){if(this.host){const state=snapshotOf(this);this.send(state);this.onSave?.(state);this.noteRecording()}}
+ // Hot-seat: two people share one device. Whoever's turn it is is "me" -- every rule and every
+ // control already speaks of the shooter that way -- and the names are theirs, not You/AI.
+ hotTurn(){
+  if(!this.hotSeat)return
+  this.me=this.turn
+  if(this.lastTurn!==this.turn){const first=this.lastTurn==null;this.lastTurn=this.turn;if(!first&&!this.over)this.onTurn?.(this.nameOf(this.turn))}
+ }
+ nameOf(p){return this.names?.[p]||(p==='a'?'Player 1':'Player 2')}
+ tag(p,fallback){return this.hotSeat?this.nameOf(p).toUpperCase():fallback}
+ // The status lines are written for one player against an opponent; two players sharing
+ // a device need them in the third person.
+ hotStatus(text){
+  if(this.over)return `${this.nameOf(this.result)} won the rack`
+  return text.replace(/your shot/i,`${this.nameOf(this.turn)}’s shot`)
+ }
+ sync(){this.hotTurn();if(this.host){const state=snapshotOf(this);this.send(state);this.onSave?.(state);this.noteRecording()}}
  // Every shot is recorded as it plays, by whoever is watching: the host from its
  // own simulation, a guest or spectator from the snapshots it is sent. Both are
  // the same 25Hz stream, so a shot looks the same whoever shares it.
@@ -183,7 +198,7 @@ export class PoolGame{
   nine.on=true;nine.x=p.x;nine.y=p.y;clearMotion(nine)
  }
  foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(this.mode==='9ball'?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand')}
- finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(winner===this.me?'You win!':'You lose')}
+ finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(this.hotSeat?`${this.nameOf(winner)} wins!`:winner===this.me?'You win!':'You lose')}
  // A drill is judged by its own rule, not by the rules of the game: nobody's turn
  // changes, nothing is won, and a failed attempt puts the table back.
  resolveDrill(){
@@ -227,13 +242,13 @@ export class PoolGame{
    this.assignment={player:shooter,ball:this.firstObjectPotted?.n||null,group:v.assign}
    const claimed=v.assign==='solid'?'Solids':'Stripes',mine=this.groups[this.me]==='solid'?'Solids':'Stripes'
    const actor=shooter===this.me?'You':this.practice?'AI Coach':'Opponent'
-   this.flash(`${actor} claimed ${claimed} · You: ${mine}`)
+   this.flash(this.hotSeat?`${this.nameOf(shooter)} claimed ${claimed}`:`${actor} claimed ${claimed} · You: ${mine}`)
   }
   this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:Boolean(v.foul),reason:v.reason||null,winner:null})
   if(v.foul)this.foul(v.reason)
   else if(v.nextTurn!==shooter){this.turn=v.nextTurn;this.calledPocket=null}
   this.breakShot=false;this.balls.forEach(clearMotion);this.phase='aim';this.sync()
-  if(this.practice&&!this.over&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
+  if(this.practice&&!this.hotSeat&&!this.over&&this.turn==='b')setTimeout(()=>this.aiShot(),650)
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
@@ -275,6 +290,7 @@ export class PoolGame{
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
   if(this.changePocket)this.changePocket.hidden=true
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · hit the ${low} first`):this.practice?'AI is lining up…':'Opponent’s turn'
+  if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
  }
  updateDrillHud(){
   if(this.groupStatus){const text=`DRILL · ${this.drillLabel||this.drill.name.toUpperCase()}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
@@ -290,10 +306,11 @@ export class PoolGame{
   // A called pocket remains part of a shot after aiming ends; only
   // discard it while setting up an illegal call, never while balls are rolling.
   this.clearInvalidCall();const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table'
-  if(this.groupStatus){const left=p=>{const g=this.group(p);if(!g)return '';const n=this.remaining(g);return n?` · ${n} left`:' · the 8'};const text=!mine&&!their?`OPEN TABLE · ${this.remaining('solid')} SOLIDS · ${this.remaining('stripe')} STRIPES`:`YOU: ${label(mine).toUpperCase()}${left(this.me)}  |  THEM: ${label(their).toUpperCase()}${left(other(this.me))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
+  if(this.groupStatus){const left=p=>{const g=this.group(p);if(!g)return '';const n=this.remaining(g);return n?` · ${n} left`:' · the 8'};const text=!mine&&!their?`OPEN TABLE · ${this.remaining('solid')} SOLIDS · ${this.remaining('stripe')} STRIPES`:`${this.tag(this.me,'YOU')}: ${label(mine).toUpperCase()}${left(this.me)}  |  ${this.tag(other(this.me),'THEM')}: ${label(their).toUpperCase()}${left(other(this.me))}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=mine||''}}this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
-  if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.aimingAtEight()&&this.eightBlocked()?`The 8 is not yours yet · ${this.eightBlocked()} ${label(mine).toLowerCase()} still to pot`:this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`}
+  if(this.changePocket)this.changePocket.hidden=!(live&&this.canCallEight()&&this.calledPocket!=null);this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':this.aimingAtEight()&&this.eightBlocked()?`The 8 is not yours yet · ${this.eightBlocked()} ${label(mine).toLowerCase()} still to pot`:this.canCallEight()&&this.calledPocket==null?'Mark an 8-ball pocket, then aim':`${label(mine)} · your shot`):this.practice?'AI is lining up…':`${label(their)} · opponent’s turn`
+  if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)}
  // The simulation is no longer paced by the animation frame. Browsers stop or
  // heavily throttle requestAnimationFrame in a hidden tab, and since the host
  // simulates for both players, a host who switched tabs froze the game for
