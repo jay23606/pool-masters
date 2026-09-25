@@ -50,8 +50,21 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
  .table-rot #callout.show{translate:-50% -50%}
 }
 
-/* On a big window the table would grow taller than the screen and push the shot
-   controls out of sight: cap it so table, power and Shoot fit together. */
+/* Desktop and tablet: the table is the point of the screen. The game fills the window,
+   the table takes whatever height the controls leave, and is fitted into that box (a
+   container query, so no guessing how tall the other rows are). */
 @media (min-width:601px) and (min-height:621px){
- .canvas-wrap{width:min(100%,max(340px,calc((100dvh - 340px)*1.842)))}
+ body:has(#game.active) header{display:none}
+ #game.active{height:100dvh;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
+ #game .play-layout{margin:0 auto;min-height:0;grid-template-rows:minmax(0,1fr);padding-top:0;padding-bottom:10px}
+ #game .table-card{min-height:0;height:100%;padding:8px 14px 8px}
+ #game .game-top{padding:5px 16px}
+ #game .game-top button{padding:.35rem .7rem}
+ #game .play-layout{max-width:1800px}
+ #game #versus{margin-bottom:0}
+ #game #versus small{display:none}
+ #game .table-bar{margin:0 0 4px}
+ .table-rot{display:flex;flex:1;min-height:0;width:100%;align-items:center;justify-content:center;container-type:size}
+ .table-rot .canvas-wrap{width:min(100cqw,calc(100cqh*1.842))}
+ #game .shot-controls{margin-top:6px}
 }
