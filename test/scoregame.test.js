@@ -21,7 +21,7 @@ test('judgeShot hands both modes to the scored-game rules',()=>{
 test('bank pool: a ball that touched a cushion scores and keeps the turn',()=>{
  const v=judgeScoreGame(shot({potted:[ball(3)],railBalls:[3]}))
  assert.deepEqual(v.score,{a:1,b:0});assert.equal(v.nextTurn,'a');assert.equal(v.foul,false)
- assert.deepEqual(v.credited,[{n:3,to:'a'}])
+ assert.deepEqual(v.credited,[{n:3,to:'a',points:1}])
 })
 
 test('bank pool: a ball that dropped without a bank scores nothing and ends the turn',()=>{

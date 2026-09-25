@@ -235,6 +235,11 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  POCKETS.forEach(([x,y])=>{const r=new THREE.Mesh(rimGeo,leather);pocketMeshes.push(r);r.rotation.x=Math.PI/2;r.position.set(tx(x),7,tz(y));r.castShadow=true;scene.add(r)})
  const ring=new THREE.Mesh(new THREE.TorusGeometry(PR+3,1.7,8,36),new THREE.MeshBasicMaterial({color:'#ffd75d'}))
  ring.rotation.x=-Math.PI/2;ring.position.y=1.6;ring.visible=false;scene.add(ring)
+ // Chaos Pool twists: a gold-ringed bonus pocket, a purple gravity well, a red pulse round the bomb ball
+ const bonusDisc=new THREE.Mesh(new THREE.CylinderGeometry(PR*.9,PR*.9,2,28),new THREE.MeshBasicMaterial({color:'#05100b'}));const bonusRing=new THREE.Mesh(new THREE.TorusGeometry(PR*.9+2,1.8,8,36),new THREE.MeshBasicMaterial({color:'#ffd75d'}))
+ bonusDisc.visible=bonusRing.visible=false;bonusRing.rotation.x=-Math.PI/2;scene.add(bonusDisc,bonusRing)
+ const wellDisc=new THREE.Mesh(new THREE.CircleGeometry(1,40),new THREE.MeshBasicMaterial({color:'#9a5bff',transparent:true,opacity:.28,depthWrite:false}));wellDisc.rotation.x=-Math.PI/2;wellDisc.visible=false;scene.add(wellDisc)
+ const bombRing=new THREE.Mesh(new THREE.TorusGeometry(R+3,1.4,8,28),new THREE.MeshBasicMaterial({color:'#ff503c'}));bombRing.rotation.x=-Math.PI/2;bombRing.visible=false;scene.add(bombRing)
  // a softer white ring for the pocket the aim has snapped to
  const snapRing=new THREE.Mesh(new THREE.TorusGeometry(PR+1,1.1,8,36),new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.7}))
  snapRing.rotation.x=-Math.PI/2;snapRing.position.y=1.7;snapRing.visible=false;scene.add(snapRing)
@@ -387,6 +392,13 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
    }
    const pk=game.pocketScale?game.pocketScale():1
    for(const m of pocketMeshes)m.scale.set(pk,1,pk)
+   const fx=game.fx
+   bonusDisc.visible=bonusRing.visible=Boolean(fx&&fx.type==='bonus')
+   if(bonusRing.visible){bonusDisc.position.set(tx(fx.x),1.2,tz(fx.y));bonusRing.position.set(tx(fx.x),2.2,tz(fx.y))}
+   wellDisc.visible=Boolean(fx&&fx.type==='well')
+   if(wellDisc.visible){wellDisc.position.set(tx(fx.x),1,tz(fx.y));wellDisc.scale.set(fx.r,fx.r,1)}
+   bombRing.visible=false
+   if(fx&&fx.type==='bomb'&&!fx.spent){const bi=game.balls.findIndex(b=>b.n===fx.n&&b.on),be=balls[bi];if(be){bombRing.visible=true;bombRing.position.set(be.mesh.position.x,R*.5,be.mesh.position.z);const k=1+.12*Math.sin(performance.now()/120);bombRing.scale.set(k,k,k)}}
    // ---- follow the shot ----
    const c0=game.balls[0],rolling=options.shotCam!==false&&game.phase==='roll'&&!game.replay&&c0?.on!==false
    if(rolling&&!shot.dir){

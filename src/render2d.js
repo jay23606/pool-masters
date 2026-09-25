@@ -30,6 +30,13 @@ export function createRenderer2D(canvas,options={}){
    g.fillStyle='#07100c'
    const pk=game.pocketScale?game.pocketScale():1
    POCKETS.forEach(([x,y],i)=>{g.beginPath();g.arc(x,y,(PR-2)*pk,0,7);g.fill();if((game.markedPocket?game.markedPocket():game.calledPocket)===i){g.strokeStyle='#ffd75d';g.lineWidth=3;g.beginPath();g.arc(x,y,PR+3,0,7);g.stroke()}if(game.snapMark&&game.snapMark()===i){g.strokeStyle='#ffffffb0';g.lineWidth=2;g.beginPath();g.arc(x,y,PR+1,0,7);g.stroke()}})
+   const fx=game.fx
+   if(fx){
+    const t=(typeof performance!=='undefined'?performance.now():0)/1000
+    if(fx.type==='bonus'){g.fillStyle='#07100c';g.beginPath();g.arc(fx.x,fx.y,PR*.9,0,7);g.fill();g.strokeStyle='#ffd75d';g.lineWidth=3;g.beginPath();g.arc(fx.x,fx.y,PR*.9+3,0,7);g.stroke();g.fillStyle='#ffd75d';g.font='bold 11px sans-serif';g.textAlign='center';g.fillText('x3',fx.x,fx.y+(fx.y<190?PR*.9+16:-PR*.9-8))}
+    if(fx.type==='well'){const gr=g.createRadialGradient(fx.x,fx.y,4,fx.x,fx.y,fx.r);gr.addColorStop(0,'rgba(150,90,255,.55)');gr.addColorStop(1,'rgba(150,90,255,0)');g.fillStyle=gr;g.beginPath();g.arc(fx.x,fx.y,fx.r,0,7);g.fill()}
+    if(fx.type==='bomb'&&!fx.spent){const bomb=game.balls.find(b=>b.n===fx.n&&b.on);if(bomb){g.strokeStyle=`rgba(255,80,60,${.55+.35*Math.sin(t*8)})`;g.lineWidth=3;g.beginPath();g.arc(bomb.x,bomb.y,R+4+2*Math.sin(t*8),0,7);g.stroke()}}
+   }
    for(const b of game.balls)if(b.on&&!(b.z>0))drawBall(b)
    // A ball in the air is drawn on top of the rest and larger, growing as it climbs and shrinking as it comes down:
    // seen from above, that is how height looks. Its shadow stays on the cloth.
