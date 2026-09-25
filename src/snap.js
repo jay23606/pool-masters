@@ -1,3 +1,4 @@
+import {rollout} from './ai.js'
 import {R,PR,POCKETS,MINX,MAXX,MINY,MAXY} from './table.js'
 
 // Aim snapping. While a player aims, the line the object ball will take (the one drawn from the
@@ -77,4 +78,27 @@ export function snapAim(balls,angle,{reach=REACH*PR,maxTurn=MAX_TURN,bankReach=B
   }
  }
  return best?{angle:best.aim,pocket:best.pocket,bank:best.bank}:none
+}
+
+// The geometric aim sends the ball at the pocket's centre, but a real cut shot throws the ball a little off that line,
+// so the geometric aim misses about a third of the time. This asks the physics: it tries every aim within `range` degrees
+// of `angle` at this power and spin, finds the runs of aims that really pot the ball, and returns the middle of the widest
+// run, the aim with the most room for error on both sides. When no nearby aim pots it, the geometric aim is kept.
+export function refineAim(balls,angle,{target,power,spin=[0,0],range=2.5,step=.25}={}){
+ if(target==null||!(power>0))return angle
+ const n=Math.round(range/step),ok=[]
+ for(let i=-n;i<=n;i++){
+  const a=angle+i*step*Math.PI/180
+  const r=rollout(balls,a,power,2.5,spin)
+  ok.push(!r.scratch&&r.potted.includes(target)&&(r.firstHit?r.firstHit.n===target:true))
+ }
+ let best=null
+ for(let i=0;i<ok.length;){
+  if(!ok[i]){i++;continue}
+  let j=i;while(j+1<ok.length&&ok[j+1])j++
+  const mid=(i+j)/2-n,len=j-i+1
+  if(!best||len>best.len||(len===best.len&&Math.abs(mid)<Math.abs(best.mid)))best={len,mid}
+  i=j+1
+ }
+ return best?angle+best.mid*step*Math.PI/180:angle
 }

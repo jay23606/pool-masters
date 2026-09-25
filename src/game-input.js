@@ -1,13 +1,22 @@
 // DOM input adapter. Keeping this separate lets PoolGame remain concerned with
 // match state and exposes one small surface for future mobile controls.
-import {snapAim} from './snap.js'
+import {snapAim,refineAim,firstBall} from './snap.js'
 
 export function bindGameInput(game){
  // If something else set the aim (a hint, the opening aim), the hand starts from there.
+ // The physics check is only redone when what it depends on changes: the geometric aim, the power, the spin, the balls.
+ const refined=snap=>{
+  const hit=firstBall(game.balls,snap.angle),power=+game.power.value,spin=[game.spin?.a||0,game.spin?.b||0]
+  if(!hit)return snap.angle
+  const key=[snap.angle.toFixed(4),power,spin[0],spin[1],game.balls.map(b=>b.on?`${b.x|0},${b.y|0}`:'-').join(';')].join('|')
+  if(game.refineCache?.key!==key)game.refineCache={key,angle:refineAim(game.balls,snap.angle,{target:hit.ball.n,power,spin})}
+  return game.refineCache.angle
+ }
  const turn=a=>{
   const base=game.raw!=null&&game.angle===game.snappedTo?game.raw:game.angle
   const raw=game.aimStep(base,game.pointerAngle,a)
   const snap=game.prefs?.snap===false?null:snapAim(game.balls,raw)
+  if(snap&&snap.pocket!=null)snap.angle=refined(snap)
   game.raw=raw;game.angle=snap?snap.angle:raw
   game.snappedTo=game.angle;game.snapPocket=snap?snap.pocket:null
  }
