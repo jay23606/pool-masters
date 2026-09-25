@@ -6,7 +6,11 @@
 // render3d.js does the moving of the actual camera.
 
 export const BEHIND=120      // how far back from the cue ball the eye is
-export const HEIGHT=46       // eye height above the cloth; rails are 18 high
+export const HEIGHT=46       // the default eye height above the cloth; rails are 18 high
+export const MIN_EYE=16      // the lowest a player can set it: just over the rail
+export const MAX_EYE=160     // and the highest: looking down on the table from standing height
+// A height from a setting, kept where it is sane (a stored or hand-edited value can be anything).
+export const eyeOf=h=>Number.isFinite(+h)&&h!==null&&h!==''?Math.max(MIN_EYE,Math.min(MAX_EYE,+h)):HEIGHT
 export const LOOK_AHEAD=260  // the point looked at, along the shot
 export const FOV=58
 export const MIN_SPEED=5     // a cue ball slower than this has no direction worth following
@@ -14,11 +18,11 @@ export const IN_SECONDS=.7,OUT_SECONDS=.55
 
 // Eye and look-at for a shot from `cue` (table coordinates) heading along v.
 // Returns null when there is no usable direction. x/z are table x/y; y is height.
-export function shotPose(cue,v){
+export function shotPose(cue,v,height=HEIGHT){
  const m=Math.hypot(v.x,v.y)
  if(!(m>=MIN_SPEED))return null
  const dx=v.x/m,dy=v.y/m
- return {eye:{x:cue.x-dx*BEHIND,y:HEIGHT,z:cue.y-dy*BEHIND},look:{x:cue.x+dx*LOOK_AHEAD,y:6,z:cue.y+dy*LOOK_AHEAD}}
+ return {eye:{x:cue.x-dx*BEHIND,y:eyeOf(height),z:cue.y-dy*BEHIND},look:{x:cue.x+dx*LOOK_AHEAD,y:6,z:cue.y+dy*LOOK_AHEAD}}
 }
 
 // Move the blend (0 = normal view, 1 = shot view) toward its target.

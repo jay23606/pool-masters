@@ -73,7 +73,8 @@ for the table itself, synced to whichever player changes them.
 **Follow the shot.** In the 3D views, when a shot is taken the camera swings to where the cue was —
 behind the cue ball, looking down the line of the shot — and returns when the balls stop.
 Striped balls switch to their real stripes for it. Turn it off under TABLE → *Follow the shot*
-(`src/shot-cam.js`).
+(`src/shot-cam.js`), and set how high the player's eye is with *Player height for the shot camera* (crouched at the
+cushion, at the cue, leaning in, or standing over the table; a stored value outside the range falls back to the default).
 
 **The table is the point of the screen.** The site header is hidden while you play. On a
 desktop or tablet the game fills the window and the table is fitted into whatever height is

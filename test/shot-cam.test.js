@@ -29,3 +29,15 @@ test('the blend eases in to 1 and back out to 0, and never leaves that range',()
  assert.equal(stepBlend(0,false,1),0);assert.equal(stepBlend(1,true,1),1)
  assert.equal(smooth(0),0);assert.equal(smooth(1),1);assert.equal(smooth(.5),.5)
 })
+
+test('the eye height is a setting: the pose uses it, and a silly value is brought back into range',async()=>{
+ const {eyeOf,MIN_EYE,MAX_EYE,HEIGHT}=await import('../src/shot-cam.js')
+ assert.equal(shotPose({x:100,y:100},{x:300,y:0},120).eye.y,120)
+ assert.equal(shotPose({x:100,y:100},{x:300,y:0}).eye.y,HEIGHT,'the default when none is given')
+ assert.equal(eyeOf(1),MIN_EYE);assert.equal(eyeOf(9999),MAX_EYE)
+ for(const junk of [undefined,null,'',NaN,'abc'])assert.equal(eyeOf(junk),HEIGHT,String(junk))
+ assert.equal(eyeOf('80'),80)
+ // the eye stays behind the ball whatever its height, and the height does not move the look-at point
+ const a=shotPose({x:200,y:190},{x:300,y:0}),b=shotPose({x:200,y:190},{x:300,y:0},150)
+ assert.equal(a.eye.x,b.eye.x);assert.deepEqual(a.look,b.look)
+})
