@@ -399,7 +399,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
     if(close){if(e.badge)e.badge.visible=false;if(e.stripe)e.stripe.visible=false}
    }
    if(shot.blend>0&&shot.dir){
-    const pose=shotPose(shot.start,shot.dir),t=smooth(shot.blend)
+    const pose=shotPose(shot.start,shot.dir,options.eyeHeight),t=smooth(shot.blend)
     if(pose){
      eye.lerpVectors(base.pos,eye1.set(tx(pose.eye.x),pose.eye.y,tz(pose.eye.z)),t)
      look.lerpVectors(TARGET,look1.set(tx(pose.look.x),pose.look.y,tz(pose.look.z)),t)
