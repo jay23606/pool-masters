@@ -159,3 +159,16 @@ dialog label:has(>input[type=checkbox]){display:flex;align-items:center;gap:10px
 #puzzle-status{min-height:1.3em;color:#bfe6cf}
 #puzzle-dialog .puzzle-tools{flex-wrap:wrap;justify-content:flex-start}
 .drill-head{margin:14px 0 4px;font-size:.9rem}.drill-head small{color:#82978a;font-weight:400;margin-left:6px}
+
+/* lobby: a primary row, the game settings, then the rest grouped by what they are for */
+.actions{margin:26px 0 12px}
+.setup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 22px}
+.setup select{border:1px solid var(--line);background:#0b1912;color:#eaf5ee;border-radius:12px;padding:.7rem .9rem;cursor:pointer}
+.setup .ghost{padding:.7rem .9rem}
+.groups{display:grid;gap:14px;margin:0 0 22px}
+.group h3{margin:0 0 7px;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:#7c9385;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{padding:.55rem .95rem;font-size:.86rem}
+.learn{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:22px 0 0;padding:12px 14px;border:1px solid #2f5544;border-radius:14px;background:#0e2318}
+.learn span{flex:1;min-width:200px;color:#bfe6cf;font-size:.9rem}
+.learn button{padding:.55rem .9rem;font-size:.86rem}
