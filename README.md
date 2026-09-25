@@ -365,6 +365,14 @@ node tools/make-icons.mjs
 It renders them from signed-distance shapes through a small PNG encoder over
 node's `zlib`, so there is no image dependency.
 
+## Roadmap
+
+Two pages, both built from public sources and linked from the lobby's *Roadmap* button:
+[`public/feature.html`](public/feature.html) compares the game with open-source and commercial pool games and
+tracks what has shipped, and [`public/commercial.html`](public/commercial.html) compares it with commercial games
+only, from their store listings, to find features worth building (a feature a listing does not mention is marked
+unknown, never "no"). The second is generated: `node tools/build-commercial.mjs`.
+
 ## Development
 
 ```sh
