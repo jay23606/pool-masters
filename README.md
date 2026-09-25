@@ -192,6 +192,20 @@ turn it is after each change, and the result and race-to-3 line name the players
 The tests pin that the turn follows the shooter, that a foul passes it on, and that the AI never
 shoots for a human (mutation-checked).
 
+## Career
+
+**Career** on the lobby is a ladder of ten opponents, each a short match at a rising level of the AI, with a
+venue and a line of character: Rookie Ray at The Rusty Cue, Banker Bea at The Rail Room, the one-pocket
+specialist, the nine-ball breaker, and at the top The Legend. It uses all four games (bank pool and
+one-pocket are a single rack; the rest are races of two to four) and needs no server. Beat one to open the
+next; any beaten opponent can be played again; a loss costs nothing. Progress is kept in the browser, and
+the ladder unlocks trophies (*Making a name*, *Regular at the club*, *Champion of the circuit*) which in turn
+unlock the Velvet felt and the Champion cue.
+
+`src/career.js` is the ladder and its rules as pure data and functions. The AI gains four rungs
+(novice, club, ace, legend) so the ladder can climb in even steps, and the tests pin that the ladder never
+gets easier as it goes, that the levels form one scale, and how opening, recording a win and losing behave.
+
 ## Drills
 
 **Drills** on the lobby opens eleven one-shot exercises on fixed tables, in three
@@ -253,8 +267,8 @@ shot.
 
 ## Trophies
 
-Twenty-seven trophies in seven groups: racks won, nine-ball, skill (runs, break and
-run, clean hands), opponents, practice drills and daily shots, sharing, and the league. Open the
+Thirty trophies in eight groups: racks won, nine-ball, skill (runs, break and
+run, clean hands), opponents, practice drills and daily shots, the career ladder, sharing, and the league. Open the
 🏆 button in the header for the case, with a progress bar for each one; an unlock
 shows a toast. Stats are counted per device in the browser. They are derived from
 finished shots, worked out from the table before and after, so a host and a guest
@@ -402,13 +416,14 @@ DOM, no renderer.
 | `src/pool.js` | game state, DOM/network glue, applies verdicts from `rules.js` |
 | `src/rules.js` | eight-ball and nine-ball rules and racks as pure functions |
 | `src/replay.js` | recording, the link format and its validation, and playback |
-| `src/trophies.js` | the stats, the twenty-seven trophies and how each is earned |
+| `src/trophies.js` | the stats, the thirty trophies and how each is earned |
 | `src/physics-info.js` | descriptions of the physics constants, for the read-only Physics panel |
 | `src/drills.js` | the drills, how each is judged, their hints, and progress |
 | `tools/solve-drills.mjs` | finds and ranks a working shot for every drill |
 | `src/daily.js`, `src/daily-data.js` | the daily shot: date to table, difficulty by weekday, share text; the generated tables |
 | `tools/gen-daily.mjs` | generates and proves the daily tables |
 | `src/cosmetics.js` | the cues, felts and rail woods, the palettes, and which trophy unlocks which |
+| `src/career.js` | the career ladder: opponents, who is open, recording a win |
 | `src/coach.js` | the shot coach: grades a shot, finds the coach's shot, builds the replays |
 | `src/shot-cam.js` | the follow-the-shot camera's poses and blend |
 | `src/screen-point.js` | maps a pointer back to the table through the phone's quarter turn |

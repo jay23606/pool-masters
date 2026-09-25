@@ -130,3 +130,8 @@ html[data-theme="light"]{--green:#087f49;--line:#c7ddd0;color-scheme:light}html[
 
 /* a checkbox reads beside its words, not above them */
 dialog label:has(>input[type=checkbox]){display:flex;align-items:center;gap:10px}
+
+.career-opp .dots{font-weight:900;color:#42d983}
+.career-opp.beaten{background:#10241a}
+.career-opp:disabled{opacity:.45}
+#career-list{display:grid;gap:8px;max-height:56vh;overflow:auto;min-width:min(420px,84vw)}

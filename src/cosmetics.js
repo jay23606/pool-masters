@@ -6,7 +6,7 @@ import {TROPHIES} from './trophies.js'
 // tested; the renderers read the palettes, the settings dialog reads the catalogue.
 
 export const FELTS={green:'#17794b',blue:'#176c88',burgundy:'#712e3c',charcoal:'#34443d',
- royal:'#4b2f7a',sunset:'#b4552a',ice:'#5b8fa1',black:'#1d2422'}
+ royal:'#4b2f7a',sunset:'#b4552a',ice:'#5b8fa1',black:'#1d2422',velvet:'#7a1f3d'}
 
 export const CUE_STYLES={
  classic:{shaft:'#e6d6ab',butt:'#4a2a18',tip:'#4e8fa6'},
@@ -15,7 +15,8 @@ export const CUE_STYLES={
  gold:{shaft:'#f2e3b5',butt:'#8c6a1c',tip:'#3a79b8'},
  crimson:{shaft:'#e9d9b0',butt:'#7a1220',tip:'#c9a24d'},
  carbon:{shaft:'#c9cdd2',butt:'#1a1d21',tip:'#59d6a4'},
- galaxy:{shaft:'#cfc6ea',butt:'#2a1650',tip:'#e16ad0'}
+ galaxy:{shaft:'#cfc6ea',butt:'#2a1650',tip:'#e16ad0'},
+ champion:{shaft:'#f4ecd0',butt:'#0d0d0f',tip:'#d9b35d'}
 }
 
 // the three colours of the wood-grain texture: the ground, the dark streaks and the light ones
@@ -38,6 +39,7 @@ export const COSMETICS=[
  {kind:'cue',key:'crimson',name:'Crimson',trophy:'first-drill'},
  {kind:'cue',key:'carbon',name:'Carbon',trophy:'on-a-roll'},
  {kind:'cue',key:'galaxy',name:'Galaxy',trophy:'beat-pro'},
+ {kind:'cue',key:'champion',name:'Champion',trophy:'career-all'},
 
  {kind:'felt',key:'green',name:'Classic green'},
  {kind:'felt',key:'blue',name:'Tournament blue'},
@@ -47,6 +49,7 @@ export const COSMETICS=[
  {kind:'felt',key:'sunset',name:'Sunset',trophy:'daily-first'},
  {kind:'felt',key:'ice',name:'Ice',trophy:'beat-league'},
  {kind:'felt',key:'black',name:'Black',trophy:'fifty-racks'},
+ {kind:'felt',key:'velvet',name:'Velvet',trophy:'career-5'},
 
  {kind:'rails',key:'walnut',name:'Walnut'},
  {kind:'rails',key:'maple',name:'Maple',trophy:'first-rack'},

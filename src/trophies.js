@@ -1,5 +1,6 @@
 import {DRILLS} from './drills.js'
 import {dailySolved} from './daily.js'
+import {beatenCount,LADDER} from './career.js'
 
 // Trophies. Pure data and pure functions, like the rules: stats are plain
 // numbers, an event changes them, and an achievement is a number reaching a
@@ -98,6 +99,10 @@ export const TROPHIES=[
 
  A('daily-first','Practice','☀️','Daily habit','Solve a daily shot.',at(c=>dailySolved(c.drills),1)),
  A('daily-7','Practice','📅','Regular customer','Solve 7 different daily shots.',at(c=>dailySolved(c.drills),7)),
+
+ A('career-1','Career','🎩','Making a name','Beat the first opponent on the career ladder.',at(c=>beatenCount(c.career),1)),
+ A('career-5','Career','🎩','Regular at the club','Beat five opponents on the career ladder.',at(c=>beatenCount(c.career),5)),
+ A('career-all','Career','👑','Champion of the circuit','Beat every opponent on the career ladder.',at(c=>beatenCount(c.career),LADDER.length)),
 
  A('share','Social','🎬','Highlight reel','Share a replay of one of your shots.',at(c=>c.stats.shared,1)),
 
