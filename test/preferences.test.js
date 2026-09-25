@@ -5,8 +5,8 @@ const memory=()=>{const data=new Map();return{getItem:k=>data.get(k)??null,setIt
 test('table preferences reject stale or invalid values',()=>{
  const p=loadTablePrefs({getItem:k=>({
   'pool-masters:table-size':'12','pool-masters:felt':'#bad',
-  'pool-masters:cue':'gold','pool-masters:lighting':'laser'}[k]??null)})
- assert.deepEqual(p,{size:7,felt:FELTS.green,cue:'classic',lighting:'hall',aimSensitivity:.3,shotCam:true})
+  'pool-masters:cue':'neon','pool-masters:lighting':'laser','pool-masters:rails':'plastic'}[k]??null)})
+ assert.deepEqual(p,{size:7,felt:FELTS.green,cue:'classic',rails:'walnut',lighting:'hall',aimSensitivity:.3,shotCam:true})
 })
 test('an out-of-range aim sensitivity falls back to the default rather than clamping silently',()=>{
  for(const bad of ['0','.05','1.4','not-a-number',null])

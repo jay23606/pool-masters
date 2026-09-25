@@ -1,6 +1,7 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
 import {rayToRail} from './pool.js'
 import {tableFractions} from './screen-point.js'
+import {CUE_STYLES,RAIL_STYLES} from './cosmetics.js'
 import {shotPose,stepBlend,smooth,FOV as SHOT_FOV,MIN_SPEED} from './shot-cam.js'
 
 // WebGL renderer. Purely a view over the existing 2D simulation: it reads the
@@ -8,7 +9,6 @@ import {shotPose,stepBlend,smooth,FOV as SHOT_FOV,MIN_SPEED} from './shot-cam.js
 // so physics and the network protocol are untouched.
 const CLOTH='#15794a',CUSHION='#0f6038',WOOD_DARK='#2c180e'
 const MOODS={hall:{bg:'#07110d',key:'#fff3dc',rim:'#9fd8ff'},warm:{bg:'#1a100c',key:'#ffe0a8',rim:'#d99b62'},cool:{bg:'#07131d',key:'#d9ebff',rim:'#70b9ff'}}
-const CUES={classic:{shaft:'#e6d6ab',butt:'#4a2a18',tip:'#4e8fa6'},ebony:{shaft:'#d8c49e',butt:'#171414',tip:'#d9b35d'},midnight:{shaft:'#c7d0d7',butt:'#102b52',tip:'#71c4e9'}}
 const tx=x=>x-W/2, tz=y=>y-H/2   // table coords -> world (y is up)
 
 // Bake a pool-ball skin into a sphere-UV texture, once per ball.
@@ -85,7 +85,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
  renderer.toneMapping=THREE.ACESFilmicToneMapping
  renderer.toneMappingExposure=.92
 
- const scene=new THREE.Scene(),mood=MOODS[options.lighting]||MOODS.hall,cueStyle=CUES[options.cue]||CUES.classic
+ const scene=new THREE.Scene(),mood=MOODS[options.lighting]||MOODS.hall,cueStyle=CUE_STYLES[options.cue]||CUE_STYLES.classic
  scene.background=new THREE.Color(mood.bg)
  const pmrem=new THREE.PMREMGenerator(renderer)
  scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture
@@ -148,8 +148,10 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   }
   g.globalAlpha=1;return c
  }
- const cushionMat=std(CUSHION,.93)
- const woodMat=new THREE.MeshPhysicalMaterial({map:tex(woodCanvas(1024,48,'#5b2f19','#2a1208','#94582f')),roughness:.42,clearcoat:.55,clearcoatRoughness:.28})
+ // cushions are the felt, a shade darker, whatever the felt is
+ const cushionMat=std(CUSHION,.93);cushionMat.color.set(options.felt||CLOTH).multiplyScalar(.74)
+ const rails=RAIL_STYLES[options.rails]||RAIL_STYLES.walnut
+ const woodMat=new THREE.MeshPhysicalMaterial({map:tex(woodCanvas(1024,48,rails.base,rails.dark,rails.light)),roughness:.42,clearcoat:.55,clearcoatRoughness:.28})
  const apronMat=std(WOOD_DARK,.6)
  const cloth=box(W,6,H,clothMat,0,-3,0);cloth.receiveShadow=true
  box(768,36,448,apronMat,0,-24,0)
@@ -346,7 +348,7 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   // swapping between the two 3D cameras must not rebuild the scene: the ball
   // textures are baked once and are by far the most expensive thing here
   setCamera(m){cam=CAMS[m]||CAMS.top;frame()},
-  setFelt(color){clothMat.color.set(color)},
+  setFelt(color){clothMat.color.set(color);cushionMat.color.set(color).multiplyScalar(.74)},
   point(e){
    const {fx,fy}=tableFractions(canvas,e)
    ndc.set(fx*2-1,-(fy*2-1))
