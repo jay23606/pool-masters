@@ -1,6 +1,8 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
 import {rayToRail,bankPath} from './pool.js'
 import {tableFractions} from './screen-point.js'
+import {getObstacles,WALL_R} from './obstacles.js'
+const PORTAL_COLORS=['#4aa8ff','#ff9a3c','#c46bff']
 
 // The original top-down renderer. Kept as the default and as a fallback for
 // devices where WebGL is unavailable or too slow.
@@ -37,6 +39,14 @@ export function createRenderer2D(canvas,options={}){
     if(fx.type==='well'){const gr=g.createRadialGradient(fx.x,fx.y,4,fx.x,fx.y,fx.r);gr.addColorStop(0,'rgba(150,90,255,.55)');gr.addColorStop(1,'rgba(150,90,255,0)');g.fillStyle=gr;g.beginPath();g.arc(fx.x,fx.y,fx.r,0,7);g.fill()}
     if(fx.type==='bomb'&&!fx.spent){const bomb=game.balls.find(b=>b.n===fx.n&&b.on);if(bomb){g.strokeStyle=`rgba(255,80,60,${.55+.35*Math.sin(t*8)})`;g.lineWidth=3;g.beginPath();g.arc(bomb.x,bomb.y,R+4+2*Math.sin(t*8),0,7);g.stroke()}}
    }
+   // obstacles: bumpers, walls and portal rings
+   let pi=0
+   for(const o of getObstacles()){
+    if(o.t==='bumper'){const gr=g.createRadialGradient(o.x-o.r*.3,o.y-o.r*.35,1,o.x,o.y,o.r);gr.addColorStop(0,'#f2f2ee');gr.addColorStop(.55,'#8a8f92');gr.addColorStop(1,'#3a3e40');g.fillStyle='#0007';g.beginPath();g.arc(o.x+2,o.y+3,o.r,0,7);g.fill();g.fillStyle=gr;g.beginPath();g.arc(o.x,o.y,o.r,0,7);g.fill()}
+    else if(o.t==='wall'){g.lineCap='round';g.strokeStyle='#0006';g.lineWidth=WALL_R*2+3;g.beginPath();g.moveTo(o.x1+1.5,o.y1+2.5);g.lineTo(o.x2+1.5,o.y2+2.5);g.stroke();g.strokeStyle='#d8c58c';g.lineWidth=WALL_R*2;g.beginPath();g.moveTo(o.x1,o.y1);g.lineTo(o.x2,o.y2);g.stroke()}
+    else if(o.t==='portal'){const c=PORTAL_COLORS[Math.floor(pi++/2)%PORTAL_COLORS.length],gr=g.createRadialGradient(o.x,o.y,2,o.x,o.y,o.r);gr.addColorStop(0,c+'cc');gr.addColorStop(1,c+'22');g.fillStyle=gr;g.beginPath();g.arc(o.x,o.y,o.r,0,7);g.fill();g.strokeStyle=c;g.lineWidth=2.5;g.beginPath();g.arc(o.x,o.y,o.r,0,7);g.stroke()}
+   }
+   g.lineCap='butt'
    for(const b of game.balls)if(b.on&&!(b.z>0))drawBall(b)
    // A ball in the air is drawn on top of the rest and larger, growing as it climbs and shrinking as it comes down:
    // seen from above, that is how height looks. Its shadow stays on the cloth.
