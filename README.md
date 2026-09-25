@@ -139,7 +139,7 @@ timer instead of freezing the game for both players.
 
 ## Game modes
 
-The lobby's game picker chooses **8-ball**, **9-ball**, **Bank pool** or **One-pocket** for practice, for a new
+The lobby's game picker chooses **8-ball**, **9-ball**, **10-ball**, **Bank pool**, **Straight pool** or **One-pocket** for practice, for a new
 table, and for quick play (which only joins a table of the same game). A table
 carries its game in its room metadata and in every state snapshot, so a guest
 always ends up in the host's game, whatever it started as.
@@ -151,6 +151,22 @@ something or drive a ball to a cushion. Pocketing any ball on a legal shot
 keeps the turn. The 9 on a legal shot wins the rack, including off a
 combination; the 9 pocketed on a foul goes back to the foot spot. Any foul gives
 the opponent ball in hand. The AI plays both games.
+
+### 10-ball
+
+Nine-ball with one more ball: a triangle of ten with the 1 at the apex and the 10 in the middle, the cue ball must
+hit the lowest ball first, a shot must pot something or drive a ball to a cushion, and the 10 on a legal shot wins
+(a 10 potted on a foul goes back to the foot spot). It shares its rules and AI with nine-ball (`isRotation()`, with the
+money ball a parameter). It is played without called shots, as nine-ball is here: real ten-ball makes you call the
+ball and pocket, which this version does not yet ask for.
+
+### Straight pool
+
+Continuous pool (14.1), simplified: fifteen balls, every ball you pot scores a point for you in any pocket, a foul
+(scratch, or hitting nothing) costs a point and gives the opponent ball in hand, and the first to thirty wins. When one
+ball is left the other fourteen are racked again as a triangle with its apex open around it (a ball left in the way
+of the rack goes on the apex). It is a scored game like bank pool, so it is one function in `judgeScoreGame()`, and the
+AI plays it. Like the ten-ball above it is uncalled: real straight pool makes you name the ball and pocket for every shot.
 
 ### Bank pool and one-pocket
 

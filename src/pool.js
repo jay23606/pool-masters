@@ -1,6 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,SCORE_TARGET,kind} from './rules.js'
+import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,targetFor,isRotation,MONEY,trianglePositions,kind} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
@@ -68,7 +68,7 @@ export class PoolGame{
  eightBlocked(){const g=this.group(this.me);return g?this.remaining(g):null}
  aimingAtEight(){return this.eightGame()&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
  // The 8 only means something in eight-ball (and a game object with no mode is one).
- eightGame(){return this.mode!=='9ball'&&!isScoreMode(this.mode)}
+ eightGame(){return !isRotation(this.mode)&&!isScoreMode(this.mode)}
  // The pocket the aim has snapped to, while the player is aiming (null otherwise).
  snapMark(){return this.aiming&&this.snapPocket!=null&&this.canAim()?this.snapPocket:null}
  // The pocket to ring on the table: the one called for the 8, or in one-pocket the shooter's own.
@@ -227,18 +227,18 @@ export class PoolGame{
   }}
  pottedMessage(b){
   if(b.k==='cue')return 'Scratch!'
-  if(this.mode==='9ball')return b.n===9?'9-ball potted!':`Ball ${b.n} potted!`
+  if(isRotation(this.mode))return b.n===MONEY[this.mode]?`${b.n}-ball potted!`:`Ball ${b.n} potted!`
   if(isScoreMode(this.mode))return `Ball ${b.n} potted`
   return b.k==='eight'?'8-ball potted!':`${b.k==='solid'?'Solid':'Stripe'} ${b.n} potted!`
  }
  // A 9 pocketed on a foul goes back on the table rather than ending the rack.
- respotNine(){
-  const nine=this.balls.find(b=>b.n===9)
+ respotNine(money=9){
+  const nine=this.balls.find(b=>b.n===money)
   if(!nine)return
-  const p=nineRespot(this.balls)
+  const p=nineRespot(this.balls,money)
   nine.on=true;nine.x=p.x;nine.y=p.y;clearMotion(nine)
  }
- foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(this.mode==='9ball'?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand')}
+ foul(reason){const cue=this.balls[0],hit=this.firstHit?.k;cue.on=true;clearMotion(cue);cue.x=154;cue.y=190;this.setSpin(0,0);this.ballInHand=true;this.placed=false;this.turn=other(this.turn);this.calledPocket=null;this.flash(reason==='scratch'?'Scratch · ball in hand':reason==='wrong-first'?(isRotation(this.mode)?`Foul · hit the ${this.firstHit.n} first, the ${this.lowest} was lowest · ball in hand`:`Foul · hit ${hit==='solid'?'a solid':hit==='stripe'?'a stripe':'the 8-ball'} first · ball in hand`):reason==='no-contact'?'Foul · no object ball contacted · ball in hand':reason==='no-rail'?'Foul · no ball reached a cushion · ball in hand':'Foul · ball in hand')}
  finish(winner){this.over=true;this.result=winner;this.finished=true;this.onFinish({winner,round:this.round});this.flash(this.hotSeat?`${this.nameOf(winner)} wins!`:winner===this.me?'You win!':'You lose')}
  // A drill is judged by its own rule, not by the rules of the game: nobody's turn
  // changes, nothing is won, and a failed attempt puts the table back.
@@ -277,8 +277,8 @@ export class PoolGame{
   if(this.chal)return this.resolveChallenge()
   const shooter=this.turn
   const v=judgeShot(this)
-  if(v.respotNine)this.respotNine()
-  if(v.score){this.score=v.score;this.scoreMessage(v,shooter)}
+  if(v.respotNine)this.respotNine(v.respotBall||9)
+  if(v.score){this.score=v.score;this.scoreMessage(v,shooter);if(v.rerack)this.reRack()}
   if(v.winner){this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:false,winner:v.winner});this.finish(v.winner);this.phase='aim';this.sync();return}
   if(v.assign){
    this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
@@ -327,7 +327,7 @@ export class PoolGame{
  // Nine-ball has no groups, counts or called pockets, so its HUD is its own.
  updateNineHud(){
   const low=lowestBall(this.balls)
-  if(this.groupStatus){const text=low===null?'9-BALL':`9-BALL · LOWEST ON TABLE: ${low}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
+  if(this.groupStatus){const name=MODES[this.mode].label.toUpperCase(),text=low===null?name:`${name} · LOWEST ON TABLE: ${low}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
   this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
@@ -335,13 +335,27 @@ export class PoolGame{
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · hit the ${low} first`):this.practice?'AI is lining up…':'Opponent’s turn'
   if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
  }
+ // Straight pool is continuous: with one ball left, the other fourteen are racked again as a triangle
+ // with its apex open. A ball that was left in the way of the rack goes on the apex instead.
+ reRack(){
+  const cue=this.balls[0],objects=this.balls.filter(b=>b.k!=='cue'),left=objects.find(b=>b.on)||null
+  const slots=trianglePositions(5)
+  let apexTaken=false
+  if(left&&left.x>=400&&Math.abs(left.y-190)<80){left.x=slots[0][0];left.y=slots[0][1];clearMotion(left);apexTaken=true}
+  const free=slots.slice(1).concat(apexTaken||left?[]:[slots[0]])
+  const rest=objects.filter(b=>b!==left).sort(()=>Math.random()-.5)
+  rest.forEach((b,i)=>{const p=free[i]||slots[0];b.on=true;b.x=p[0];b.y=p[1];clearMotion(b)})
+  // the cue ball must not end up inside the rack
+  if(this.balls.some(b=>b!==cue&&b.on&&Math.hypot(b.x-cue.x,b.y-cue.y)<2*R+1)){cue.x=154;cue.y=190;clearMotion(cue)}
+  this.flash('Re-rack · fourteen balls back on the table')
+ }
  // What happened to the score on a shot, in a sentence.
  scoreMessage(v,shooter){
   const who=p=>this.hotSeat?this.nameOf(p):p===this.me?'You':this.practice?'The AI':'Opponent'
   if(v.foul)return
   if(v.credited.length){
    const mine=v.credited.filter(c=>c.to===shooter).length,theirs=v.credited.length-mine
-   this.flash(theirs&&!mine?`${who(shooter)} sank it in ${who(other(shooter))}’s pocket`:mine?`${who(shooter)} scored${mine>1?` ${mine}`:''} · ${v.score[shooter]} of ${SCORE_TARGET}`:'')
+   this.flash(theirs&&!mine?`${who(shooter)} sank it in ${who(other(shooter))}’s pocket`:mine?`${who(shooter)} scored${mine>1?` ${mine}`:''} · ${v.score[shooter]} of ${targetFor(this.mode)}`:'')
   }else if(v.wasted.length)this.flash(this.mode==='bank'?`No bank · ball ${v.wasted[0]} does not count`:`Wrong pocket · ball ${v.wasted[0]} does not count`)
  }
  // Bank pool and one-pocket: a score, and what counts, instead of groups.
@@ -349,13 +363,13 @@ export class PoolGame{
   const a=this.score?.a||0,b=this.score?.b||0
   const nm=p=>this.hotSeat?this.nameOf(p).toUpperCase():p===this.me?'YOU':this.practice?'AI':'THEM'
   const me=this.hotSeat?this.turn:this.me,opp=other(me)
-  const label=this.mode==='bank'?'BANK POOL':'ONE-POCKET'
-  if(this.groupStatus){const text=`${label} · ${nm(me)} ${me==='a'?a:b} – ${opp==='a'?a:b} ${nm(opp)} · FIRST TO ${SCORE_TARGET}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
+  const label=this.mode==='bank'?'BANK POOL':this.mode==='straight'?'STRAIGHT POOL':'ONE-POCKET'
+  if(this.groupStatus){const text=`${label} · ${nm(me)} ${me==='a'?a:b} – ${opp==='a'?a:b} ${nm(opp)} · FIRST TO ${targetFor(this.mode)}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
   this.shoot.disabled=!this.canAim()||!this.aiming
   const live=this.canControl()&&!this.ballInHand
   if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
   if(this.changePocket)this.changePocket.hidden=true
-  const rule=this.mode==='bank'?'bank it off a cushion':'sink it in the ringed pocket'
+  const rule=this.mode==='bank'?'bank it off a cushion':this.mode==='straight'?'pot any ball, a foul costs a point':'sink it in the ringed pocket'
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · ${rule}`):this.practice?'AI is lining up…':'Opponent’s turn'
   if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
  }
@@ -382,7 +396,7 @@ export class PoolGame{
  updateHud(){
   if(this.drill)return this.updateDrillHud()
   if(this.chal)return this.updateChallengeHud()
-  if(this.mode==='9ball')return this.updateNineHud()
+  if(isRotation(this.mode))return this.updateNineHud()
   if(isScoreMode(this.mode))return this.updateScoreHud()
   // A called pocket remains part of a shot after aiming ends; only
   // discard it while setting up an illegal call, never while balls are rolling.

@@ -1,5 +1,5 @@
 import {W,H,TABLE_SIZES} from './table.js'
-import {kind,MODES,modeOf} from './rules.js'
+import {kind,MODES,modeOf,MONEY} from './rules.js'
 
 // A replay is a recorded shot: where every ball was, sampled at the rate the
 // host already broadcasts state, played back by interpolating between samples.
@@ -66,7 +66,7 @@ export function fromWire(w){
  if(!TABLE_SIZES[size])throw new Error('unknown table')
  const ids=w.i,balls=MODES[mode].balls
  if(!Array.isArray(ids)||ids.length!==balls)throw new Error('wrong number of balls')
- const top=mode==='9ball'?9:15
+ const top=MONEY[mode]??15     // nine-ball is balls 0-9, ten-ball 0-10, the rest up to 15
  if(!ids.every(v=>int(v)&&v>=0&&v<=top)||new Set(ids).size!==balls)throw new Error('bad ball numbers')
  if(!Array.isArray(w.t)||w.t.length<2||w.t.length>MAX_FRAMES)throw new Error('bad length')
  const n=w.t.length

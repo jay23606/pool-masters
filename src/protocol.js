@@ -2,7 +2,8 @@ const groups=new Set(['cue','solid','stripe','eight'])
 const phase=new Set(['aim','roll'])
 const player=new Set(['a','b'])
 const finite=n=>typeof n==='number'&&Number.isFinite(n)
-const RACK_SIZE={'8ball':16,'9ball':10,bank:16,onepocket:16}
+const RACK_SIZE={'8ball':16,'9ball':10,'10ball':11,bank:16,onepocket:16,straight:16}
+const TOP_BALL={'9ball':9,'10ball':10}
 const expectedGroup=n=>n===0?'cue':n===8?'eight':n<8?'solid':'stripe'
 
 export function isGameMessage(m){
@@ -21,9 +22,9 @@ export function isGameMessage(m){
  if(!size)return false
  if(m.b.length!==size||!m.b.every(validBall))return false
  if(new Set(m.b.map(b=>b[4])).size!==size)return false
- if(mode==='9ball'&&!m.b.every(b=>b[4]<=9))return false   // balls 0-9 only
+ if(TOP_BALL[mode]&&!m.b.every(b=>b[4]<=TOP_BALL[mode]))return false   // nine-ball is balls 0-9, ten-ball 0-10
  // the score of a scored game: two small whole numbers, and absent before those games existed
- if(m.score!==undefined&&!(m.score&&typeof m.score==='object'&&['a','b'].every(p=>Number.isInteger(m.score[p])&&m.score[p]>=0&&m.score[p]<=15)))return false
+ if(m.score!==undefined&&!(m.score&&typeof m.score==='object'&&['a','b'].every(p=>Number.isInteger(m.score[p])&&m.score[p]>=-99&&m.score[p]<=999)))return false
  return m.groups&&['a','b'].every(p=>m.groups[p]===null||m.groups[p]==='solid'||m.groups[p]==='stripe')
 }
 

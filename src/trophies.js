@@ -39,7 +39,7 @@ export function applyEvent(stats,e){
    if(!pots)return {...s,run:0}
    const run=s.run+pots
    // pocketing the 9 on the break, legally, wins the rack: the golden break
-   const golden=e.brk&&e.mode==='9ball'&&e.won&&e.potted.includes(9)
+   const golden=e.brk&&(e.mode==='9ball'||e.mode==='10ball')&&e.won&&e.potted.includes(e.mode==='9ball'?9:10)
    return {...s,run:e.over?0:run,longestRun:Math.max(s.longestRun,run),goldenBreaks:s.goldenBreaks+(golden?1:0)}
   }
   case 'rack':{

@@ -61,7 +61,7 @@ test('the score travels in a snapshot, and an old snapshot without one is a nil-
 test('a hostile snapshot cannot smuggle in a bad score or an unknown game',()=>{
  const snap=JSON.parse(JSON.stringify(snapshotOf(host('onepocket'))))
  assert.ok(isGameMessage(snap))
- for(const bad of [{a:-1,b:0},{a:99,b:0},{a:1.5,b:0},{a:'x',b:0},{a:1},null,7])assert.equal(isGameMessage({...snap,score:bad}),false,JSON.stringify(bad))
+ for(const bad of [{a:-100,b:0},{a:1000,b:0},{a:1.5,b:0},{a:'x',b:0},{a:1},null,7])assert.equal(isGameMessage({...snap,score:bad}),false,JSON.stringify(bad))
  assert.equal(isGameMessage({...snap,mode:'12ball'}),false)
  assert.equal(isGameMessage({...snap,b:snap.b.slice(1)}),false,'wrong ball count for the game')
 })
