@@ -4,8 +4,19 @@ import {R,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 // Nothing here touches the DOM, the network or a renderer, so a game can be
 // judged, tested or replayed without any of them.
 
-export const MODES={'8ball':{label:'8-ball',balls:16},'9ball':{label:'9-ball',balls:10}}
+export const MODES={
+ '8ball':{label:'8-ball',balls:16},'9ball':{label:'9-ball',balls:10},
+ 'bank':{label:'Bank pool',balls:16},'onepocket':{label:'One-pocket',balls:16}
+}
 export const modeOf=m=>MODES[m]?m:'8ball'
+// Bank pool and one-pocket are scored games: fifteen balls, any of them may be hit first, and the
+// first to eight wins. What they share is judged by judgeScoreGame().
+export const isScoreMode=m=>m==='bank'||m==='onepocket'
+export const SCORE_TARGET=8
+// One-pocket: each player owns one of the two foot corners (the end the rack sits at). Player A
+// has the bottom-right pocket and player B the top-right; a ball dropped in either is that
+// player's, whoever shot it.
+export const ONE_POCKET={a:5,b:2}
 
 export const other=t=>t==='a'?'b':'a'
 export const kind=n=>n===8?'eight':n<8?'solid':'stripe'
@@ -63,6 +74,7 @@ export const validCueSpot=(balls,p)=>
 // table when the shot was taken.
 export function judgeShot(s){
  if(modeOf(s.mode)==='9ball')return judgeNineBall(s)
+ if(isScoreMode(modeOf(s.mode)))return judgeScoreGame(s)
  const shooter=s.turn,group=normalizeGroup(s.groups[shooter]),open=!group
  const black=s.potted.some(b=>b.k==='eight')
  const onTheEight=s.before===0
@@ -135,4 +147,39 @@ export function judgeNineBall(s){
  if(reason)return {winner:null,foul:true,reason,assign:null,nextTurn:other(shooter),respotNine:nine}
  if(nine)return {winner:shooter,foul:false,reason:null,assign:null,nextTurn:shooter,respotNine:false}
  return {winner:null,foul:false,reason:null,assign:null,nextTurn:s.potted.length?shooter:other(shooter),respotNine:false}
+}
+
+// ---- bank pool and one-pocket ----
+//
+// Any ball may be hit first; the cue ball must hit something, and must not go in a pocket. A foul
+// gives the opponent ball in hand and scores nothing, whatever dropped. Otherwise:
+//   bank pool   a ball scores for the shooter only if it touched a cushion on its way to the
+//               pocket; a ball that dropped without doing so is out of the game and scores nothing
+//   one-pocket  a ball scores for whoever owns the pocket it dropped in (ONE_POCKET); a ball in any
+//               other pocket is out of the game and scores nothing
+// The shooter keeps the table while they score for themselves. First to SCORE_TARGET wins; if the
+// balls run out first, the higher score wins, and a tie goes to whoever was not shooting.
+//
+// Takes: mode, turn, score {a,b}, potted (object balls), pockets (or pocketOf) {ball: pocket}, railBalls (balls
+// that touched a cushion; an array or a Set), scratch, firstHit, and balls (the table after the shot).
+export function judgeScoreGame(s){
+ const shooter=s.turn,opponent=other(shooter),mode=modeOf(s.mode)
+ const score={a:s.score?.a||0,b:s.score?.b||0}
+ const rails=new Set(s.railBalls||[])
+ const pockets=s.pockets||s.pocketOf      // a game object keeps this as pocketOf; a bare test shot says pockets
+ const reason=s.scratch?'scratch':!s.firstHit?'no-contact':null
+ const credited=[],wasted=[]
+ for(const b of s.potted){
+  let to=null
+  if(!reason){
+   if(mode==='bank')to=rails.has(b.n)?shooter:null
+   else{const i=pockets?.[b.n];to=i===ONE_POCKET.a?'a':i===ONE_POCKET.b?'b':null}
+  }
+  if(to){score[to]++;credited.push({n:b.n,to})}else wasted.push(b.n)
+ }
+ const left=s.balls.filter(b=>b.on&&b.k!=='cue').length
+ let winner=score.a>=SCORE_TARGET?'a':score.b>=SCORE_TARGET?'b':null
+ if(!winner&&left===0)winner=score.a>score.b?'a':score.b>score.a?'b':opponent
+ const kept=!reason&&credited.some(c=>c.to===shooter)
+ return {winner,foul:Boolean(reason),reason,assign:null,nextTurn:reason||!kept?opponent:shooter,score,credited,wasted}
 }

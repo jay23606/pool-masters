@@ -139,7 +139,7 @@ timer instead of freezing the game for both players.
 
 ## Game modes
 
-The lobby's game picker chooses **8-ball** or **9-ball** for practice, for a new
+The lobby's game picker chooses **8-ball**, **9-ball**, **Bank pool** or **One-pocket** for practice, for a new
 table, and for quick play (which only joins a table of the same game). A table
 carries its game in its room metadata and in every state snapshot, so a guest
 always ends up in the host's game, whatever it started as.
@@ -151,6 +151,32 @@ something or drive a ball to a cushion. Pocketing any ball on a legal shot
 keeps the turn. The 9 on a legal shot wins the rack, including off a
 combination; the 9 pocketed on a foul goes back to the foot spot. Any foul gives
 the opponent ball in hand. The AI plays both games.
+
+### Bank pool and one-pocket
+
+Both are scored games on a full rack of fifteen: any ball may be hit first, the cue ball must hit
+something and must not go in a pocket (a foul gives the opponent ball in hand and scores nothing,
+whatever dropped), and the first to eight wins. If the balls run out first the higher score wins,
+and a tie goes to whoever was not shooting.
+
+- **Bank pool:** a ball scores for the shooter only if it touched a cushion on its way to the pocket.
+  One that dropped without a bank is out of the game and scores nothing. Keep the table while you bank.
+- **One-pocket:** each player owns one of the two foot corners (you are ringed on the table; player A
+  has the bottom right, B the top right). A ball scores for whoever owns the pocket it dropped in, so
+  sinking one in your opponent's pocket gives them the point and ends your turn; a ball in any other
+  pocket is out of the game.
+
+`src/rules.js`'s `judgeScoreGame()` holds both as one pure function; the score crosses the network in
+the snapshot (validated: two small whole numbers, and absent means nil-nil). The AI plays both. For
+one-pocket it aims only at its own pocket. For bank shots it mirrors each pocket across each cushion,
+aims the object ball at the mirror image, and keeps only a candidate that a real play-out confirms
+actually banks the ball in (`bankShot()`), within a time budget so a turn never stalls; the coach
+searches without the clock so its answer stays reproducible. The shot coach knows what counts here:
+a ball that dropped but did not bank is "dropped, but it did not count". Self-play found a real bug
+during the build: the game keeps its pockets as `pocketOf` where the rules read `pockets`, so one-pocket
+never scored until the rules accepted both.
+
+Both are unranked, like nine-ball.
 
 Nine-ball is deliberately unranked for now: the ranking tables have no notion of
 which game a result came from, and mixing the two into one Elo would be wrong.

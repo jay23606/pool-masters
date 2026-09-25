@@ -1,6 +1,6 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS,tableSize} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,clearMotion,strike,shotSpeed} from './physics.js'
-import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES} from './rules.js'
+import {other,remaining as countLeft,nearestPocket,validCueSpot,judgeShot,opposite,normalizeGroup,modeOf,lowestBall,nineRespot,MODES,isScoreMode,ONE_POCKET,SCORE_TARGET} from './rules.js'
 import {chooseShot} from './ai.js'
 import {freshRackState,snapshotOf,applySnapshot} from './game-state.js'
 import {isGameMessage} from './protocol.js'
@@ -32,12 +32,16 @@ export class PoolGame{
  // The eight is only legal once your own group is gone. Nothing used to say so:
  // a tap meant to call a pocket was simply swallowed.
  eightBlocked(){const g=this.group(this.me);return g?this.remaining(g):null}
- aimingAtEight(){return this.mode!=='9ball'&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
+ aimingAtEight(){return this.eightGame()&&this.aiming&&this.canAim()&&this.guide().hit?.k==='eight'}
+ // The 8 only means something in eight-ball (and a game object with no mode is one).
+ eightGame(){return this.mode!=='9ball'&&!isScoreMode(this.mode)}
+ // The pocket to ring on the table: the one called for the 8, or in one-pocket the shooter's own.
+ markedPocket(){return this.mode==='onepocket'?ONE_POCKET[this.turn]:this.calledPocket}
  canCallEight(){return this.group()&&this.remaining(this.group())===0&&this.phase==='aim'&&!this.over}
  setSpectator(v){this.spectator=Boolean(v);this.draw()}
  canControl(){return !this.spectator&&!this.replay&&this.ready&&this.phase==='aim'&&this.turn===this.me&&!this.over&&this.balls[0]?.on}
  canAim(){return this.canControl()&&!this.ballInHand}
- takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.mode!=='9ball'&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
+ takeShot(){if(!this.canAim()||!this.aiming)return;if(!this.drill&&this.eightGame()&&this.guide().hit?.k==='eight'&&!this.canCallEight()){this.calledPocket=null;this.aiming=false;this.flash(`The 8 is not yours yet · ${this.eightBlocked()} ${this.group(this.me)} still to pot`);return}const s=shotSpeed(+this.power.value),vx=Math.cos(this.angle)*s,vy=Math.sin(this.angle)*s,spin=[this.spin.a,this.spin.b];if(!this.drill)this.lastCoach={before:this.balls.map(b=>({...b})),shot:{angle:this.angle,power:+this.power.value,spin},group:this.group(this.me),mode:this.mode,player:this.me,breakShot:this.breakShot,result:null,replays:null};this.aiming=false;this.sfx?.cue(+this.power.value/100);this.startShot();if(this.host)strike(this.balls[0],vx,vy,spin[0],spin[1]);else this.send({t:'shot',vx,vy,spin,place:this.pendingPlace,called:this.canCallEight()?this.calledPocket:null});this.pendingPlace=null}
  startShot(){this.shots??={a:0,b:0};this.shots[this.turn]=(this.shots[this.turn]||0)+1;this.placed=false;this.potted=[];this.firstObjectPotted=null;this.scratch=false;this.firstHit=null;this.before=this.group()?this.remaining(this.group()):null;this.lowest=lowestBall(this.balls);this.railHit=false;this.pocketOf={};this.railBalls=new Set();this.cueRailFirst=false;this.phase='roll';this.noteRecording(true)}
  receive(m){
   if(!isGameMessage(m))return
@@ -188,6 +192,7 @@ export class PoolGame{
  pottedMessage(b){
   if(b.k==='cue')return 'Scratch!'
   if(this.mode==='9ball')return b.n===9?'9-ball potted!':`Ball ${b.n} potted!`
+  if(isScoreMode(this.mode))return `Ball ${b.n} potted`
   return b.k==='eight'?'8-ball potted!':`${b.k==='solid'?'Solid':'Stripe'} ${b.n} potted!`
  }
  // A 9 pocketed on a foul goes back on the table rather than ending the rack.
@@ -236,6 +241,7 @@ export class PoolGame{
   const shooter=this.turn
   const v=judgeShot(this)
   if(v.respotNine)this.respotNine()
+  if(v.score){this.score=v.score;this.scoreMessage(v,shooter)}
   if(v.winner){this.onShotResult?.({shooter,potted:this.potted.map(b=>b.n),foul:false,winner:v.winner});this.finish(v.winner);this.phase='aim';this.sync();return}
   if(v.assign){
    this.groups[shooter]=v.assign;this.groups[other(shooter)]=opposite(v.assign)
@@ -252,12 +258,12 @@ export class PoolGame{
  }
  aiShot(){
   if(this.phase!=='aim'||this.over)return
- const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel,this.mode)
+ const plan=chooseShot(this.balls,this.group('b'),this.ballInHand,this.aiLevel,this.mode,{player:'b'})
  if(!plan)return
  if(plan.place){this.ballInHand=false;this.placed=false}
   // The planner may receive old room state; never show an 8-ball call unless
   // the live game state confirms the AI has cleared its own group.
-  if(this.mode!=='9ball'&&plan.pocket!=null&&this.remaining(this.group('b'))===0)this.calledPocket=plan.pocket
+  if(this.eightGame()&&plan.pocket!=null&&this.remaining(this.group('b'))===0)this.calledPocket=plan.pocket
   this.startShot()
   const s=shotSpeed(plan.power)
   strike(this.balls[0],Math.cos(plan.angle)*s,Math.sin(plan.angle)*s)
@@ -292,6 +298,30 @@ export class PoolGame{
   this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · hit the ${low} first`):this.practice?'AI is lining up…':'Opponent’s turn'
   if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
  }
+ // What happened to the score on a shot, in a sentence.
+ scoreMessage(v,shooter){
+  const who=p=>this.hotSeat?this.nameOf(p):p===this.me?'You':this.practice?'The AI':'Opponent'
+  if(v.foul)return
+  if(v.credited.length){
+   const mine=v.credited.filter(c=>c.to===shooter).length,theirs=v.credited.length-mine
+   this.flash(theirs&&!mine?`${who(shooter)} sank it in ${who(other(shooter))}’s pocket`:mine?`${who(shooter)} scored${mine>1?` ${mine}`:''} · ${v.score[shooter]} of ${SCORE_TARGET}`:'')
+  }else if(v.wasted.length)this.flash(this.mode==='bank'?`No bank · ball ${v.wasted[0]} does not count`:`Wrong pocket · ball ${v.wasted[0]} does not count`)
+ }
+ // Bank pool and one-pocket: a score, and what counts, instead of groups.
+ updateScoreHud(){
+  const a=this.score?.a||0,b=this.score?.b||0
+  const nm=p=>this.hotSeat?this.nameOf(p).toUpperCase():p===this.me?'YOU':this.practice?'AI':'THEM'
+  const me=this.hotSeat?this.turn:this.me,opp=other(me)
+  const label=this.mode==='bank'?'BANK POOL':'ONE-POCKET'
+  if(this.groupStatus){const text=`${label} · ${nm(me)} ${me==='a'?a:b} – ${opp==='a'?a:b} ${nm(opp)} · FIRST TO ${SCORE_TARGET}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
+  this.shoot.disabled=!this.canAim()||!this.aiming
+  const live=this.canControl()&&!this.ballInHand
+  if(this.moveCue)this.moveCue.hidden=!(live&&this.placed)
+  if(this.changePocket)this.changePocket.hidden=true
+  const rule=this.mode==='bank'?'bank it off a cushion':'sink it in the ringed pocket'
+  this.status.textContent=this.spectator?'Spectating live · controls are with the players':!this.ready?'Waiting for another player…':this.over?(this.result===this.me?'You won the rack':'Opponent won the rack'):this.turn===this.me?(this.ballInHand?'Ball in hand · tap table to place cue':`Your shot · ${rule}`):this.practice?'AI is lining up…':'Opponent’s turn'
+  if(this.hotSeat)this.status.textContent=this.hotStatus(this.status.textContent)
+ }
  updateDrillHud(){
   if(this.groupStatus){const text=`DRILL · ${this.drillLabel||this.drill.name.toUpperCase()}`;if(this.groupStatus.textContent!==text){this.groupStatus.textContent=text;this.groupStatus.className=''}}
   this.shoot.disabled=!this.canAim()||!this.aiming
@@ -303,6 +333,7 @@ export class PoolGame{
  updateHud(){
   if(this.drill)return this.updateDrillHud()
   if(this.mode==='9ball')return this.updateNineHud()
+  if(isScoreMode(this.mode))return this.updateScoreHud()
   // A called pocket remains part of a shot after aiming ends; only
   // discard it while setting up an illegal call, never while balls are rolling.
   this.clearInvalidCall();const mine=this.group(this.me),their=this.group(other(this.me)),label=x=>x?x==='solid'?'Solids':'Stripes':'Open table'

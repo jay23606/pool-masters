@@ -54,7 +54,7 @@ test('the HUD names the players instead of you and them',()=>{
  const g=game();g.groups={a:'solid',b:'stripe'};g.turn='b';g.sync()
  const bar={textContent:'',className:''},st={textContent:''}
  Object.assign(g,{groupStatus:bar,status:st,shoot:{disabled:false},power:{value:45},aiming:false,canControl:()=>true,changePocket:null,moveCue:null,spinPad:null})
- try{g.updateHud()}catch(e){/* the HUD touches parts of a real game this one does not have */}
+ try{g.updateHud()}catch{/* the HUD touches parts of a real game this one does not have */}
  assert.match(bar.textContent,/^BO: STRIPES · \d+ left {2}\| {2}ANN: SOLIDS · \d+ left$/)
  assert.match(st.textContent,/Bo’s shot/)
 })
