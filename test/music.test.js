@@ -51,3 +51,37 @@ test('when the browser refuses to construct an Audio element for a fetched track
   await tick()
  }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
 })
+
+const oneTrack={source:'jamendo',url:'https://example.test/track.mp3',duration:120000,license:'by',title:'Test Track',creator:'Someone',foreign_landing_url:'https://example.test/track'}
+
+test('a failed request is retried on another genre before the radio gives up on real songs',async()=>{
+ const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ const urls=[]
+ globalThis.fetch=url=>{urls.push(url);return urls.length<3?Promise.reject(new Error('flaky')):Promise.resolve({ok:true,json:async()=>({results:[oneTrack]})})}
+ let made=0
+ globalThis.Audio=class{constructor(){made++;this.volume=1}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+ try{
+  const m=createMusic();m.setEnabled(true);await tick(40);m.setEnabled(false)
+  assert.equal(urls.length,3,'two failures, then a success')
+  assert.equal(new Set(urls.map(u=>new URL(u).searchParams.get('q'))).size,3,'each attempt used a different genre')
+  assert.equal(made,1,'and the real track played')
+ }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
+})
+
+test('a browser that blocks autoplay gets the real song on the first touch, not the synth',async()=>{
+ const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio,realAdd=globalThis.addEventListener
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ globalThis.fetch=()=>Promise.resolve({ok:true,json:async()=>({results:[oneTrack]})})
+ let made=0,blocked=true
+ globalThis.Audio=class{constructor(){made++;this.volume=1}play(){return blocked?Promise.reject(Object.assign(new Error('blocked'),{name:'NotAllowedError'})):Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+ const handlers={}
+ globalThis.addEventListener=(type,fn)=>{handlers[type]=fn}
+ try{
+  const m=createMusic();m.setEnabled(true);await tick(40)
+  assert.equal(made,1);assert.ok(handlers.pointerdown,'waiting for a touch')
+  blocked=false;handlers.pointerdown();await tick()
+  assert.equal(made,2,'played once the player touched the page')
+  m.setEnabled(false)
+ }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio;globalThis.addEventListener=realAdd}
+})

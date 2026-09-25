@@ -38,7 +38,7 @@ export function createMusic(){
  const listeners=new Set()
  // Jamendo's music collection provides actual tracks; general Openverse audio
  // results also include pets, ambience, and sound effects.
- const searches=['indie rock','folk','hip hop','electronic','soul','jazz','latin','pop','vocal','ambient','funk','piano']
+ const searches=['indie rock','folk','hip hop','electronic','soul','jazz','latin','pop','vocal','ambient','funk','piano','blues','reggae','rock','acoustic','lofi','house','synthwave','classical','country','r&b','disco','world','chillout','trip hop','swing','bossa nova','punk','metal','techno','gospel','ska','dub','singer songwriter','instrumental']
  const shuffled=items=>{const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]]}return out}
  const nextSearch=()=>{if(!searchBag.length)searchBag=shuffled(searches);return searchBag.pop()}
  const remember=track=>{const id=track.foreign_landing_url||track.url;if(playedSet.has(id))return;played.push(id);playedSet.add(id);if(played.length>80)playedSet.delete(played.shift())}
@@ -91,9 +91,15 @@ export function createMusic(){
   step=(step+1)%64
   timer=setTimeout(schedule,Math.max(80,beat*1000-20))
  }
- const startSynth=()=>{if(!enabled)return;const c=context();if(!c)return;c.resume().then(()=>{if(!enabled||timer)return;master.gain.cancelScheduledValues(c.currentTime);master.gain.linearRampToValueAtTime(volume,c.currentTime+.16);schedule()}).catch(()=>{})}
+ const startSynth=()=>{if(!enabled)return;scheduleRetry();const c=context();if(!c)return;c.resume().then(()=>{if(!enabled||timer)return;master.gain.cancelScheduledValues(c.currentTime);master.gain.linearRampToValueAtTime(volume,c.currentTime+.16);schedule()}).catch(()=>{})}
+ // The synth is a stopgap for when no real track can be had, not a destination: try
+ // the radio again now and then, so one failed request does not leave a whole game
+ // on the same twelve pool-themed loops.
+ let retryTimer=null
+ const scheduleRetry=()=>{clearTimeout(retryTimer);retryTimer=setTimeout(()=>{if(!enabled||stream||loading)return;stopSynth();startRadio()},40000);retryTimer.unref?.()}
  const stopSynth=()=>{clearTimeout(timer);timer=null;if(ctx)master.gain.linearRampToValueAtTime(.0001,ctx.currentTime+.12)}
  const stop=()=>{
+  clearTimeout(retryTimer);retryTimer=null;abortWait?.abort();abortWait=null
   stopSynth()
   if(stream){
    const old=stream;stream=null
@@ -101,6 +107,15 @@ export function createMusic(){
    // track never starts an extra song in the background.
    old.onended=null;old.onerror=null;old.pause();old.removeAttribute('src');old.load()
   }
+ }
+ // Browsers refuse to start sound before the player has touched the page. That is not
+ // a failure of the track: wait for the first touch and play it then.
+ let abortWait=null
+ const playAfterGesture=track=>{
+  if(abortWait||typeof addEventListener!=='function')return startSynth()
+  abortWait=new AbortController()
+  const go=()=>{abortWait?.abort();abortWait=null;if(enabled&&!stream)playTrack(track)}
+  for(const type of['pointerdown','keydown','touchend'])addEventListener(type,go,{signal:abortWait.signal})
  }
  const playTrack=track=>{
   if(!enabled||!track)return
@@ -115,7 +130,7 @@ export function createMusic(){
    listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
    audio.onended=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
    audio.onerror=()=>{if(stream!==audio||!enabled)return;stream=null;startRadio()}
-   audio.play().catch(()=>{if(stream===audio){stream=null;startSynth()}})
+   audio.play().catch(err=>{if(stream!==audio)return;stream=null;if(err?.name==='NotAllowedError')playAfterGesture(track);else startSynth()})
   }catch{stream=null;startSynth()}
  }
  async function startRadio(){
@@ -123,10 +138,19 @@ export function createMusic(){
   const next=queue.pop();if(next)return playTrack(next)
   loading=true
   try{
-   const query=nextSearch()
-   const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&source=jamendo&license=by,by-sa&page_size=20`)
-   const data=await response.json()
-   const candidates=(data.results||[]).filter(track=>track.source==='jamendo'&&track.url?.startsWith('https://')&&track.duration>=90000&&['by','by-sa'].includes(track.license))
+   // A different genre each time, and a random page of it, so the catalogue is a few
+   // thousand tracks rather than the first twenty of a dozen searches. An empty or
+   // failed page is retried on another genre before giving up.
+   let candidates=[]
+   for(let attempt=0;attempt<3&&!candidates.length;attempt++){
+    try{
+     const page=attempt?1:1+Math.floor(Math.random()*6)
+     const response=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(nextSearch())}&source=jamendo&license=by,by-sa&page_size=20&page=${page}`)
+     if(response.ok===false)continue
+     const data=await response.json()
+     candidates=(data.results||[]).filter(track=>track.source==='jamendo'&&track.url?.startsWith('https://')&&track.duration>=90000&&['by','by-sa'].includes(track.license))
+    }catch{/* try the next genre */}
+   }
    // Do not replay a song until 80 other selections have been remembered.
    queue=shuffled(candidates.filter(track=>!playedSet.has(track.foreign_landing_url||track.url)))
    if(!queue.length)queue=shuffled(candidates)
