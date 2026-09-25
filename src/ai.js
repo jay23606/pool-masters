@@ -117,20 +117,25 @@ export function simulateFirstHit(balls,angle,power){
 // real game does, and report what it did. The AI uses this to see its own
 // scratches and illegal contacts before it shoots -- without it, a ball sitting
 // beside a pocket had the cue ball follow it in on every attempt, forever.
-export function rollout(balls,angle,power,maxSeconds=8){
+export function rollout(balls,angle,power,maxSeconds=8,spin=[0,0]){
  const bs=balls.map(b=>({...b}))
  const s=shotSpeed(power)
- strike(bs[0],Math.cos(angle)*s,Math.sin(angle)*s)
- let firstHit=null,railHit=false,scratch=false
- const potted=[]
+ strike(bs[0],Math.cos(angle)*s,Math.sin(angle)*s,spin[0],spin[1])
+ let firstHit=null,railHit=false,scratch=false,cueRailFirst=false
+ const potted=[],pockets={},railBalls=new Set()
  for(let t=0;t<maxSeconds;t+=STEP){
   const n=substeps(bs,STEP),h=STEP/n
   for(let k=0;k<n;k++){
    for(const b of bs){
     if(!b.on)continue
     integrate(b,h)
-    if(POCKETS.some(q=>Math.hypot(b.x-q[0],b.y-q[1])<PR)){b.on=false;if(b.k==='cue')scratch=true;else potted.push(b.n);continue}
-    if(railBounce(b)&&firstHit)railHit=true
+    const p=POCKETS.findIndex(q=>Math.hypot(b.x-q[0],b.y-q[1])<PR)
+    if(p>=0){b.on=false;if(b.k==='cue')scratch=true;else{potted.push(b.n);pockets[b.n]=p};continue}
+    if(railBounce(b)){
+     railBalls.add(b.n)
+     if(firstHit)railHit=true
+     if(b.k==='cue'&&!firstHit)cueRailFirst=true
+    }
    }
    for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){
     const a=bs[i],b=bs[j]
@@ -140,7 +145,8 @@ export function rollout(balls,angle,power,maxSeconds=8){
   }
   if(bs.every(b=>!b.on||atRest(b)))break
  }
- return {scratch,firstHit:firstHit&&{n:firstHit.n,k:firstHit.k},railHit,potted}
+ return {scratch,firstHit:firstHit&&{n:firstHit.n,k:firstHit.k},railHit,potted,pockets,railBalls:[...railBalls],cueRailFirst,
+  cue:{x:bs[0].x,y:bs[0].y,on:bs[0].on}}
 }
 
 // Snookered: no legal ball has a clear straight path. Approximating a bank off
