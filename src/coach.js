@@ -1,6 +1,6 @@
 import {rollout,chooseShot,foulReason} from './ai.js'
 import {createRecorder} from './replay.js'
-import {normalizeGroup} from './rules.js'
+import {normalizeGroup,isScoreMode,ONE_POCKET} from './rules.js'
 import {tableSize} from './table.js'
 
 // The shot coach. From the table as it stood before a shot, it plays the shot that was
@@ -23,34 +23,36 @@ const gauss=r=>Math.sqrt(-2*Math.log(1-r()))*Math.cos(2*Math.PI*r())
 const clone=balls=>balls.map(b=>({...b}))
 
 // Play a shot out and describe it: what dropped, what was hit first, whether it fouled.
-export function play(before,shot,group,mode){
+export function play(before,shot,group,mode,player='a'){
  const r=rollout(clone(before),shot.angle,shot.power,10,shot.spin||[0,0])
  const pot=r.potted[0]!=null?r.potted[0]:null
  return {potted:r.potted,pockets:r.pockets,firstHit:r.firstHit?r.firstHit.n:null,scratch:r.scratch,
-  foul:foulReason(before,r,normalizeGroup(group),mode),pot,pocket:pot!=null?r.pockets[pot]:null}
+  foul:foulReason(before,r,normalizeGroup(group),mode),pot,pocket:pot!=null?r.pockets[pot]:null,mode,
+  // the balls that scored: in the scored games a ball that dropped the wrong way is no use
+  counted:!isScoreMode(mode)?r.potted:r.potted.filter(n=>mode==='bank'?r.railBalls.includes(n):r.pockets[n]===ONE_POCKET[player])}
 }
 
 // How often a shot like this one works for a steady player: aim and power wobbled a little
 // around it, counting the tries that drop something without fouling.
-export function chance(before,shot,group,mode){
+export function chance(before,shot,group,mode,player='a'){
  const rand=prng(Math.round((shot.angle+10)*1e5)^Math.round(shot.power*1000))
  let ok=0
  for(let i=0;i<TRIALS;i++){
   const t={angle:shot.angle+gauss(rand)*AIM_SIGMA*Math.PI/180,power:Math.max(5,Math.min(100,shot.power+gauss(rand)*POWER_SIGMA)),spin:shot.spin}
-  const p=play(before,t,group,mode)
-  if(!p.foul&&p.potted.length)ok++
+  const p=play(before,t,group,mode,player)
+  if(!p.foul&&p.counted.length)ok++
  }
  return ok/TRIALS
 }
 
 // The coach's own shot from these balls: null when there is nothing legal to hit.
-export function coachShot(before,group,mode){
+export function coachShot(before,group,mode,player='a'){
  // The AI breaks ties and searches for escapes with Math.random; the coach must give the
  // same answer for the same table, so it draws from a fixed sequence while it thinks.
  const real=Math.random
  Math.random=prng(20260101)
  try{
-  const plan=chooseShot(clone(before),normalizeGroup(group),false,'coach',mode)
+  const plan=chooseShot(clone(before),normalizeGroup(group),false,'coach',mode,{player})
   return plan?{angle:plan.angle,power:plan.power,spin:[0,0]}:null
  }finally{Math.random=real}
 }
@@ -73,6 +75,11 @@ export function describe(yours,best){
  const aim=b=>b.pot!=null?`the ${b.pot} into the ${pocketName(b.pocket)} pocket`:'a safe shot'
  const coachLine=best?(best.pot!=null?`The coach would have played ${aim(best)}, which works ${rate(best.chance)}.`:'There was no good pot on, so the coach would have played safe.'):''
  if(yours.foul)return {verdict:'foul',headline:`That was a foul: ${reasonText(yours.foul)}.`,detail:coachLine}
+ const counted=yours.counted||yours.potted    // hand-built results in tests may not say
+ if(yours.potted.length&&!counted.length){
+  const rule=yours.mode==='bank'?'In bank pool a ball has to touch a cushion on its way.':'In one-pocket a ball has to go in your own pocket.'
+  return {verdict:'miss',headline:`${list(yours.potted)[0].toUpperCase()+list(yours.potted).slice(1)} dropped, but it did not count.`,detail:`${rule} ${coachLine}`.trim()}
+ }
  if(yours.potted.length){
   const good=yours.chance>=.6
   const same=best&&best.pot===yours.pot&&best.pocket===yours.pocket
@@ -85,12 +92,12 @@ export function describe(yours,best){
 
 // Everything for one shot: `before` is the balls as they stood, shot is {angle,power,spin}.
 // A break has no pot worth comparing to, so it is only described.
-export function analyse({before,shot,group,mode,breakShot=false}){
- const y=play(before,shot,group,mode)
- const yours={...y,chance:y.foul?0:chance(before,shot,group,mode),shot}
- const cs=breakShot?null:coachShot(before,group,mode)
+export function analyse({before,shot,group,mode,breakShot=false,player='a'}){
+ const y=play(before,shot,group,mode,player)
+ const yours={...y,chance:y.foul?0:chance(before,shot,group,mode,player),shot}
+ const cs=breakShot?null:coachShot(before,group,mode,player)
  let best=null
- if(cs){const b=play(before,cs,group,mode);best={...b,chance:b.foul?0:chance(before,cs,group,mode),shot:cs}}
+ if(cs){const b=play(before,cs,group,mode,player);best={...b,chance:b.foul?0:chance(before,cs,group,mode,player),shot:cs}}
  return {yours,best,...describe(yours,best)}
 }
 

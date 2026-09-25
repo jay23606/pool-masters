@@ -105,3 +105,16 @@ test('the coach shot can be watched: it becomes a replay that survives a link',a
  assert.equal(last.find(b=>b.n===1).on,false,'the 1 was potted in the replay')
  const back=await unpack(await pack(rec));assert.deepEqual(back,rec)
 })
+
+test('in the scored games the coach only counts what scores',()=>{
+ // a straight pot with nothing else on the table: in bank pool it is not a bank, so it does not count
+ const before=rack('bank').map(b=>b.n===0?{...b,x:350,y:260}:b.n===1?{...b,x:350,y:150}:{...b,on:false})
+ const a=analyse({before,shot:hint,group:null,mode:'bank',player:'a'})
+ assert.deepEqual(a.yours.potted,[1]);assert.deepEqual(a.yours.counted,[]);assert.equal(a.verdict,'miss')
+ assert.match(a.headline,/dropped, but it did not count/);assert.match(a.detail,/touch a cushion/)
+ // one-pocket: the top-middle pocket is nobody's, so it does not count there either
+ const b=analyse({before:before.map(x=>({...x})),shot:hint,group:null,mode:'onepocket',player:'a'})
+ assert.deepEqual(b.yours.counted,[]);assert.match(b.detail,/your own pocket/)
+ // and an eight-ball shot counts everything that dropped, as before
+ assert.deepEqual(analyse({before:straight(),shot:hint,group:null,mode:'8ball'}).yours.counted,[1])
+})

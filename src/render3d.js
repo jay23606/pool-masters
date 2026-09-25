@@ -403,8 +403,9 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
      camera.position.copy(eye);camera.lookAt(look);camera.updateProjectionMatrix();shot.applied=true
     }
    }else if(shot.applied){frame();shot.applied=false}
-   ring.visible=game.calledPocket!=null
-   if(ring.visible){const[px,py]=POCKETS[game.calledPocket];ring.position.x=tx(px);ring.position.z=tz(py)}
+   const marked=game.markedPocket?game.markedPocket():game.calledPocket
+   ring.visible=marked!=null
+   if(ring.visible){const[px,py]=POCKETS[marked];ring.position.x=tx(px);ring.position.z=tz(py)}
 
    const aiming=game.aiming&&game.canAim()
    cue.visible=ghost.visible=aiming

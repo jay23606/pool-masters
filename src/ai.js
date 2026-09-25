@@ -1,7 +1,7 @@
 import {R,PR,MINX,MAXX,MINY,MAXY,POCKETS} from './table.js'
 import {integrate,railBounce,ballCollide,substeps,atRest,strike,shotSpeed} from './physics.js'
 import {STEP} from './predict.js'
-import {remaining,validCueSpot,nearestPocket,normalizeGroup,lowestBall} from './rules.js'
+import {remaining,validCueSpot,nearestPocket,normalizeGroup,lowestBall,isScoreMode,ONE_POCKET} from './rules.js'
 
 // The practice opponent, as pure functions over a ball array. It never touches
 // the game object, so it can be run, measured and tested on its own -- which is
@@ -24,6 +24,7 @@ export const difficultyFor=level=>level==='coach'?COACH:AI_LEVELS[level]||AI_LEV
 // which balls this player is allowed to hit first. In nine-ball that is exactly
 // one ball -- the lowest on the table -- whoever is shooting.
 export function legalTargets(balls,group,mode='8ball'){
+ if(isScoreMode(mode))return balls.filter(b=>b.on&&b.k!=='cue')     // bank pool and one-pocket: any ball
  if(mode==='9ball'){const low=lowestBall(balls);return balls.filter(b=>b.on&&b.n===low)}
  return balls.filter(b=>b.on&&b.k!=='cue'&&
   (group?b.k===(remaining(balls,group)?group:'eight'):b.k!=='eight'))
@@ -68,10 +69,12 @@ export function aimFor(cue,t,dx,dy){
 
 // For every legal ball and every pocket, work out where the cue ball has to
 // be at contact, reject blocked or near-90-degree cuts, and take the best.
-export function bestShot(balls,group,mode='8ball'){
+// `opts.pockets` limits which pockets count (one-pocket: only your own).
+export function bestShot(balls,group,mode='8ball',opts={}){
  const cue=balls[0]
  let best=null
  for(const t of legalTargets(balls,group,mode))for(let pi=0;pi<POCKETS.length;pi++){
+  if(opts.pockets&&!opts.pockets.includes(pi))continue
   const[px,py]=POCKETS[pi]
   const ax=px-t.x,ay=py-t.y,ad=Math.hypot(ax,ay)
   if(!ad)continue
@@ -83,6 +86,47 @@ export function bestShot(balls,group,mode='8ball'){
    best={score,cut:aim.cut,angle:aim.angle,pocket:pi,target:t,power:Math.min(92,32+aim.cd/16+ad/20)}
  }
  return best
+}
+
+// The pockets a player may score in: all of them, except in one-pocket where it is their own.
+const pocketsFor=(mode,ctx)=>mode==='onepocket'?{pockets:[ONE_POCKET[ctx?.player||'b']]}:{}
+
+// Bank shots. Mirror each pocket across each cushion line and aim the object ball at the mirror
+// image: the ball then meets the cushion and rebounds to the real pocket. This cushion sheds speed,
+// so the geometry is only a guide -- every candidate is played out on a copy of the table, and
+// only one that really banks the ball into a pocket is returned. `budgetMs` bounds the search so
+// a turn never stalls; the coach passes Infinity so that its answer does not depend on the clock.
+export function bankShot(balls,budgetMs=350){
+ const cue=balls[0],cands=[]
+ const lines=[{axis:'x',v:MINX},{axis:'x',v:MAXX},{axis:'y',v:MINY},{axis:'y',v:MAXY}]
+ for(const t of balls){
+  if(!t.on||t.k==='cue')continue
+  for(let pi=0;pi<POCKETS.length;pi++)for(const L of lines){
+   const[px,py]=POCKETS[pi]
+   const vx=L.axis==='x'?2*L.v-px:px,vy=L.axis==='y'?2*L.v-py:py
+   const ax=vx-t.x,ay=vy-t.y,ad=Math.hypot(ax,ay)
+   if(!ad)continue
+   // the rebound has to happen on the table: where the line to the mirror pocket crosses the cushion
+   const u=L.axis==='x'?(L.v-t.x)/ax:(L.v-t.y)/ay
+   if(!(u>0&&u<1))continue
+   const cx=t.x+ax*u,cy=t.y+ay*u
+   if(L.axis==='x'?(cy<MINY||cy>MAXY):(cx<MINX||cx>MAXX))continue
+   const aim=aimFor(cue,t,ax/ad,ay/ad)
+   if(!aim||aim.cut<=.2||!pathClear(balls,cue,aim.gx,aim.gy,[t]))continue
+   cands.push({angle:aim.angle,target:t,pocket:pi,cut:aim.cut,score:aim.cut*1.5-aim.cd/900-ad/900})
+  }
+ }
+ cands.sort((a,b)=>b.score-a.score)
+ const start=Date.now()
+ for(const c of cands.slice(0,40)){
+  if(Date.now()-start>budgetMs)break
+  for(const power of [48,68]){
+   const r=rollout(balls,c.angle,power)
+   if(!r.scratch&&r.firstHit&&r.potted.includes(c.target.n)&&r.railBalls.includes(c.target.n))
+    return {angle:c.angle,power,cut:1,pocket:c.pocket,target:c.target,score:c.score,banked:true}
+  }
+ }
+ return null
 }
 
 // No pot on: prefer a ball there is actually a clear path to, rather than just
@@ -164,7 +208,7 @@ export function escapeShot(balls,want,mode='8ball'){
   const angle=start+i*Math.PI*2/40
   const hit=simulateFirstHit(balls,angle,power)
   if(!hit)continue
-  if(mode==='9ball'?hit.n===low:(want?hit.k===want:hit.k!=='eight'))return{angle,power}
+  if(mode==='9ball'?hit.n===low:(isScoreMode(mode)||(want?hit.k===want:hit.k!=='eight')))return{angle,power}
  }
  return null
 }
@@ -173,21 +217,21 @@ export function escapeShot(balls,want,mode='8ball'){
 // pot they give, then walked best-first until one whose shot does not foul --
 // the best-looking pot is often a straight-in shot at a ball beside a pocket,
 // from where the cue ball follows it in.
-export function bestCueSpot(balls,group,mode='8ball'){
+export function bestCueSpot(balls,group,mode='8ball',ctx){
  const cue=balls[0],origin={x:cue.x,y:cue.y}
  const spots=[]
  for(let i=1;i<8;i++)for(let j=1;j<5;j++){
   const p={x:MINX+(MAXX-MINX)*i/8,y:MINY+(MAXY-MINY)*j/5}
   if(!validCueSpot(balls,p))continue
   cue.x=p.x;cue.y=p.y
-  const plan=bestShot(balls,group,mode)
+  const plan=bestShot(balls,group,mode,pocketsFor(mode,ctx))
   spots.push({x:p.x,y:p.y,score:plan?plan.score:-1})
  }
  spots.sort((p,q)=>q.score-p.score)
  let pick=spots[0]||{x:origin.x,y:origin.y}
  for(const sp of spots.slice(0,10)){
   cue.x=sp.x;cue.y=sp.y
-  const plan=planOnce(balls,group,'pro',mode,null)
+  const plan=planOnce(balls,group,'pro',mode,null,ctx)
   if(plan&&!fouls(balls,plan,group,mode)){pick=sp;break}
  }
  cue.x=origin.x;cue.y=origin.y
@@ -224,13 +268,13 @@ export function foulReason(balls,r,group,mode){
 // A plan is drawn, played out on a copy of the table, and redrawn if it would
 // foul -- each redraw gets fresh aim noise and alternately a little less or a
 // little more power.
-export function chooseShot(balls,group,ballInHand,level='league',mode='8ball'){
+export function chooseShot(balls,group,ballInHand,level='league',mode='8ball',ctx={player:'b'}){
  group=normalizeGroup(group)
- const place=ballInHand?bestCueSpot(balls,group,mode):null
+ const place=ballInHand?bestCueSpot(balls,group,mode,ctx):null
  if(place){balls[0].x=place.x;balls[0].y=place.y}
  let first=null
  for(let attempt=0;attempt<10;attempt++){
-  const plan=planOnce(balls,group,level,mode,place)
+  const plan=planOnce(balls,group,level,mode,place,ctx)
   if(!plan)return null
   // softer helps a cue ball that follows its target in; harder helps a shot
   // that dies before reaching a cushion
@@ -243,12 +287,13 @@ export function chooseShot(balls,group,ballInHand,level='league',mode='8ball'){
 }
 
 // One draw of the plan, with this attempt's aim noise.
-function planOnce(balls,group,level,mode,place){
+function planOnce(balls,group,level,mode,place,ctx){
  const difficulty=difficultyFor(level)
  // nine-ball has no called pockets, so nothing here ever names one
  const calls=t=>mode!=='9ball'&&t.k==='eight'
  const cue=balls[0]
- const shot=bestShot(balls,group,mode)
+ // bank pool wants a bank; one-pocket only your own pocket; the others, any pot
+ const shot=mode==='bank'?bankShot(balls,level==='coach'?Infinity:350):bestShot(balls,group,mode,pocketsFor(mode,ctx))
  if(shot&&shot.cut>=difficulty.safetyCut){
   return {place,angle:shot.angle+(Math.random()-.5)*difficulty.aimError/Math.max(.45,shot.cut),
           power:shot.power+(Math.random()-.5)*difficulty.powerError,pocket:calls(shot.target)?shot.pocket:null}
