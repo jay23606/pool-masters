@@ -227,7 +227,7 @@ export function bestCueSpot(balls,group,mode='8ball',ctx){
  const spots=[]
  for(let i=1;i<8;i++)for(let j=1;j<5;j++){
   const p={x:MINX+(MAXX-MINX)*i/8,y:MINY+(MAXY-MINY)*j/5}
-  if(!validCueSpot(balls,p))continue
+  if(!validCueSpot(balls,p,ctx?.limitX))continue
   cue.x=p.x;cue.y=p.y
   const plan=bestShot(balls,group,mode,pocketsFor(mode,ctx))
   spots.push({x:p.x,y:p.y,score:plan?plan.score:-1})

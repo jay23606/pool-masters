@@ -84,8 +84,9 @@ export const nearestPocket=p=>POCKETS.reduce((best,x,i)=>{
  const d=Math.hypot(p.x-x[0],p.y-x[1])
  return d<best.d?{i,d}:best
 },{i:0,d:Infinity}).i
-export const validCueSpot=(balls,p)=>
- p.x>=MINX&&p.x<=MAXX&&p.y>=MINY&&p.y<=MAXY&&
+// `limitX`, when given, keeps the cue ball behind that line (the head string, for kitchen ball in hand).
+export const validCueSpot=(balls,p,limitX=null)=>
+ (limitX==null||p.x<=limitX)&&p.x>=MINX&&p.x<=MAXX&&p.y>=MINY&&p.y<=MAXY&&
  !balls.some(b=>b.k!=='cue'&&b.on&&Math.hypot(b.x-p.x,b.y-p.y)<2*R)
 
 // What a finished shot means, decided without changing anything. The caller
@@ -203,7 +204,7 @@ export function judgeScoreGame(s){
   if(to){score[to]++;credited.push({n:b.n,to})}else wasted.push(b.n)
  }
  const left=s.balls.filter(b=>b.on&&b.k!=='cue').length
- const target=targetFor(mode)
+ const target=s.scoreTarget||targetFor(mode)     // a house rule may set it for straight pool
  if(mode==='straight')score[shooter]-=reason?1:0                    // a foul costs a point
  let winner=score.a>=target?'a':score.b>=target?'b':null
  if(!winner&&left===0&&mode!=='straight')winner=score.a>score.b?'a':score.b>score.a?'b':opponent
