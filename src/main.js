@@ -16,6 +16,7 @@ import { MODES,modeOf } from './rules.js'
 import { pack,unpack } from './replay.js'
 import { DRILLS,DRILL_TABLE,emptyProgress,recordDrill,doneCount,nextDrill } from './drills.js'
 import { analyse,replayOf } from './coach.js'
+import { CHALLENGES,byId as challengeById,emptyResults,record as recordChallenge,format as formatChallenge } from './challenges.js'
 import { LADDER,byId as opponentById,emptyCareer,isBeaten,isOpen,recordWin,summaryOf,nextOpponent,beatenCount } from './career.js'
 import { dayNumber,dailyDrill,isDaily,dailyNumberOf,shareText } from './daily.js'
 import { CONSTANTS,GROUPS as PHYS_GROUPS,valueOf,format as fmt,shotTable,tables as tableInfo,simulation } from './physics-info.js'
@@ -49,7 +50,7 @@ setTableSize(tablePrefs.size)
 document.querySelector('#app').innerHTML=`
 <header><button class="brand" id="home">● Pool Masters</button><div class="identity"><a class="ghost" href="feature.html" target="_blank" rel="noopener" title="How this compares to other pool games, and what is next">Roadmap</a><button id="theme-toggle" class="theme-toggle" title="Switch color theme">☼</button><span id="mini-rating"></span><button id="trophies" class="ghost" title="Trophies">🏆</button><button id="player-stats" class="ghost">Stats</button><button id="edit-name" class="ghost"></button></div></header>
 <main>
- <section id="lobby" class="screen active"><div class="hero"><p class="eyebrow">THE TABLE IS OPEN</p><h1>Rack up.<br><em>Play anyone.</em></h1><p>Instant rooms, live chat, and calls. No account required.</p><div class="actions"><button id="quick" class="primary">Find a game</button><button id="practice">Practice vs AI</button><button id="career">Career</button><button id="hotseat">Two players, one device</button><button id="daily">Daily shot</button><button id="drills">Drills</button><select id="game-mode" aria-label="Game"><option value="8ball" selected>8-ball</option><option value="9ball">9-ball</option><option value="bank">Bank pool</option><option value="onepocket">One-pocket</option></select><select id="ai-level" aria-label="AI difficulty"><option value="beginner">Beginner AI</option><option value="league" selected>League AI</option><option value="pro">Pro AI</option></select></div><div class="join"><input id="code" maxlength="5" placeholder="ROOM CODE"><button id="join">Join</button></div><div class="hero-art" aria-hidden="true"></div></div><div class="lobby-side"><div class="panel"><div class="panel-title"><h2>Open tables</h2><button id="refresh" class="icon">↻</button></div><div id="rooms" class="room-list"></div><button id="create" class="wide">+ Create a private table</button></div><div class="panel leaderboard"><h2>League leaders</h2><div id="leaders"></div></div></div></section>
+ <section id="lobby" class="screen active"><div class="hero"><p class="eyebrow">THE TABLE IS OPEN</p><h1>Rack up.<br><em>Play anyone.</em></h1><p>Instant rooms, live chat, and calls. No account required.</p><div class="actions"><button id="quick" class="primary">Find a game</button><button id="practice">Practice vs AI</button><button id="career">Career</button><button id="hotseat">Two players, one device</button><button id="daily">Daily shot</button><button id="challenges">Challenges</button><button id="drills">Drills</button><select id="game-mode" aria-label="Game"><option value="8ball" selected>8-ball</option><option value="9ball">9-ball</option><option value="bank">Bank pool</option><option value="onepocket">One-pocket</option></select><select id="ai-level" aria-label="AI difficulty"><option value="beginner">Beginner AI</option><option value="league" selected>League AI</option><option value="pro">Pro AI</option></select></div><div class="join"><input id="code" maxlength="5" placeholder="ROOM CODE"><button id="join">Join</button></div><div class="hero-art" aria-hidden="true"></div></div><div class="lobby-side"><div class="panel"><div class="panel-title"><h2>Open tables</h2><button id="refresh" class="icon">↻</button></div><div id="rooms" class="room-list"></div><button id="create" class="wide">+ Create a private table</button></div><div class="panel leaderboard"><h2>League leaders</h2><div id="leaders"></div></div></div></section>
  <section id="game" class="screen"><div class="game-top"><div><button id="leave" class="ghost">← Leave room</button><span id="room-label"></span><span id="match-score" class="match-score"></span><button id="rename-room" class="ghost" hidden>Rename</button></div><div id="spectator-requests"></div><div class="call-actions"><button id="focus-table" class="ghost">Focus table</button><button id="copy" class="ghost">Copy invite</button><button id="call">Start call</button></div></div><div class="play-layout"><div class="table-card"><div id="versus"></div><div class="table-bar"><div id="groups"></div><a id="music-credit" class="music-credit" target="_blank" rel="noopener" hidden></a><div class="view-buttons"><button id="music-toggle" class="view-toggle sfx-toggle" title="Background music"></button><input id="music-volume" class="music-volume" type="range" min="10" max="100" value="100" aria-label="Music volume" title="Music volume" hidden><button id="music-shuffle" class="view-toggle" title="Shuffle music">↻</button><button id="mute-sfx" class="view-toggle sfx-toggle" title="Table sound"></button><button id="view-3d" class="view-toggle" title="Switch table view: top-down 3D, angled 3D, flat 2D">TOP</button></div></div><div class="table-rot"><div class="canvas-wrap"><canvas id="table" width="700" height="380"></canvas><canvas id="table3d" hidden></canvas><div id="callout"></div></div></div><div class="table-side"><div class="shot-controls"><div id="spin" class="spin" title="Cue tip contact point. Drag for draw, follow and English; double-click to centre."><i></i></div><label>Power <input id="power" type="range" min="1" max="100" value="45"><output>45%</output></label><button id="shoot" class="primary" disabled>Shoot</button><button id="next-rack" hidden>Next rack</button><button id="move-cue" class="redo" hidden>Move cue ball</button><button id="change-pocket" class="redo" hidden>Change 8-ball pocket</button></div><div id="game-status"></div><div id="drill-bar" hidden><div id="drill-tip"></div><div id="drill-buttons"><button id="drill-hint" class="ghost" title="Set the aim, power and spin to a shot that works">Show me</button><button id="drill-retry" class="ghost">↺ Retry</button><button id="drill-next" class="ghost" hidden>Next drill →</button><button id="drill-share" class="ghost" hidden>Share result</button></div></div><div id="replay-bar" hidden><button id="replay-shot" class="ghost" title="Watch the last shot again">↺ Replay</button><button id="replay-slow" class="ghost" title="Watch it at a quarter of the speed">Slow motion</button><button id="share-replay" class="ghost" title="Copy a link that plays this shot for anyone">Copy replay link</button><button id="coach-open" class="ghost" title="What would a coach say about your last shot?">🎓 Coach</button><button id="replay-home" class="ghost" hidden>Play a game</button></div><div id="practice-record" hidden></div></div></div><aside id="room-sidebar"><div id="video-panel"><video id="remote-video" autoplay playsinline></video><video id="local-video" autoplay playsinline muted></video><div class="media-controls"><button id="mute">Mic</button><button id="camera">Camera</button></div></div><div class="chat"><div id="messages"></div><form id="chat-form"><input id="message" maxlength="500" autocomplete="off" placeholder="Message the room"><button>Send</button></form></div></aside></div></section>
 </main><dialog id="name-dialog"><form method="dialog"><h2>Choose your name</h2><p>This device remembers you. You can change it anytime.</p><input id="name" maxlength="24" placeholder="Pool player" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-name" value="default" class="primary">Continue</button></div></form></dialog><dialog id="room-dialog"><form method="dialog"><h2>Name this table</h2><p>Players will see this name in the open-table list.</p><input id="room-name" maxlength="48" placeholder="Friday night pool" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-room-name" value="default" class="primary">Save</button></div></form></dialog><dialog id="stats-dialog"><form method="dialog"><h2>Your league record</h2><div id="stats-body"></div><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="result-dialog"><form method="dialog"><h2 id="result-title"></h2><p id="result-summary"></p><div><button id="share-result" type="button" class="ghost">Share result</button><button id="result-next" type="button" class="primary">Next rack</button><button value="default" class="ghost">Close</button></div></form></dialog><dialog id="trophies-dialog"><form method="dialog"><h2>Trophies</h2><p id="trophies-summary"></p><div id="trophy-list"></div><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="drills-dialog"><form method="dialog"><h2>Practice drills</h2><p id="drills-summary"></p><div id="drill-list"></div><div><button value="default" class="primary">Done</button></div></form></dialog><div id="toast"></div>`
 $('.view-buttons').insertAdjacentHTML('beforeend','<button id="replay-menu" class="view-toggle" title="Replay the last shot" hidden aria-label=\"Replay the last shot\">⟲</button>')
@@ -92,7 +93,7 @@ function bind(){
  paintTheme()
  $('#theme-toggle').onclick=()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;localStorage.setItem('pool-masters:theme',next);paintTheme()}
  $('#home').onclick=()=>leaveRoom();$('#leave').onclick=()=>leaveRoom();$('#refresh').onclick=refresh
- $('#create').onclick=createRoom;$('#quick').onclick=quickPlay;$('#practice').onclick=()=>startPractice($('#ai-level').value);$('#hotseat').onclick=()=>startHotSeat();$('#career').onclick=openCareer;$('#game-mode').value=modeOf(localStorage.getItem('pool-masters:game-mode'));$('#game-mode').onchange=e=>localStorage.setItem('pool-masters:game-mode',e.target.value);$('#ai-level').value=localStorage.getItem('pool-masters:ai-level')||'league';$('#ai-level').onchange=e=>localStorage.setItem('pool-masters:ai-level',e.target.value);$('#join').onclick=()=>joinRoom($('#code').value)
+ $('#create').onclick=createRoom;$('#quick').onclick=quickPlay;$('#practice').onclick=()=>startPractice($('#ai-level').value);$('#hotseat').onclick=()=>startHotSeat();$('#challenges').onclick=openChallenges;$('#career').onclick=openCareer;$('#game-mode').value=modeOf(localStorage.getItem('pool-masters:game-mode'));$('#game-mode').onchange=e=>localStorage.setItem('pool-masters:game-mode',e.target.value);$('#ai-level').value=localStorage.getItem('pool-masters:ai-level')||'league';$('#ai-level').onchange=e=>localStorage.setItem('pool-masters:ai-level',e.target.value);$('#join').onclick=()=>joinRoom($('#code').value)
  $('#code').oninput=e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z2-9]/g,'');$('#rooms').onclick=e=>{const b=e.target.closest('[data-code]'),watch=e.target.closest('[data-watch]');if(watch)joinRoom(watch.dataset.watch,'spectator');else if(b)joinRoom(b.dataset.code)}
  $('#spectator-requests').onclick=async e=>{const admit=e.target.closest('[data-admit]'),remove=e.target.closest('[data-remove]');if(!state.room?.isHost)return;if(admit){await state.room.update({metadata:admitSpectator(state.room.metadata,admit.dataset.admit)});toast('Spectator admitted')}if(remove){await state.room.update({metadata:removeSpectator(state.room.metadata,remove.dataset.remove)});await state.room.kick(remove.dataset.remove);toast('Spectator removed')}}
  $('#edit-name').onclick=()=>{$('#name').value=foyer.player.name;$('#name-dialog').showModal()}
@@ -106,7 +107,7 @@ function bind(){
  const watch=speed=>{const g=state.game;if(g?.lastReplay&&!g.startReplay(g.lastReplay,speed))toast('Wait for the shot to finish')}
  $('#replay-menu').onclick=e=>{e.stopPropagation();const bar=$('#replay-bar'),open=!bar.classList.contains('open');bar.classList.toggle('open',open);if(open){const r=e.currentTarget.getBoundingClientRect();bar.style.top=`${Math.round(r.bottom+6)}px`;bar.style.right=`${Math.max(8,Math.round(innerWidth-r.right))}px`}}
  document.addEventListener('click',e=>{const bar=$('#replay-bar');if(bar.classList.contains('open')&&e.target!==$('#replay-menu'))bar.classList.remove('open')})
- document.body.insertAdjacentHTML('beforeend','<dialog id="coach-dialog"><form method="dialog"><h2>Coach</h2><section id="coach-body"></section><div><button type="button" id="coach-yours" class="ghost">Watch your shot</button><button type="button" id="coach-best" class="ghost">Watch the coach’s shot</button><button class="primary">Done</button></div></form></dialog><dialog id="career-dialog"><form method="dialog"><h2>Career</h2><p id="career-summary"></p><section id="career-list"></section><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="physics-dialog"><form method="dialog"><h2>The physics</h2><p>Every number the simulation runs on, read live from the code. Read-only: the same values drive every game, so all players see the same shot.</p><section id="physics-body"></section><div><button class="primary">Done</button></div></form></dialog>')
+ document.body.insertAdjacentHTML('beforeend','<dialog id="coach-dialog"><form method="dialog"><h2>Coach</h2><section id="coach-body"></section><div><button type="button" id="coach-yours" class="ghost">Watch your shot</button><button type="button" id="coach-best" class="ghost">Watch the coach’s shot</button><button class="primary">Done</button></div></form></dialog><dialog id="career-dialog"><form method="dialog"><h2>Career</h2><p id="career-summary"></p><section id="career-list"></section><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="challenges-dialog"><form method="dialog"><h2>Challenges</h2><p>Short scored games for one. Beat your best.</p><section id="challenge-list"></section><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="physics-dialog"><form method="dialog"><h2>The physics</h2><p>Every number the simulation runs on, read live from the code. Read-only: the same values drive every game, so all players see the same shot.</p><section id="physics-body"></section><div><button class="primary">Done</button></div></form></dialog>')
  $('#coach-open').onclick=openCoach
  $('#coach-yours').onclick=()=>watchCoach('yours')
  $('#coach-best').onclick=()=>watchCoach('best')
@@ -119,6 +120,7 @@ function bind(){
  paintDaily()
  $('#trophies').onclick=openTrophies
  $('#career-list').onclick=e=>{const b=e.target.closest('[data-opponent]');if(b&&!b.disabled)startCareer(b.dataset.opponent)}
+ $('#challenge-list').onclick=e=>{const b=e.target.closest('[data-challenge]');if(b)startChallenge(b.dataset.challenge)}
  $('#open-physics').onclick=()=>{$('#table-dialog').close();openPhysics()}
  $('#drill-hint').onclick=()=>{if(!state.game?.applyHint())toast('Wait for the balls to stop')}
  $('#drill-retry').onclick=()=>state.game?.retryDrill()
@@ -240,7 +242,7 @@ function trackRack(result){
 }
 function checkTrophies(){
  const unlocked=loadUnlocked()
- const fresh=newlyEarned({stats:loadStats(),drills:drillProgress(),career:careerProgress(),profile:state.profile},unlocked)
+ const fresh=newlyEarned({stats:loadStats(),drills:drillProgress(),career:careerProgress(),challenges:challengeResults(),profile:state.profile},unlocked)
  if(!fresh.length)return
  localStorage.setItem('pool-masters:trophies',JSON.stringify(unlock(unlocked,fresh)))
  // a toast holds one message, so stagger a couple and summarise a crowd
@@ -250,7 +252,7 @@ function checkTrophies(){
 }
 function paintTrophies(){const n=Object.keys(loadUnlocked()).length;$('#trophies').textContent=n?`🏆 ${n}`:'🏆';$('#trophies').title=`Trophies: ${n} of ${TROPHIES.length}`}
 function openTrophies(){
- const unlocked=loadUnlocked(),c={stats:loadStats(),drills:drillProgress(),career:careerProgress(),profile:state.profile}
+ const unlocked=loadUnlocked(),c={stats:loadStats(),drills:drillProgress(),career:careerProgress(),challenges:challengeResults(),profile:state.profile}
  $('#trophies-summary').textContent=`${TROPHIES.filter(t=>unlocked[t.id]).length} of ${TROPHIES.length} earned. Kept on this device.`
  $('#trophy-list').innerHTML=GROUPS.map(g=>`<h3>${g}</h3>`+TROPHIES.filter(t=>t.group===g).map(t=>{
   const u=unlocked[t.id],p=progressOf(t,c),gives=rewardsOf(t.id).map(r=>r.name).join(', ')
@@ -448,4 +450,39 @@ function careerMatchDone(won){
  if(won)localStorage.setItem('pool-masters:career',JSON.stringify(after))
  $('#result-summary').textContent=summaryOf(o,won,after)
  if(won)setTimeout(checkTrophies,1800)
+}
+
+// ---- challenge games ----
+function challengeResults(){try{return JSON.parse(localStorage.getItem('pool-masters:challenges'))||emptyResults()}catch{return emptyResults()}}
+function openChallenges(){
+ const r=challengeResults()
+ $('#challenge-list').innerHTML=CHALLENGES.map(c=>{const best=r[c.id]?.best;return `<button type="button" class="drill" data-challenge="${c.id}"><span class="dots">▶</span><span class="what"><b>${esc(c.name)}</b><small>${esc(c.blurb)}</small></span><span class="done">${best==null?'':'Best '+formatChallenge(c.id,best)+(c.unit&&c.id!=='clear'?' '+c.unit:'')}</span></button>`}).join('')
+ $('#challenges-dialog').showModal()
+}
+async function startChallenge(id){
+ const def=challengeById(id);if(!def)return
+ if($('#challenges-dialog').open)$('#challenges-dialog').close()
+ state.game?.destroy();state.game=null
+ state.mode='challenge';state.room=null;state.opponent=null
+ showGame()
+ $('#game').classList.add('focus','solo');$('.call-actions').hidden=true;$('#room-sidebar').hidden=true
+ history.replaceState({},'',location.pathname)
+ $('#room-label').textContent=`Challenge · ${def.name}`;$('#match-score').textContent=''
+ $('#versus').innerHTML=`<span style="grid-column:1/-1;text-align:center"><b>${esc(def.name)}</b><small>${esc(def.blurb)}</small></span>`
+ $('#practice-record').hidden=true
+ state.game=new PoolGame({challenge:id,mode:'8ball',renderer:await ensureRenderer(),surface:$('.canvas-wrap'),status:$('#game-status'),groupStatus:$('#groups'),callout:$('#callout'),power:$('#power'),powerOut:$('.shot-controls output'),shoot:$('#shoot'),spinPad:$('#spin'),moveCue:$('#move-cue'),changePocket:$('#change-pocket'),sfx,onReplay:paintReplayBar,aimSensitivity:tablePrefs.aimSensitivity,prefs:tablePrefs,host:true,practice:true,spectator:false,send:()=>{},onFinish:finishChallenge})
+ state.game.setReady(true)
+}
+// The game has ended: keep a best, and say how it went.
+function finishChallenge(result){
+ const c=result.challenge,def=challengeById(c.id)
+ const {results,newBest,best}=recordChallenge(challengeResults(),c.id,c.final)
+ localStorage.setItem('pool-masters:challenges',JSON.stringify(results))
+ music.duck();sfx.result(newBest)
+ $('#result-title').textContent=newBest?'New best!':def.name
+ const score=formatChallenge(c.id,c.final)+(def.unit&&c.id!=='clear'?' '+def.unit:'')
+ $('#result-summary').textContent=`${def.name}: ${score}. Best: ${formatChallenge(c.id,best)}${def.unit&&c.id!=='clear'?' '+def.unit:''}.`
+ $('#result-next').hidden=false;$('#result-next').textContent='Play again'
+ $('#result-dialog').showModal()
+ setTimeout(checkTrophies,1800)
 }
