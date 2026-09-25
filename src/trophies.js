@@ -1,4 +1,5 @@
 import {DRILLS} from './drills.js'
+import {dailySolved} from './daily.js'
 
 // Trophies. Pure data and pure functions, like the rules: stats are plain
 // numbers, an event changes them, and an achievement is a number reaching a
@@ -94,6 +95,9 @@ export const TROPHIES=[
  A('unaided','Practice','🧠','No training wheels','Solve 5 drills without using the hint.',at(unaided,5)),
  A('advanced','Practice','🎓','Advanced class','Complete every level-3 drill.',at(c=>level3.filter(d=>c.drills?.[d.id]?.done).length,level3.length)),
  A('all-drills','Practice','🏅','Graduate','Complete every practice drill.',at(drillsDone,DRILLS.length)),
+
+ A('daily-first','Practice','☀️','Daily habit','Solve a daily shot.',at(c=>dailySolved(c.drills),1)),
+ A('daily-7','Practice','📅','Regular customer','Solve 7 different daily shots.',at(c=>dailySolved(c.drills),7)),
 
  A('share','Social','🎬','Highlight reel','Share a replay of one of your shots.',at(c=>c.stats.shared,1)),
 

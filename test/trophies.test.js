@@ -231,3 +231,14 @@ test('a whole winning game, folded event by event, earns the trophies it should'
  for(const id of ['first-rack','nine-ball','golden-break','break-and-run','clean-hands','beat-pro'])assert.ok(got.includes(id),id)
  for(const id of ['ten-racks','match','tables','bragging-rights','face-to-face','sweep'])assert.ok(!got.includes(id),`${id} should not be earned`)
 })
+
+test('the daily-shot trophies count different days solved, and nothing else',()=>{
+ const ctx=d=>({stats:{},drills:d,profile:null})
+ const t=id=>TROPHIES.find(x=>x.id===id)
+ assert.equal(earned(t('daily-first'),ctx({})),false)
+ assert.equal(earned(t('daily-first'),ctx({'straight-in':{done:true}})),false,'a practice drill is not a daily shot')
+ assert.equal(earned(t('daily-first'),ctx({'daily-3':{done:true}})),true)
+ const week=Object.fromEntries([1,2,3,4,5,6].map(n=>[`daily-${n}`,{done:true}]))
+ assert.equal(earned(t('daily-7'),ctx(week)),false)
+ assert.equal(earned(t('daily-7'),ctx({...week,'daily-7':{done:true}})),true)
+})

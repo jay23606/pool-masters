@@ -209,7 +209,7 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
   <div class="rm shipped">
    <div class="rank">✓</div>
    <div><h4>Achievements / trophies</h4>
-   <p><strong>Shipped.</strong> Twenty-five trophies in seven groups (racks, nine-ball, skill,
+   <p><strong>Shipped.</strong> Twenty-seven trophies in seven groups (racks, nine-ball, skill,
    opponents, practice, social, league), each with a progress bar toward its target, a toast
    when one unlocks and a trophy case in the header. Stats are derived from what happened on
    the table, so host and guest agree, and kept per device. Building it also found and fixed
@@ -264,7 +264,68 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
 </section>
 
 <section>
- <h2><span class="n">03</span>Full comparison</h2>
+ <h2><span class="n">03</span>What none of them have</h2>
+ <p class="section-sub">Catching up on the list above only makes the game as good as the field.
+ These are things none of the five competitors is known to offer, chosen because the game
+ already has the parts to build them: pure rules, an AI that can play out a shot, replays as
+ links, drills that are proven solvable, and a host-authoritative simulation.</p>
+ <div class="roadmap">
+
+  <div class="rm shipped">
+   <div class="rank">✓</div>
+   <div><h4>Daily shot</h4>
+   <p><strong>Shipped.</strong> One fixed table a day, the same for everyone, that a search of the real physics has shown can be solved. Difficulty rises through the week, the result is a shareable line, and there is no account or server, so it works offline. Two trophies hang off it.</p></div>
+   <span class="tag done">Shipped</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">10</div>
+   <div><h4>Shot coach</h4>
+   <p>After a shot, show the shot the AI would have played from the same table, and how likely yours was to work. The AI already plays every candidate out on a copy of the table to screen out fouls; the same machinery can grade a human shot. Nobody else explains <em>why</em> a shot was good or bad.</p></div>
+   <span class="tag high">High impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">11</div>
+   <div><h4>Hot-seat: two players, one device</h4>
+   <p>Pass the phone. No room code, no network, no account: the rules and physics already run without one. Cheap, and the way most people first play pool with a friend.</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">12</div>
+   <div><h4>Bank pool and one-pocket</h4>
+   <p>Two more game modes that are mostly rules: every pot must be a bank (the game already tracks which balls touched a cushion), or each player owns a single pocket. Written as pure functions like nine-ball, so the AI can play them too.</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">13</div>
+   <div><h4>Cosmetics earned, not bought</h4>
+   <p>New cues, felts and ball sets unlocked by trophies. The game has no ads and no in-app purchases, which is a selling point the mobile leaders cannot copy; this gives the trophies something to be for.</p></div>
+   <span class="tag med">Medium impact</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">14</div>
+   <div><h4>Replay director</h4>
+   <p>The replay is a recording of positions, so it can be played from any camera: scrub, slow-mo through the contact, orbit the cue ball. A shared shot becomes a clip worth sending.</p></div>
+   <span class="tag low">Lower priority</span>
+  </div>
+
+  <div class="rm">
+   <div class="rank">15</div>
+   <div><h4>Made for everyone to see</h4>
+   <p>Colour-blind-safe ball patterns, spoken shot commentary for screen readers, and larger touch targets. Every competitor relies on colour alone to tell solids from stripes.</p></div>
+   <span class="tag low">Lower priority</span>
+  </div>
+
+
+ </div>
+</section>
+
+<section>
+ <h2><span class="n">04</span>Full comparison</h2>
  <p class="section-sub">Every feature below is scored against what each project
  documents about itself or visibly ships. A star marks something we do that no other
  entry in this table does.</p>
@@ -295,7 +356,7 @@ footer{max-width:1180px;margin:40px auto 0;padding:20px clamp(20px,4vw,32px);bor
 </section>
 
 <section>
- <h2><span class="n">04</span>Sources</h2>
+ <h2><span class="n">05</span>Sources</h2>
  <p class="sources">
   <a href="https://github.com/tailuge/billiards" target="_blank" rel="noopener">tailuge/billiards</a> — GitHub repository and live demo.<br>
   <a href="https://ekiefl.github.io/projects/pooltool/" target="_blank" rel="noopener">Pooltool</a> — project page, JOSS paper and developer blog (ekiefl.github.io).<br>
@@ -360,6 +421,7 @@ const rows = [
 ['Recent match history', ['y','n','n','p','p','p']],
 ['Achievements / trophies', ['y','n','n','y','y','y']],
 ['Daily login rewards', ['n','n','n','y','n','n']],
+['Daily shot (same solvable table for everyone)', ['y','n','n','n','n','n'], 'One proven-solvable table a day, difficulty rising through the week, with a shareable result. No account or server.'],
 ['Coin / currency economy', ['n','n','n','y','y','n']],
 
 ['cat','Practice & AI'],
