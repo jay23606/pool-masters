@@ -66,6 +66,10 @@ for the table itself, synced to whichever player changes them.
 
 ## Table views
 
+Held upright on a phone, the table turns a quarter turn so its long side runs down the
+screen and fills the width; the site header and secondary buttons are hidden while you
+play. Landscape is unchanged. Pointer positions are mapped back in `src/screen-point.js`.
+
 The table draws through a swappable renderer, and the button in the corner of
 the table cycles three of them:
 

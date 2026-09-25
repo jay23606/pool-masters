@@ -1,5 +1,6 @@
 import {W,H,R,PR,POCKETS,COLORS} from './table.js'
 import {rayToRail} from './pool.js'
+import {tableFractions} from './screen-point.js'
 
 // WebGL renderer. Purely a view over the existing 2D simulation: it reads the
 // same {x,y,vx,vy,on,k,n} balls the 2D renderer does and never writes to them,
@@ -231,8 +232,8 @@ export async function createRenderer3D(canvas,camera3d='top',options={}){
   setCamera(m){cam=CAMS[m]||CAMS.top;frame()},
   setFelt(color){clothMat.color.set(color)},
   point(e){
-   const r=canvas.getBoundingClientRect()
-   ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1))
+   const {fx,fy}=tableFractions(canvas,e)
+   ndc.set(fx*2-1,-(fy*2-1))
    ray.setFromCamera(ndc,camera)
    if(!ray.ray.intersectPlane(plane,hitPt))return null
    return{x:hitPt.x+W/2,y:hitPt.z+H/2}
