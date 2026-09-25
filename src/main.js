@@ -14,6 +14,7 @@ import { AI_LEVELS } from './ai.js'
 import { MODES,modeOf } from './rules.js'
 import { pack,unpack } from './replay.js'
 import { DRILLS,emptyProgress,recordDrill,doneCount,nextDrill } from './drills.js'
+import { CONSTANTS,GROUPS as PHYS_GROUPS,valueOf,format as fmt,shotTable,tables as tableInfo,simulation } from './physics-info.js'
 import { TROPHIES,GROUPS,emptyStats,applyEvent,newlyEarned,unlock,progressOf } from './trophies.js'
 import { emptyScore,scoreRack,scoreLine,matchWinner,MATCH_TARGET } from './match-score.js'
 import { occupancyLabel } from './room-summary.js'
@@ -49,7 +50,7 @@ document.querySelector('#app').innerHTML=`
 </main><dialog id="name-dialog"><form method="dialog"><h2>Choose your name</h2><p>This device remembers you. You can change it anytime.</p><input id="name" maxlength="24" placeholder="Pool player" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-name" value="default" class="primary">Continue</button></div></form></dialog><dialog id="room-dialog"><form method="dialog"><h2>Name this table</h2><p>Players will see this name in the open-table list.</p><input id="room-name" maxlength="48" placeholder="Friday night pool" required><div><button value="cancel" class="ghost">Cancel</button><button id="save-room-name" value="default" class="primary">Save</button></div></form></dialog><dialog id="stats-dialog"><form method="dialog"><h2>Your league record</h2><div id="stats-body"></div><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="result-dialog"><form method="dialog"><h2 id="result-title"></h2><p id="result-summary"></p><div><button id="share-result" type="button" class="ghost">Share result</button><button id="result-next" type="button" class="primary">Next rack</button><button value="default" class="ghost">Close</button></div></form></dialog><dialog id="trophies-dialog"><form method="dialog"><h2>Trophies</h2><p id="trophies-summary"></p><div id="trophy-list"></div><div><button value="default" class="primary">Done</button></div></form></dialog><dialog id="drills-dialog"><form method="dialog"><h2>Practice drills</h2><p id="drills-summary"></p><div id="drill-list"></div><div><button value="default" class="primary">Done</button></div></form></dialog><div id="toast"></div>`
 $('.view-buttons').insertAdjacentHTML('afterbegin','<button id="table-settings" class="view-toggle" title="Table size and felt">TABLE</button>')
 document.body.insertAdjacentHTML('beforeend','<dialog id="table-dialog"><form method="dialog"><h2>Set up the table</h2><p>Table size changes the ball-to-table proportion. Changing it starts a fresh rack.</p><label>Table size <select id="table-size"><option value="7">7 ft · bar</option><option value="8">8 ft · home</option><option value="9">9 ft · league</option></select></label><label>Felt <select id="felt"><option value="green">Classic green</option><option value="blue">Tournament blue</option><option value="burgundy">Burgundy</option><option value="charcoal">Charcoal</option></select></label><div><button value="cancel" class="ghost">Cancel</button><button id="save-table" value="default" class="primary">Apply</button></div></form></dialog>')
-$('#table-dialog form').insertAdjacentHTML('beforeend','<label>Cue finish <select id="cue-finish"><option value="classic">Classic maple</option><option value="ebony">Ebony</option><option value="midnight">Midnight blue</option></select></label><label>Room lighting <select id="lighting"><option value="hall">Pool hall</option><option value="warm">Warm lounge</option><option value="cool">Cool arena</option></select></label><label>Aim sensitivity <input id="aim-sensitivity" type="range" min="10" max="100" value="30"> <output id="aim-sensitivity-out"></output></label><label><input id="shot-cam" type="checkbox"> Follow the shot (3D views): swing the camera behind the cue while balls roll</label><label><input id="haptics" type="checkbox"> Haptic feedback</label>')
+$('#table-dialog form').insertAdjacentHTML('beforeend','<label>Cue finish <select id="cue-finish"><option value="classic">Classic maple</option><option value="ebony">Ebony</option><option value="midnight">Midnight blue</option></select></label><label>Room lighting <select id="lighting"><option value="hall">Pool hall</option><option value="warm">Warm lounge</option><option value="cool">Cool arena</option></select></label><label>Aim sensitivity <input id="aim-sensitivity" type="range" min="10" max="100" value="30"> <output id="aim-sensitivity-out"></output></label><label><input id="shot-cam" type="checkbox"> Follow the shot (3D views): swing the camera behind the cue while balls roll</label><label><input id="haptics" type="checkbox"> Haptic feedback</label><button type="button" id="open-physics" class="ghost">How the physics works…</button>')
 
 function toast(text){const e=$('#toast');e.textContent=text;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2200)}
 const viewManager=createViewManager({$,tablePrefs,toast,
@@ -101,6 +102,8 @@ function bind(){
  $('#share-replay').onclick=shareReplay
  $('#drills').onclick=openDrills
  $('#trophies').onclick=openTrophies
+ document.body.insertAdjacentHTML('beforeend','<dialog id="physics-dialog"><form method="dialog"><h2>The physics</h2><p>Every number the simulation runs on, read live from the code. Read-only: the same values drive every game, so all players see the same shot.</p><section id="physics-body"></section><div><button class="primary">Done</button></div></form></dialog>')
+ $('#open-physics').onclick=()=>{$('#table-dialog').close();openPhysics()}
  $('#drill-hint').onclick=()=>{if(!state.game?.applyHint())toast('Wait for the balls to stop')}
  $('#drill-retry').onclick=()=>state.game?.retryDrill()
  $('#drill-next').onclick=()=>{const n=nextDrill(state.drillId);if(n)startDrill(n.id);else{toast('That was the last drill');leaveRoom().then(openDrills)}}
@@ -310,3 +313,16 @@ if(import.meta.env.PROD&&'serviceWorker'in navigator)
 if(import.meta.env.DEV)window.__pm={state,viewManager,openReplay,track,checkTrophies,openTrophies}
 
 boot().catch(e=>{console.error(e);toast('Could not connect. Reload to try again.')})
+
+function openPhysics(){
+ const row=(a,b,c)=>`<tr><th>${a}</th><td>${b}</td><td>${c}</td></tr>`
+ const groups=PHYS_GROUPS.map(g=>{
+  const rows=CONSTANTS.filter(c=>c.group===g).map(c=>`<tr><th>${esc(c.name)}</th><td class="num">${fmt(valueOf(c))}${c.unit?` <small>${esc(c.unit)}</small>`:''}</td><td>${esc(c.note)}</td></tr>`)
+  const extra=g==='Simulation'?simulation().map(r=>row(esc(r.name),`<span class="num">${esc(r.value)}</span>`,esc(r.note))):[]
+  return rows.length+extra.length?`<h3>${g}</h3><table>${rows.join('')}${extra.join('')}</table>`:''
+ }).join('')
+ const shots=`<h3>Power to speed</h3><table>${shotTable().map(r=>row(`${r.power}%`,`<span class="num">${Math.round(r.speed)}</span> <small>units/s</small>`,`about ${r.ms.toFixed(1)} m/s`)).join('')}</table>`
+ const sizes=`<h3>Tables</h3><table>${tableInfo().map(r=>row(r.label,`<span class="num">${r.ball}</span> <small>ball radius</small>`,`pocket radius ${r.pocket} — bigger tables make the same ball smaller`)).join('')}</table>`
+ $('#physics-body').innerHTML=groups+shots+sizes
+ $('#physics-dialog').showModal()
+}

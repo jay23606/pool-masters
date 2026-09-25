@@ -14,7 +14,7 @@ export const MU_ROLL=.04          // rolling resistance once it grips
 export const SPIN_DECAY=12          // rad/s^2, decay of vertical-axis English
 export const MU_BALL=.06,E_BALL=.95 // ball-on-ball friction and restitution
 export const MU_CUSHION=.2
-const SLIP_EPS=.6                   // below this the ball counts as rolling
+export const SLIP_EPS=.6                   // below this the ball counts as rolling
 
 // A ball carries angular velocity (wx,wy,wz) as well as (vx,vy). wx/wy give
 // top- and backspin, wz is English. The contact patch sits at (0,0,-R), so the
@@ -124,5 +124,6 @@ export function substeps(balls,dt){
 
 // A ball at the top of a draw shot has almost no velocity but a great deal of
 // slip, and is about to come back — so resting means both are small.
-export const atRest=b=>speed(b)<4.5&&slipSpeed(b)<4.5
+export const REST_SPEED=4.5          // units/s, below both linear and slip speed a ball counts as stopped
+export const atRest=b=>speed(b)<REST_SPEED&&slipSpeed(b)<REST_SPEED
 export const clearMotion=b=>{b.vx=b.vy=b.wx=b.wy=b.wz=0}
