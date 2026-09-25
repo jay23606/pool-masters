@@ -35,7 +35,7 @@ const sfx=createSfx()
 const music=createMusic()
 sfx.setEnabled(localStorage.getItem('pool-masters:muted')!=='1')
 sfx.setHaptics(localStorage.getItem('pool-masters:haptics')!=='0')
-music.setVolume(localStorage.getItem('pool-masters:music-volume')||1)
+music.setVolume(localStorage.getItem('pool-masters:music-volume')||.2)
 // an AudioContext may only start from a gesture, so take the first one going
 addEventListener('pointerdown',()=>{sfx.resume();music.resume()},{once:true})
 const tablePrefs=loadTablePrefs()
@@ -297,7 +297,7 @@ async function openReplay(link){
  state.game.startReplay(rec)
  return true
 }
-function showGame(){$('#drill-bar').hidden=true;$('.shot-controls').hidden=false;$('#replay-home').hidden=true;if(localStorage.getItem('pool-masters:music')==='1')music.setEnabled(true);state.paintMusic?.();$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#game').classList.remove('focus');$('#focus-table').textContent='Focus table';$('#messages').innerHTML='';$('#room-sidebar').hidden=false;$('#practice-record').hidden=true;$('#next-rack').hidden=true}
+function showGame(){$('#drill-bar').hidden=true;$('.shot-controls').hidden=false;$('#replay-home').hidden=true;if(localStorage.getItem('pool-masters:music')!=='0')music.setEnabled(true);state.paintMusic?.();$('#lobby').classList.remove('active');$('#game').classList.add('active');$('#game').classList.remove('focus');$('#focus-table').textContent='Focus table';$('#messages').innerHTML='';$('#room-sidebar').hidden=false;$('#practice-record').hidden=true;$('#next-rack').hidden=true}
 async function startCall(){if(!state.room)return;try{if(!state.media){state.media=state.room.media();state.media.onStream((_,s)=>{$('#remote-video').srcObject=s;$('#video-panel').classList.add('live')});state.media.onLeave(()=>{$('#remote-video').srcObject=null});const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#local-video').srcObject=stream;await state.media.start(stream);$('#call').textContent='End call';return}state.media.stop();state.media=null;$('#local-video').srcObject=null;$('#remote-video').srcObject=null;$('#call').textContent='Start call'}catch{toast('Camera or microphone unavailable')}}
 async function leaveRoom(push=true){music.setEnabled(false);state.paintMusic?.();if(state.game&&state.room?.isHost)await persistMatch(snapshotOf(state.game),true);clearTimeout(state.saveTimer);state.saveTimer=null;state.game?.destroy();state.game=null;state.media?.stop();state.media=null;state.net?.close?.();state.net=null;state.peers.clear();state.unsubs.splice(0).forEach(fn=>fn?.());const oldRoom=state.room;state.room=null;state.mode='lobby';if(state.previewedTable){state.previewedTable=false;await viewManager.applyTablePrefs(tablePrefs.size,tablePrefs.felt,{fresh:false,remote:true})};$('#game').classList.remove('active');$('#lobby').classList.add('active');if(push)history.pushState({},'',location.pathname);if(oldRoom)await oldRoom.leave().catch(()=>{});await refresh()}
 // Registered after boot so it never delays first paint, and only in a build:
