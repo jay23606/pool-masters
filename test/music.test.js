@@ -85,3 +85,60 @@ test('a browser that blocks autoplay gets the real song on the first touch, not 
   m.setEnabled(false)
  }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio;globalThis.addEventListener=realAdd}
 })
+
+// twenty different songs, four artists, as one page of a search would return
+const page=n=>Array.from({length:20},(_,i)=>({source:'jamendo',url:`https://example.test/p${n}-${i}.mp3`,duration:120000,license:'by',title:`Song ${n}-${i}`,creator:`Artist ${i%4}`,foreign_landing_url:`https://example.test/p${n}-${i}`}))
+
+test('each song comes from a fresh genre: the radio never plays out the rest of one page in a row',async()=>{
+ const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ const queries=[];let calls=0
+ globalThis.fetch=url=>{queries.push(new URL(url).searchParams.get('q'));return Promise.resolve({ok:true,json:async()=>({results:page(++calls)})})}
+ const audios=[]
+ globalThis.Audio=class{constructor(src){this.src=src;this.volume=1;audios.push(this)}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+ try{
+  const m=createMusic();m.setEnabled(true);await tick(30)
+  for(let i=0;i<7;i++){audios.at(-1).onended();await tick(30)}
+  m.setEnabled(false)
+  assert.equal(audios.length,8,'eight songs played')
+  assert.equal(queries.length,8,'and each one asked for its own search, not the leftovers of the last')
+  assert.ok(new Set(queries).size>=6,`different genres (${new Set(queries).size} of 8)`)
+  const pages=audios.map(a=>a.src.match(/p(\d+)-/)[1]);assert.equal(new Set(pages).size,8,'no two songs from the same page')
+  assert.equal(new Set(audios.map(a=>a.src)).size,8,'no repeats')
+ }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
+})
+
+test('the same artist is not played twice in a row when the page offers anyone else',async()=>{
+ const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ const creators={};let calls=0
+ globalThis.fetch=()=>{const p=page(++calls);p.forEach(t=>{creators[t.url]=t.creator});return Promise.resolve({ok:true,json:async()=>({results:p})})}
+ const audios=[]
+ globalThis.Audio=class{constructor(src){this.src=src;this.volume=1;audios.push(this)}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+ try{
+  const m=createMusic();m.setEnabled(true);await tick(30)
+  for(let i=0;i<12;i++){audios.at(-1).onended();await tick(30)}
+  m.setEnabled(false)
+  const artists=audios.map(a=>creators[a.src])
+  for(let i=1;i<artists.length;i++)assert.notEqual(artists[i],artists[i-1],`songs ${i} and ${i+1} are by ${artists[i]}`)
+ }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
+})
+
+test('the volume slider is only offered when the device honours it, and always on the synth',async()=>{
+ const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio
+ globalThis.window={AudioContext:fakeAudioContextClass()}
+ globalThis.fetch=()=>Promise.resolve({ok:true,json:async()=>({results:page(1)})})
+ // an iPhone: the element takes any value and reports the device level
+ globalThis.Audio=class{constructor(){this._v=1}get volume(){return this._v}set volume(_v){/* ignored */}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+ try{
+  const m=createMusic();assert.equal(m.volumeAdjustable,true,'nothing playing: nothing to say')
+  m.setEnabled(true);await tick(30)
+  assert.equal(m.volumeAdjustable,false,'a real song on a phone that ignores element volume')
+  m.setEnabled(false)
+  globalThis.Audio=class{constructor(){this.volume=1}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+  const n=createMusic();n.setEnabled(true);await tick(30);assert.equal(n.volumeAdjustable,true,'a browser that honours it');n.setVolume(.4);n.setEnabled(false)
+  globalThis.fetch=()=>Promise.reject(new Error('offline'))
+  globalThis.Audio=class{constructor(){this._v=1}get volume(){return this._v}set volume(_v){}}
+  const s=createMusic();s.setEnabled(true);await tick(30);assert.equal(s.volumeAdjustable,true,'the synth is adjustable through Web Audio, whatever the element does');s.setEnabled(false)
+ }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
+})
