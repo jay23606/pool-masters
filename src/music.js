@@ -33,16 +33,24 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
- let stream=null,loading=false,remoteTitle='',remoteCredit='',remoteCreator='',remoteLicense='',queue=[],duckTimer
+ let stream=null,loading=false,remoteTitle='',remoteCredit='',remoteCreator='',remoteLicense='',lastCreator='',duckTimer
  const played=[],playedSet=new Set();let searchBag=[]
  const listeners=new Set()
  // Jamendo's music collection provides actual tracks; general Openverse audio
  // results also include pets, ambience, and sound effects.
- const searches=['indie rock','folk','hip hop','electronic','soul','jazz','latin','pop','vocal','ambient','funk','piano','blues','reggae','rock','acoustic','lofi','house','synthwave','classical','country','r&b','disco','world','chillout','trip hop','swing','bossa nova','punk','metal','techno','gospel','ska','dub','singer songwriter','instrumental']
+ const searches=['indie rock','folk','hip hop','electronic','soul','jazz','latin','pop','vocal','ambient','funk','piano','blues','reggae','rock','acoustic','lofi','house','synthwave','classical','country','r&b','disco','world','chillout','trip hop','swing','bossa nova','punk','metal','techno','gospel','ska','dub','singer songwriter','instrumental','chill','dance','new age','celtic','flamenco','indie pop','alternative','post rock','downtempo','soundtrack','cinematic','folk rock','electro swing','breakbeat','hip-hop instrumental','jazz fusion','world music','experimental','bluegrass','trance','drum and bass','soft rock','psychedelic']
  const shuffled=items=>{const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]]}return out}
  const nextSearch=()=>{if(!searchBag.length)searchBag=shuffled(searches);return searchBag.pop()}
  const remember=track=>{const id=track.foreign_landing_url||track.url;if(playedSet.has(id))return;played.push(id);playedSet.add(id);if(played.length>80)playedSet.delete(played.shift())}
  const current=()=>MUSIC_PRESETS[index]
+ // Some phones (iPhones) ignore an audio element's volume: it stays at the device's level whatever is set.
+ // The slider is only honest when the setting sticks, so it is tested once and reported.
+ let elementVolume=null
+ const elementVolumeWorks=()=>{
+  if(elementVolume!=null)return elementVolume
+  try{if(typeof Audio!=='function')return true;const a=new Audio();a.volume=.5;elementVolume=a.volume===.5}catch{elementVolume=true}
+  return elementVolume
+ }
  const context=()=>{
   if(ctx)return ctx
   const C=window.AudioContext||window.webkitAudioContext
@@ -135,7 +143,6 @@ export function createMusic(){
  }
  async function startRadio(){
   if(!enabled||stream||loading)return
-  const next=queue.pop();if(next)return playTrack(next)
   loading=true
   try{
    // A different genre each time, and a random page of it, so the catalogue is a few
@@ -151,14 +158,17 @@ export function createMusic(){
      candidates=(data.results||[]).filter(track=>track.source==='jamendo'&&track.url?.startsWith('https://')&&track.duration>=90000&&['by','by-sa'].includes(track.license))
     }catch{/* try the next genre */}
    }
-   // Do not replay a song until 80 other selections have been remembered.
-   queue=shuffled(candidates.filter(track=>!playedSet.has(track.foreign_landing_url||track.url)))
-   if(!queue.length)queue=shuffled(candidates)
-   if(queue.length)playTrack(queue.pop());else startSynth()
+   // One song from each fresh search, never the rest of that page: playing a whole page in a row is
+   // twenty songs of one genre, which sounds like a small mix. Not a song heard in the last 80, and not
+   // the artist who has just played, unless that leaves nothing.
+   const unheard=candidates.filter(track=>!playedSet.has(track.foreign_landing_url||track.url))
+   const fresh=unheard.filter(track=>track.creator!==lastCreator)
+   const pick=shuffled(fresh.length?fresh:unheard.length?unheard:candidates)[0]
+   if(pick){lastCreator=pick.creator;playTrack(pick)}else startSynth()
   }catch{startSynth()}finally{loading=false}
  }
  return {
-  get enabled(){return enabled},get title(){return remoteTitle||current().name},get credit(){return remoteCredit},get lyric(){return current().lyric},get volume(){return volume},
+  get enabled(){return enabled},get title(){return remoteTitle||current().name},get credit(){return remoteCredit},get lyric(){return current().lyric},get volume(){return volume},get volumeAdjustable(){return !stream||elementVolumeWorks()},
   onTrack(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   setEnabled(value){enabled=!!value;if(enabled)startRadio();else stop()},
   setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(stream)stream.volume=volume;if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},

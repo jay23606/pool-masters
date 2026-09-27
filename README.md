@@ -53,8 +53,10 @@ room sidebar and give the table more space.
 Pool Masters Radio streams real, actually-licensed tracks (CC BY / BY-SA,
 fetched from Jamendo via the Openverse API) rather than a fixed playlist. It is on
 by default at 20% volume (turn it off or change the volume and that choice is kept),
-picks from 36 genres and a random page of each, so the mix is thousands of tracks,
-and never repeats a song until 80 others have played. A failed request is retried on
+asks for a fresh genre (of 59) and a random page for every song and plays one track from it (never the rest of that page, which
+would be twenty songs of one genre, and never the artist who has just played), so the mix is thousands of tracks,
+and never repeats a song until 80 others have played. Some phones (iPhones) ignore an audio element's volume, so
+the volume slider is hidden while a real song plays there, and the button's tooltip says to use the device's own buttons. A failed request is retried on
 other genres; a browser that blocks autoplay gets the song on your first tap. Only if
 no real track can be had does it fall back to the procedurally-generated station
 catalogue (`src/music.js`'s 48 `MUSIC_PRESETS`, the pool-themed loops), and it tries
