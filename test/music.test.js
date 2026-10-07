@@ -158,7 +158,7 @@ test('a stream routed through Web Audio keeps the volume slider on devices that 
  }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
 })
 
-test('a desktop stream keeps its native volume in sync even when Web Audio is attached',async()=>{
+test('a stream routed through Web Audio leaves the native element at full level for one gain-controlled path',async()=>{
  const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio
  const Context=fakeAudioContextClass();Context.prototype.createMediaElementSource=()=>({connect(){},disconnect(){}})
  globalThis.window={AudioContext:Context};globalThis.fetch=()=>Promise.resolve({ok:true,json:async()=>({results:[oneTrack]})})
@@ -166,7 +166,7 @@ test('a desktop stream keeps its native volume in sync even when Web Audio is at
  globalThis.Audio=class{constructor(){this.volume=1;audios.push(this)}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
  try{
   const m=createMusic();m.setEnabled(true);await tick(30);m.setVolume(.42)
-  assert.equal(audios[0].volume,.42,'the platform media path receives the new slider value')
+  assert.equal(audios[0].volume,1,'the graph is the single volume control when it is attached')
   m.setEnabled(false)
  }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
 })
