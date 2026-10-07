@@ -15,7 +15,7 @@ import {createRecorder,ballsAt,duration} from './replay.js'
 import {buildBalls,evaluate,resultOf,REASONS} from './drills.js'
 import {begin as beginChallenge,startClock,judge as judgeChallenge,timedOut,timeUp,scatter,byId as challengeById,timeLeft,clearTime,HEAD_SPOT} from './challenges.js'
 export {shotSpeed}
-export const aimStep=(aim,previous,current,sensitivity=.3)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*sensitivity
+export const aimStep=(aim,previous,current,sensitivity=.5)=>aim+Math.atan2(Math.sin(current-previous),Math.cos(current-previous))*sensitivity
 export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls[0].x)
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
