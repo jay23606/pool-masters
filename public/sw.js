@@ -1,6 +1,6 @@
 // Deliberately conservative: this app redeploys on every push to main, and a
 // cache-first shell is the classic way to strand players on an old build.
-const VERSION='pool-masters-v4'
+const VERSION='pool-masters-v5'
 const SHELL=['./','./manifest.webmanifest','./icon-192.png','./icon-512.png']
 
 self.addEventListener('install',e=>{
