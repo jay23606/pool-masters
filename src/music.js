@@ -33,7 +33,7 @@ export const MUSIC_PRESETS=moods.flatMap(([name,scale,bpm,wave,lead])=>[0,1,2,3]
 
 export function createMusic(){
  let ctx,master,limiter,enabled=false,volume=1,index=Math.floor(Math.random()*MUSIC_PRESETS.length),timer,step=0
- let stream=null,loading=false,remoteTitle='',remoteCredit='',remoteCreator='',remoteLicense='',lastCreator='',duckTimer
+ let stream=null,streamSource=null,streamGain=null,loading=false,remoteTitle='',remoteCredit='',remoteCreator='',remoteLicense='',lastCreator='',duckTimer
  const played=[],playedSet=new Set();let searchBag=[]
  const listeners=new Set()
  // Jamendo's music collection provides actual tracks; general Openverse audio
@@ -59,6 +59,25 @@ export function createMusic(){
   // Keep the full-volume setting musical when a bass, chord, and lead overlap.
   limiter=ctx.createDynamicsCompressor();limiter.threshold.value=-10;limiter.knee.value=12;limiter.ratio.value=12;limiter.attack.value=.004;limiter.release.value=.16
   master.connect(limiter);limiter.connect(ctx.destination);return ctx
+ }
+ // iOS deliberately ignores HTMLMediaElement.volume.  When a radio stream is
+ // CORS-safe, place it in the same Web Audio graph as the fallback music so
+ // the in-game slider controls it there too.  A stream that cannot join that
+ // graph still plays directly and keeps the browser's normal volume behavior.
+ const attachStreamGain=audio=>{
+  try{
+   const c=context()
+   if(!c?.createMediaElementSource)return false
+   c.resume?.().catch?.(()=>{})
+   const source=c.createMediaElementSource(audio),gain=c.createGain()
+   gain.gain.value=volume;source.connect(gain);gain.connect(limiter)
+   streamSource=source;streamGain=gain
+   return true
+  }catch{return false}
+ }
+ const setStreamVolume=value=>{
+  if(streamGain?.gain){streamGain.gain.cancelScheduledValues?.(ctx.currentTime);streamGain.gain.linearRampToValueAtTime(value,ctx.currentTime+.08)}
+  else if(stream)stream.volume=value
  }
  const note=(at,duration,hz,gain,type,detune=0)=>{
   const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=hz;o.detune.value=detune
@@ -111,6 +130,7 @@ export function createMusic(){
   stopSynth()
   if(stream){
    const old=stream;stream=null
+   streamSource?.disconnect?.();streamGain?.disconnect?.();streamSource=null;streamGain=null
    // Clearing src can emit an error. Detach the callbacks first so replacing a
    // track never starts an extra song in the background.
    old.onended=null;old.onerror=null;old.pause();old.removeAttribute('src');old.load()
@@ -132,7 +152,13 @@ export function createMusic(){
   // here -- disabled media, a locked-down CSP -- has to be handled locally
   // rather than relying on that catch to still be in scope.
   try{
-   const audio=new Audio(track.url);stream=audio;audio.volume=Math.min(1,volume);audio.preload='auto'
+   const audio=new Audio()
+   // Jamendo serves the licensed playback files with CORS enabled.  Setting
+   // this before src lets supported browsers feed the track through the gain
+   // node; if a particular host does not allow it, the normal media fallback
+   // below remains available.
+   audio.crossOrigin='anonymous';audio.src=track.url;stream=audio;audio.volume=Math.min(1,volume);audio.preload='auto'
+   attachStreamGain(audio)
    remember(track)
    remoteTitle=track.title||'Pool Masters Radio';remoteCreator=track.creator||'Unknown artist';remoteLicense=`CC ${track.license?.toUpperCase()}`;remoteCredit=`${remoteCreator} · ${remoteLicense}`
    listeners.forEach(listener=>listener({title:remoteTitle,creator:remoteCreator,license:remoteLicense,url:track.foreign_landing_url||track.url}))
@@ -168,16 +194,16 @@ export function createMusic(){
   }catch{startSynth()}finally{loading=false}
  }
  return {
-  get enabled(){return enabled},get title(){return remoteTitle||current().name},get credit(){return remoteCredit},get lyric(){return current().lyric},get volume(){return volume},get volumeAdjustable(){return !stream||elementVolumeWorks()},
+  get enabled(){return enabled},get title(){return remoteTitle||current().name},get credit(){return remoteCredit},get lyric(){return current().lyric},get volume(){return volume},get volumeAdjustable(){return !stream||Boolean(streamGain)||elementVolumeWorks()},
   onTrack(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   setEnabled(value){enabled=!!value;if(enabled)startRadio();else stop()},
-  setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));if(stream)stream.volume=volume;if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
+  setVolume(value){volume=Math.max(.1,Math.min(1,Number(value)||1));setStreamVolume(volume);if(enabled&&ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.08)},
   duck(ms=1200){
    if(!enabled)return
    clearTimeout(duckTimer)
-   if(stream)stream.volume=Math.min(.22,volume)
+   setStreamVolume(Math.min(.22,volume))
    if(ctx)master.gain.linearRampToValueAtTime(Math.min(.22,volume),ctx.currentTime+.04)
-   duckTimer=setTimeout(()=>{if(stream)stream.volume=volume;if(ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.12)},ms)
+   duckTimer=setTimeout(()=>{setStreamVolume(volume);if(ctx)master.gain.linearRampToValueAtTime(volume,ctx.currentTime+.12)},ms)
   },
   resume(){if(enabled)startRadio()},
   shuffle(){index=(index+1+Math.floor(Math.random()*(MUSIC_PRESETS.length-1)))%MUSIC_PRESETS.length;step=0;remoteTitle='';remoteCredit='';remoteCreator='';remoteLicense='';if(enabled){stop();startRadio()}return current().name},

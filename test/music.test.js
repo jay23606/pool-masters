@@ -142,3 +142,18 @@ test('the volume slider is only offered when the device honours it, and always o
   const s=createMusic();s.setEnabled(true);await tick(30);assert.equal(s.volumeAdjustable,true,'the synth is adjustable through Web Audio, whatever the element does');s.setEnabled(false)
  }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
 })
+
+test('a stream routed through Web Audio keeps the volume slider on devices that ignore media-element volume',async()=>{
+ const realWindow=globalThis.window,realFetch=globalThis.fetch,realAudio=globalThis.Audio
+ const Context=fakeAudioContextClass()
+ Context.prototype.createMediaElementSource=()=>({connect(){},disconnect(){}})
+ globalThis.window={AudioContext:Context}
+ globalThis.fetch=()=>Promise.resolve({ok:true,json:async()=>({results:[oneTrack]})})
+ globalThis.Audio=class{constructor(){this._v=1}get volume(){return this._v}set volume(_v){/* iOS-style ignored setter */}play(){return Promise.resolve()}pause(){}removeAttribute(){}load(){}}
+ try{
+  const m=createMusic();m.setEnabled(true);await tick(30)
+  assert.equal(m.volumeAdjustable,true,'the graph gain, not the ignored element property, controls this stream')
+  m.setVolume(.35);assert.equal(m.volume,.35)
+  m.setEnabled(false)
+ }finally{globalThis.window=realWindow;globalThis.fetch=realFetch;globalThis.Audio=realAudio}
+})

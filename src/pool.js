@@ -19,6 +19,21 @@ export const aimStep=(aim,previous,current,sensitivity=.3)=>aim+Math.atan2(Math.
 export const openingAim=balls=>Math.atan2(balls[1].y-balls[0].y,balls[1].x-balls[0].x)
 export function rayToRail(x,y,dx,dy){const tx=dx>0?(MAXX-x)/dx:dx<0?(MINX-x)/dx:Infinity,ty=dy>0?(MAXY-y)/dy:dy<0?(MINY-y)/dy:Infinity;return Math.max(0,Math.min(tx>=0?tx:Infinity,ty>=0?ty:Infinity))}
 export function bankPath(x,y,dx,dy,bounces=2){const points=[];for(let i=0;i<bounces;i++){const d=rayToRail(x,y,dx,dy),p={x:x+dx*d,y:y+dy*d};points.push(p);if(Math.abs(p.x-MINX)<.1||Math.abs(p.x-MAXX)<.1)dx=-dx;if(Math.abs(p.y-MINY)<.1||Math.abs(p.y-MAXY)<.1)dy=-dy;x=p.x+dx*.05;y=p.y+dy*.05}return points}
+// A simple rectangular cushion has no pocket jaws, so a ball that stops on a
+// mouth lip could otherwise stay visibly pinned there.  Keep the normal
+// centre-of-pocket rule, then accept only a ball already touching a cushion
+// and moving into (or resting in) the very small lip zone.
+export function pocketForBall(b,pockets=POCKETS.map(([x,y])=>({x,y,r:PR})),scale=1){
+ const atRail=b.x<=MINX+.25||b.x>=MAXX-.25||b.y<=MINY+.25||b.y>=MAXY-.25
+ for(let p=0;p<pockets.length;p++){
+  const q=pockets[p],r=q.r*(p<6?scale:1),dx=q.x-b.x,dy=q.y-b.y,d=Math.hypot(dx,dy)
+  if(d<r)return p
+  // Do not widen a moving target: a fast near-miss must still bounce out.
+  // This only cleans up the visibly stuck, essentially motionless case.
+  if(p<6&&atRail&&d<r+R*.4&&Math.hypot(b.vx||0,b.vy||0)<4.5)return p
+ }
+ return -1
+}
 export class PoolGame{
  constructor(o){Object.assign(this,o);this.mode=modeOf(o.mode);this.house=normalizeHouse(o.house);this.breaker='a';this.scoreTarget=this.mode==='straight'?this.house.straightTo:(this.scoreTarget||targetFor(this.mode));this.spectator=Boolean(o.spectator);this.aimSensitivity=o.aimSensitivity??.3;this.aimStep=(a,p,c)=>aimStep(a,p,c,this.aimSensitivity);this.surface=o.surface||o.renderer.el;this.me=this.host?'a':'b';this.round=1;this.ready=this.practice;this.power.value=45;this.bind();this.resetRack();this.simAt=this.drawnAt=performance.now();this.raf=requestAnimationFrame(t=>this.loop(t));this.predictor=createPredictor();this.predicted=null;if(this.host)this.background=setInterval(()=>{if(typeof document!=='undefined'&&document.hidden)this.advance(performance.now())},250);if(this.practice)this.sync()}
  // ---- Rogue Pool (see rogue.js) ----
@@ -328,7 +343,7 @@ export class PoolGame{
    if(!b.on)continue
    if(well&&!airborne(b))wellPull(b,well,dt)
    integrate(b,dt)
-   for(let p=0;p<pockets.length;p++){const q=pockets[p];if(!airborne(b)&&Math.hypot(b.x-q.x,b.y-q.y)<q.r*(p<6?scale:1)){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b));break}}
+   const p=!airborne(b)?pocketForBall(b,pockets,scale):-1;if(p>=0){b.on=false;if(b.k==='cue')this.scratch=true;else{this.potted.push(b);(this.pocketOf??={})[b.n]=p;if(!this.firstObjectPotted&&(b.k==='solid'||b.k==='stripe'))this.firstObjectPotted=b}if(b.k==='eight')this.eightPocket=p;this.flash(this.pottedMessage(b))}
    if(!b.on)continue
    if(railBounce(b)){
     // which balls touched a cushion, and whether the cue did so before it

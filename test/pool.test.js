@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import{PoolGame,shotSpeed,rayToRail,bankPath,aimStep,openingAim}from'../src/pool.js';import{rack}from'../src/rules.js'
+import test from 'node:test';import assert from 'node:assert/strict';import{PoolGame,shotSpeed,rayToRail,bankPath,aimStep,openingAim,pocketForBall}from'../src/pool.js';import{rack}from'../src/rules.js';import{MINY}from'../src/table.js'
 test('a fresh rack is lined up for a one-click opening break',()=>{assert.ok(Math.abs(openingAim(rack()))<.001)})
 test('power curve gives precise low power and a broad range',()=>{assert.ok(shotSpeed(10)<shotSpeed(50));assert.equal(shotSpeed(100),3200)})
 test('guide reflects through two cushions',()=>{const p=bankPath(350,190,1,.25,2);assert.equal(p.length,2);assert.ok(Math.abs(p[0].x-663)<.1);assert.ok(Math.abs(p[1].y-343)<.1)})
@@ -13,6 +13,15 @@ test('aim rotation stays continuous across the angle boundary and through full c
 test('lower aim sensitivity turns the cue more slowly per drag step',()=>{
  const step=sensitivity=>aimStep(0,0,Math.PI/2,sensitivity)
  assert.ok(step(.1)<step(.3));assert.ok(step(.3)<step(.5))
+})
+
+test('a ball caught on a pocket lip is taken instead of remaining pinned on the cushion',()=>{
+ const b={x:370,y:MINY,vx:0,vy:0}
+ assert.equal(pocketForBall(b),1)
+})
+test('the lip guard does not pull an ordinary rail ball into a pocket',()=>{
+ const b={x:390,y:MINY,vx:0,vy:0}
+ assert.equal(pocketForBall(b),-1)
 })
 
 test('an eight-ball pocket cannot be called while a group ball remains',()=>{
