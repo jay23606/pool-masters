@@ -70,14 +70,20 @@ export function createMusic(){
    if(!c?.createMediaElementSource)return false
    c.resume?.().catch?.(()=>{})
    const source=c.createMediaElementSource(audio),gain=c.createGain()
-   gain.gain.value=volume;source.connect(gain);gain.connect(limiter)
+   // Desktop browsers honour mediaElement.volume, which also works if an
+   // extension or platform audio path bypasses this graph.  Phones that
+   // ignore it use the gain node instead.
+   gain.gain.value=elementVolumeWorks()?1:volume;source.connect(gain);gain.connect(limiter)
    streamSource=source;streamGain=gain
    return true
   }catch{return false}
  }
  const setStreamVolume=value=>{
-  if(streamGain?.gain){streamGain.gain.cancelScheduledValues?.(ctx.currentTime);streamGain.gain.linearRampToValueAtTime(value,ctx.currentTime+.08)}
-  else if(stream)stream.volume=value
+  // Keep the native element current on desktops, even when it is also routed
+  // through Web Audio.  This avoids a PWA/extension audio path leaving the
+  // slider visually movable while the audible stream stays at its old level.
+  if(stream)stream.volume=value
+  if(streamGain?.gain){const gain=elementVolumeWorks()?1:value;streamGain.gain.cancelScheduledValues?.(ctx.currentTime);streamGain.gain.linearRampToValueAtTime(gain,ctx.currentTime+.08)}
  }
  const note=(at,duration,hz,gain,type,detune=0)=>{
   const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=hz;o.detune.value=detune

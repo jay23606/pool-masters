@@ -155,7 +155,8 @@ function bind(){
  state.paintMusic=paintMusic
  music.onTrack(track=>{paintMusic();const credit=$('#music-credit');credit.hidden=false;credit.href=track.url;credit.textContent=`♫ ${track.title} — ${track.creator}`;credit.title=`${track.license} · Open the track source`})
  $('#music-toggle').onclick=()=>{music.setEnabled(!music.enabled);localStorage.setItem('pool-masters:music',music.enabled?'1':'0');paintMusic()}
- $('#music-volume').oninput=e=>{music.setVolume(Number(e.target.value)/100);localStorage.setItem('pool-masters:music-volume',music.volume)}
+ const setMusicVolume=e=>{music.setVolume(Number(e.target.value)/100);localStorage.setItem('pool-masters:music-volume',music.volume);paintMusic()}
+ $('#music-volume').oninput=setMusicVolume;$('#music-volume').onchange=setMusicVolume
  $('#music-shuffle').onclick=()=>{const title=music.shuffle();toast(`Now playing: ${title}`);paintMusic()}
  paintMusic()
  $('#view-3d').onclick=()=>viewManager.cycle()
@@ -370,7 +371,7 @@ async function leaveRoom(push=true){music.setEnabled(false);state.paintMusic?.()
 // Registered after boot so it never delays first paint, and only in a build:
 // a worker in dev would just cache things you are actively editing.
 if(import.meta.env.PROD&&'serviceWorker'in navigator)
- addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('service worker not registered',e)))
+ addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(e=>console.warn('service worker not registered',e)))
 
 // For driving the running app from a browser test. Vite replaces this with
 // false in a production build, so none of it ships.
